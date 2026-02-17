@@ -1,4 +1,5 @@
-# Any Markdown - WYSIWYG Markdown Editor for VS Code
+<img src="media/icon.png" alt="Any Markdown" width="48" align="absmiddle"> Any Markdown - WYSIWYG Markdown Editor for VS Code
+=
 
 A seamless WYSIWYG markdown editor for VS Code inspired by Typora, Notion, and Obsidian. Experience smooth markdown editing with live preview - what you see is what you get!
 
