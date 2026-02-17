@@ -8242,7 +8242,7 @@
                     const p = document.createElement('p');
                     p.innerHTML = currentLine.innerHTML || '<br>';
                     currentLine.replaceWith(p);
-                    setCursorToEnd(p);
+                    setCursorToStart(p);
                     syncMarkdown();
                     return;
                 }
