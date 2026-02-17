@@ -2,7 +2,7 @@
   "name": "any-markdown",
   "displayName": "Any Markdown Editor",
   "description": "A WYSIWYG markdown editor for VS Code with seamless live preview",
-  "version": "0.195.207",
+  "version": "0.195.209",
   "publisher": "imaken",
   "icon": "media/icon.png",
   "license": "MIT",
@@ -18,7 +18,20 @@
     "vscode": "^1.85.0"
   },
   "categories": [
-    "Other"
+    "Programming Languages",
+    "Formatters",
+    "Visualization"
+  ],
+  "keywords": [
+    "markdown",
+    "wysiwyg",
+    "editor",
+    "live preview",
+    "mermaid",
+    "typora",
+    "notion",
+    "table",
+    "rich text"
   ],
   "activationEvents": [],
   "main": "./out/extension.js",

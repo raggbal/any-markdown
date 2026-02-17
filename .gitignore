@@ -9,6 +9,7 @@ dist/
 .cursor/
 .kiro/
 .claude/
+.vscode/
 
 # Test artifacts
 test-results/

@@ -741,16 +741,15 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
             
             // Get the image directory from settings/directive
             const imageDir = imageDirectoryManager.getImageDirectory(document.uri, document.getText());
-            
+
+            try {
             // Ensure the directory exists
             ensureDirectoryExists(imageDir);
-            
+
             // Always generate unique filename using timestamp format
             const ext = path.extname(sourcePath).slice(1) || 'png'; // Remove leading dot
             const fileName = generateUniqueFileName(imageDir, ext);
             const destPath = path.join(imageDir, fileName);
-            
-            try {
                 // Copy the image with new name
                 fs.copyFileSync(sourcePath, destPath);
                 
@@ -780,20 +779,19 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
         
         // Get the image directory from settings/directive
         const imageDir = imageDirectoryManager.getImageDirectory(document.uri, document.getText());
-        
+
+        try {
         // Ensure the directory exists
         ensureDirectoryExists(imageDir);
-        
+
         // Always generate unique filename using timestamp format
         const extension = this.getImageExtension(dataUrl);
         const imageName = generateUniqueFileName(imageDir, extension);
         const imagePath = path.join(imageDir, imageName);
-        
+
         // Convert data URL to buffer
         const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, '');
         const imageBuffer = Buffer.from(base64Data, 'base64');
-        
-        try {
             // Write the file
             fs.writeFileSync(imagePath, imageBuffer);
             console.log('[DEBUG] Image saved to:', imagePath);
