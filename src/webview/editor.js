@@ -8070,10 +8070,10 @@
                                     prevElement.appendChild(tempDiv.firstChild);
                                 }
                             }
-                            
+
                             // Remove current paragraph
                             currentLine.remove();
-                            
+
                             // Set cursor position
                             if (cursorNode && cursorNode.nodeType === 3) {
                                 const newRange = document.createRange();
@@ -8081,6 +8081,9 @@
                                 newRange.collapse(true);
                                 sel.removeAllRanges();
                                 sel.addRange(newRange);
+                            } else if (isPrevEmpty) {
+                                // Previous paragraph was empty - cursor should be at start of merged content
+                                setCursorToStart(prevElement);
                             } else {
                                 setCursorToEnd(prevElement);
                             }
