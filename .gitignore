@@ -1,0 +1,27 @@
+node_modules/
+out/
+dist/
+*.vsix
+.vscode-test/
+.DS_Store
+
+# Development tools
+.cursor/
+.kiro/
+
+# Test artifacts
+test-results/
+playwright-report/
+
+# Temporary files
+*.log
+*.tmp
+
+# OS files
+Thumbs.db
+
+# Sample and documentation files (not needed for extension)
+samples/
+docs/
+images/
+images2/

@@ -1,0 +1,10 @@
+{
+    "any-md.imageDefaultDir": "/Users/imaken/pg_prod/vscode-md/images",
+    "any-md.forceRelativeImagePath": true,
+    "any-md.language": "ja",
+    "any-md.theme": "dark",
+    "any-md.enableDebugLogging": true,
+    "any-md.fontSize": 16,
+    "any-md.lineNumbers": true   
+}
+

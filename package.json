@@ -1,0 +1,207 @@
+{
+  "name": "any-markdown",
+  "displayName": "Any Markdown Editor",
+  "description": "A WYSIWYG markdown editor for VS Code with seamless live preview",
+  "version": "0.195.186",
+  "publisher": "imaken",
+  "icon": "media/icon.png",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/raggbal/any-markdown"
+  },
+  "bugs": {
+    "url": "https://github.com/raggbal/any-markdown/issues"
+  },
+  "homepage": "https://github.com/raggbal/any-markdown#readme",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "any-md.openEditor",
+        "title": "Open with Any Markdown Editor",
+        "category": "Any MD"
+      },
+      {
+        "command": "any-md.exportToPdf",
+        "title": "Export to PDF",
+        "category": "Any MD"
+      },
+      {
+        "command": "any-md.insertTable",
+        "title": "Insert Table",
+        "category": "Any MD"
+      },
+      {
+        "command": "any-md.insertToc",
+        "title": "Insert Table of Contents",
+        "category": "Any MD"
+      },
+      {
+        "command": "any-md.openAsText",
+        "title": "Open as Text Editor",
+        "category": "Any MD"
+      },
+      {
+        "command": "any-md.compareAsText",
+        "title": "Compare as Text",
+        "category": "Any MD"
+      }
+    ],
+    "customEditors": [
+      {
+        "viewType": "any-md.editor",
+        "displayName": "Any Markdown",
+        "selector": [
+          {
+            "filenamePattern": "*.md"
+          },
+          {
+            "filenamePattern": "*.markdown"
+          }
+        ],
+        "priority": "option"
+      }
+    ],
+    "configuration": {
+      "title": "Any Markdown",
+      "properties": {
+        "any-md.autoSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Auto-save changes"
+        },
+        "any-md.theme": {
+          "type": "string",
+          "enum": [
+            "github",
+            "sepia",
+            "night",
+            "dark",
+            "minimal"
+          ],
+          "default": "github",
+          "description": "Editor theme"
+        },
+        "any-md.fontSize": {
+          "type": "number",
+          "default": 16,
+          "description": "Base font size in pixels"
+        },
+        "any-md.lineNumbers": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show line numbers in code blocks"
+        },
+        "any-md.autoPair": {
+          "type": "boolean",
+          "default": true,
+          "description": "Auto-pair brackets and markdown symbols"
+        },
+        "any-md.imageDefaultDir": {
+          "type": "string",
+          "default": "",
+          "description": "画像保存のデフォルトディレクトリ。空の場合はMarkdownファイルと同じディレクトリを使用。絶対パス（/path/to/dir）または相対パス（./images、images/）を指定可能。"
+        },
+        "any-md.forceRelativeImagePath": {
+          "type": "boolean",
+          "default": false,
+          "description": "画像パスを常に相対パスで挿入します。絶対パスでimageDefaultDirを指定した場合でも、Markdownには相対パスが挿入されます。"
+        },
+        "any-md.language": {
+          "type": "string",
+          "enum": [
+            "default",
+            "en",
+            "ja",
+            "zh-TW",
+            "zh-CN",
+            "ko",
+            "es",
+            "fr"
+          ],
+          "default": "default",
+          "description": "UI language. 'default' uses VS Code's display language. / UI言語。'default'はVS Codeの表示言語を使用します。"
+        },
+        "any-md.enableDebugLogging": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable debug logging in the editor. Useful for troubleshooting. / エディタのデバッグログを有効にします。トラブルシューティングに便利です。"
+        }
+      }
+    },
+    "menus": {
+      "editor/context": [
+        {
+          "command": "any-md.insertTable",
+          "when": "resourceLangId == markdown",
+          "group": "anymd"
+        },
+        {
+          "command": "any-md.insertToc",
+          "when": "resourceLangId == markdown",
+          "group": "anymd"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "any-md.openAsText",
+          "when": "resourceLangId == markdown",
+          "group": "navigation@99"
+        },
+        {
+          "command": "any-md.compareAsText",
+          "when": "resourceLangId == markdown",
+          "group": "3_compare"
+        }
+      ],
+      "editor/title/context": [
+        {
+          "command": "any-md.openAsText",
+          "when": "resourceLangId == markdown",
+          "group": "navigation"
+        }
+      ]
+    },
+    "keybindings": []
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./ && node build-locales.js && mkdir -p out/webview && cp src/webview/*.js src/webview/*.css out/webview/",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "package": "vsce package",
+    "test:build": "node test/build-standalone.js",
+    "test:e2e": "npm run test:build && playwright test",
+    "test:e2e:ui": "npm run test:build && playwright test --ui",
+    "test:serve": "npx serve test/html -p 3000",
+    "build:locales": "node build-locales.js"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.1",
+    "@types/node": "^20.10.0",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^6.13.0",
+    "@typescript-eslint/parser": "^6.13.0",
+    "eslint": "^8.55.0",
+    "jsdom": "^27.4.0",
+    "serve": "^14.2.5",
+    "typescript": "^5.3.0"
+  },
+  "dependencies": {
+    "highlight.js": "^11.9.0",
+    "katex": "^0.16.9",
+    "marked": "^11.1.0",
+    "mermaid": "^10.6.0",
+    "turndown": "^7.2.2",
+    "turndown-plugin-gfm": "^1.0.2"
+  }
+}
