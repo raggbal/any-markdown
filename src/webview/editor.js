@@ -950,8 +950,8 @@
                         if (!trimmedContent || trimmedContent === '') {
                             codeHtml = '<br>';
                         } else {
-                            // Add <br> at the end to preserve the structure
-                            codeHtml = escapeHtml(trimmedContent).replace(/\n/g, '<br>') + '<br>';
+                            // No trailing <br> for non-empty code blocks (requirement 9A-21)
+                            codeHtml = escapeHtml(trimmedContent).replace(/\n/g, '<br>');
                         }
                         if (codeLang === 'mermaid') {
                             // Mermaid: wrap in container with both code and diagram placeholder
