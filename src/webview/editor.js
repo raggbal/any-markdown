@@ -9592,6 +9592,12 @@
     window.addEventListener('message', function(event) {
         const message = event.data;
         if (message.type === 'update') {
+            // Skip if content hasn't changed (safety net for any remaining bounce-backs)
+            if (message.content === markdown) {
+                logger.log('Skipping update: content unchanged');
+                return;
+            }
+            logger.log('Accepting external update');
             markdown = message.content;
             // Update currentImageDir from new content
             currentImageDir = extractImageDirFromMarkdown(markdown);

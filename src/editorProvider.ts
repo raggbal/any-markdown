@@ -419,20 +419,36 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
         // Initialize IMAGE_DIR tracking
         imageDirectoryManager.initializeForDocument(document.uri, document.getText());
 
-        // Track if we're updating from webview
-        let isUpdatingFromWebview = false;
+        // lastContentFromWebview: bounce-back detection for webview edits
+        let lastContentFromWebview: string | null = null;
 
-        // Listen for document changes (from VS Code internal edits)
+        // Listen for document changes — single path for ALL webview messaging
         const changeDocumentSubscription = vscode.workspace.onDidChangeTextDocument(e => {
-            if (e.document.uri.toString() === document.uri.toString() && !isUpdatingFromWebview) {
-                const content = convertImagePaths(document.getText());
+            if (e.document.uri.toString() === document.uri.toString()) {
+                const currentContent = document.getText();
+                // Skip bounce-back from webview's own edit (latest or currently being applied)
+                if (currentContent === lastContentFromWebview || currentContent === contentBeingApplied) {
+                    return;
+                }
+                // Skip VS Code normalization events (e.g. trailing newline added after applyEdit)
+                if (Date.now() - lastApplyEditTime < 500) {
+                    lastContentFromWebview = currentContent;
+                    return;
+                }
+                // This is a genuine external change — cancel any pending webview edit
+                pendingContent = null;
+                if (editDebounceTimer) {
+                    clearTimeout(editDebounceTimer);
+                    editDebounceTimer = null;
+                }
+                const content = convertImagePaths(currentContent);
                 webviewPanel.webview.postMessage({
                     type: 'update',
                     content: content
                 });
-                
-                // Check for IMAGE_DIR changes (only when not updating from webview, i.e., external edit)
-                if (imageDirectoryManager.checkAndWarnIfChanged(document.uri, document.getText())) {
+
+                // Check for IMAGE_DIR changes (external edit)
+                if (imageDirectoryManager.checkAndWarnIfChanged(document.uri, currentContent)) {
                     vscode.window.showInformationMessage(
                         t('imageDirChanged'),
                         t('reload')
@@ -446,47 +462,34 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
             }
         });
 
-        // Listen for file system changes (from external editors)
+        // Listen for file system changes (from external editors like Claude)
+        // This ONLY syncs the VS Code document; messaging is handled by onDidChangeTextDocument
         const fileWatcher = vscode.workspace.createFileSystemWatcher(
             new vscode.RelativePattern(vscode.Uri.joinPath(document.uri, '..'), path.basename(document.uri.fsPath))
         );
-        
+
         const fileChangeSubscription = fileWatcher.onDidChange(async (uri) => {
-            if (uri.toString() === document.uri.toString() && !isUpdatingFromWebview) {
-                // File was changed externally, reload the document content
-                // VS Code may not have updated the TextDocument yet, so we need to wait a bit
+            if (uri.toString() === document.uri.toString()) {
                 setTimeout(async () => {
                     try {
-                        // Re-read the file content
                         const fileContent = await vscode.workspace.fs.readFile(uri);
                         const newContent = new TextDecoder().decode(fileContent);
                         const currentContent = document.getText();
-                        
-                        // Only update if content actually changed
+
                         if (newContent !== currentContent) {
-                            const convertedContent = convertImagePaths(newContent);
-                            webviewPanel.webview.postMessage({
-                                type: 'update',
-                                content: convertedContent
-                            });
-                            
-                            // Check for IMAGE_DIR changes
-                            if (imageDirectoryManager.checkAndWarnIfChanged(document.uri, newContent)) {
-                                vscode.window.showInformationMessage(
-                                    t('imageDirChanged'),
-                                    t('reload')
-                                ).then(selection => {
-                                    if (selection === t('reload')) {
-                                        updateWebview();
-                                        imageDirectoryManager.initializeForDocument(document.uri, newContent);
-                                    }
-                                });
-                            }
+                            // Sync VS Code document with file content (triggers onDidChangeTextDocument)
+                            const fullRange = new vscode.Range(
+                                document.positionAt(0),
+                                document.positionAt(currentContent.length)
+                            );
+                            const edit = new vscode.WorkspaceEdit();
+                            edit.replace(document.uri, fullRange, newContent);
+                            await vscode.workspace.applyEdit(edit);
                         }
                     } catch (error) {
                         console.error('[Any MD] Error reading file after external change:', error);
                     }
-                }, 100); // Small delay to ensure file write is complete
+                }, 100);
             }
         });
 
@@ -505,16 +508,20 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
         let pendingContent: string | null = null;
         let isApplyingEdit = false;
         let editDebounceTimer: NodeJS.Timeout | null = null;
-        
+        // Track content currently being applied to detect bounce-backs during race conditions
+        let contentBeingApplied: string | null = null;
+        // Cooldown after applyEdit to suppress VS Code normalization events
+        let lastApplyEditTime = 0;
+
         const applyPendingEdit = async () => {
             if (isApplyingEdit || pendingContent === null) return;
-            
+
             isApplyingEdit = true;
             const content = pendingContent;
             pendingContent = null;
-            
+            contentBeingApplied = content;
+
             try {
-                isUpdatingFromWebview = true;
                 const edit = new vscode.WorkspaceEdit();
                 edit.replace(
                     document.uri,
@@ -526,11 +533,15 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
                 // Ignore edit errors (e.g., file changed in the meantime)
                 console.log('Edit error (ignored):', e);
             } finally {
-                isUpdatingFromWebview = false;
                 isApplyingEdit = false;
+                contentBeingApplied = null;
+                // Record time so normalization events from VS Code are suppressed
+                lastApplyEditTime = Date.now();
+                // Sync with actual document content (VS Code may normalize content, e.g. trailing newline)
+                lastContentFromWebview = document.getText();
                 // Process any pending edit that came in while we were applying
                 if (pendingContent !== null) {
-                    setTimeout(applyPendingEdit, 100); // Increased from 50ms
+                    setTimeout(applyPendingEdit, 100);
                 }
             }
         };
@@ -552,6 +563,8 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
         webviewPanel.webview.onDidReceiveMessage(async message => {
             switch (message.type) {
                 case 'edit':
+                    // Track content from webview to detect bounce-backs in onDidChangeTextDocument
+                    lastContentFromWebview = message.content;
                     // Queue the edit with debouncing for better performance
                     scheduleEdit(message.content);
                     break;

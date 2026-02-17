@@ -328,7 +328,3 @@ MIT License - feel free to use this extension in your projects.
 
 - Inspired by [Typora](https://typora.io/), [Notion](https://notion.so/), and [Obsidian](https://obsidian.md/)
 - Built with love for the VS Code community
-
----
-IMAGE_DIR: ./assets/images
-FORCE_RELATIVE_PATH: true
