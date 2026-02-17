@@ -6407,6 +6407,8 @@
                                             }
                                         }
                                     }, 0);
+                                } else if (prev.tagName.toLowerCase() === 'blockquote') {
+                                    setCursorToBlockLastLineStart(prev);
                                 } else {
                                     setCursorToEnd(prev);
                                 }
@@ -6441,6 +6443,8 @@
                                             }
                                         }
                                     }, 0);
+                                } else if (prev.tagName.toLowerCase() === 'blockquote') {
+                                    setCursorToBlockLastLineStart(prev);
                                 } else {
                                     setCursorToEnd(prev);
                                 }
