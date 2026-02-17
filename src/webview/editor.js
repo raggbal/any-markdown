@@ -8124,8 +8124,18 @@
                                     // Append paragraph content to code block
                                     const codeEl = prevElement.querySelector('code');
                                     if (codeEl) {
-                                        // Add the paragraph content as a new line
-                                        if (codeEl.lastChild && codeEl.lastChild.nodeName !== 'BR') {
+                                        // Remove trailing empty text nodes and trailing <br>
+                                        while (codeEl.lastChild) {
+                                            if (codeEl.lastChild.nodeType === 3 && codeEl.lastChild.textContent === '') {
+                                                codeEl.lastChild.remove();
+                                            } else if (codeEl.lastChild.nodeName === 'BR') {
+                                                codeEl.lastChild.remove();
+                                            } else {
+                                                break;
+                                            }
+                                        }
+                                        // Add exactly one <br> as line separator, then the content
+                                        if (codeEl.lastChild) {
                                             codeEl.appendChild(document.createElement('br'));
                                         }
                                         codeEl.appendChild(document.createTextNode(currentContent));
