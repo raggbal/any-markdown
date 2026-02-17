@@ -8216,6 +8216,102 @@
                             syncMarkdown();
                             return;
                         }
+
+                        // If previous element is a heading, blockquote, or other block element,
+                        // merge paragraph content into it (similar to p+p merge)
+                        if (/^h[1-6]$/.test(prevTag) || prevTag === 'blockquote' || prevTag === 'table') {
+                            e.preventDefault();
+
+                            const currentContent = currentLine.innerHTML === '<br>' ? '' : currentLine.innerHTML;
+                            const isCurrentEmpty = !currentContent || currentContent === '';
+
+                            if (isCurrentEmpty) {
+                                // Empty paragraph - just remove it and move cursor to end of previous element
+                                currentLine.remove();
+                                setCursorToEnd(prevElement);
+                                syncMarkdown();
+                                return;
+                            }
+
+                            // For table, just move cursor to last cell
+                            if (prevTag === 'table') {
+                                setCursorToEnd(prevElement);
+                                return;
+                            }
+
+                            // For blockquote, merge paragraph content as a new line in the blockquote
+                            if (prevTag === 'blockquote') {
+                                // Add <br> then paragraph content to blockquote
+                                const lastChild = prevElement.lastChild;
+                                if (lastChild && lastChild.nodeName !== 'BR') {
+                                    prevElement.appendChild(document.createElement('br'));
+                                }
+                                // Mark cursor position
+                                const cursorMarker = document.createTextNode('');
+                                prevElement.appendChild(cursorMarker);
+
+                                // Append paragraph content
+                                const tempDiv2 = document.createElement('div');
+                                tempDiv2.innerHTML = currentContent;
+                                while (tempDiv2.firstChild) {
+                                    prevElement.appendChild(tempDiv2.firstChild);
+                                }
+
+                                currentLine.remove();
+
+                                // Set cursor at the start of appended content
+                                const newRange = document.createRange();
+                                newRange.setStartAfter(cursorMarker);
+                                newRange.collapse(true);
+                                sel.removeAllRanges();
+                                sel.addRange(newRange);
+                                // Clean up empty marker
+                                if (cursorMarker.parentNode) cursorMarker.remove();
+
+                                syncMarkdown();
+                                return;
+                            }
+
+                            // For headings: merge paragraph content into heading
+                            // Mark cursor position at end of heading's current content
+                            const prevContent = prevElement.innerHTML === '<br>' ? '' : prevElement.innerHTML;
+                            const isPrevEmpty = !prevContent || prevContent === '';
+
+                            // Remove trailing <br> from heading
+                            if (prevElement.lastChild && prevElement.lastChild.nodeType === 1 &&
+                                prevElement.lastChild.tagName.toLowerCase() === 'br') {
+                                prevElement.lastChild.remove();
+                            }
+
+                            let cursorNode = prevElement.lastChild;
+                            let cursorOffset = cursorNode && cursorNode.nodeType === 3 ? cursorNode.textContent.length : 0;
+
+                            // Append current paragraph content
+                            const tempDiv = document.createElement('div');
+                            tempDiv.innerHTML = currentContent;
+                            while (tempDiv.firstChild) {
+                                prevElement.appendChild(tempDiv.firstChild);
+                            }
+
+                            // Remove current paragraph
+                            currentLine.remove();
+
+                            // Set cursor position
+                            if (!isPrevEmpty && cursorNode && cursorNode.nodeType === 3) {
+                                const newRange = document.createRange();
+                                newRange.setStart(cursorNode, cursorOffset);
+                                newRange.collapse(true);
+                                sel.removeAllRanges();
+                                sel.addRange(newRange);
+                            } else if (isPrevEmpty) {
+                                setCursorToStart(prevElement);
+                            } else {
+                                setCursorToEnd(prevElement);
+                            }
+
+                            syncMarkdown();
+                            return;
+                        }
                     }
                 }
 
