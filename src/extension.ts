@@ -13,7 +13,7 @@ export function activate(context: vscode.ExtensionContext) {
     
     context.subscriptions.push(
         vscode.window.registerCustomEditorProvider(
-            'any-md.editor',
+            'any-markdown.editor',
             provider,
             {
                 webviewOptions: {
@@ -29,13 +29,13 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Register commands
     context.subscriptions.push(
-        vscode.commands.registerCommand('any-md.openEditor', async () => {
+        vscode.commands.registerCommand('any-markdown.openEditor', async () => {
             const activeEditor = vscode.window.activeTextEditor;
             if (activeEditor && activeEditor.document.languageId === 'markdown') {
                 await vscode.commands.executeCommand(
                     'vscode.openWith',
                     activeEditor.document.uri,
-                    'any-md.editor'
+                    'any-markdown.editor'
                 );
             } else {
                 vscode.window.showInformationMessage(t('openMarkdownFirst'));
@@ -44,7 +44,7 @@ export function activate(context: vscode.ExtensionContext) {
     );
 
     context.subscriptions.push(
-        vscode.commands.registerCommand('any-md.insertTable', async () => {
+        vscode.commands.registerCommand('any-markdown.insertTable', async () => {
             const rows = await vscode.window.showInputBox({
                 prompt: t('numberOfRows'),
                 value: '3',
@@ -76,7 +76,7 @@ export function activate(context: vscode.ExtensionContext) {
     );
 
     context.subscriptions.push(
-        vscode.commands.registerCommand('any-md.insertToc', () => {
+        vscode.commands.registerCommand('any-markdown.insertToc', () => {
             const editor = vscode.window.activeTextEditor;
             if (editor) {
                 editor.edit(editBuilder => {
@@ -87,14 +87,14 @@ export function activate(context: vscode.ExtensionContext) {
     );
 
     context.subscriptions.push(
-        vscode.commands.registerCommand('any-md.exportToPdf', () => {
+        vscode.commands.registerCommand('any-markdown.exportToPdf', () => {
             vscode.window.showInformationMessage(t('pdfExportComingSoon'));
         })
     );
 
     // Open markdown file in standard text editor
     context.subscriptions.push(
-        vscode.commands.registerCommand('any-md.openAsText', async (uri?: vscode.Uri) => {
+        vscode.commands.registerCommand('any-markdown.openAsText', async (uri?: vscode.Uri) => {
             // Get URI from argument (context menu) or active editor
             let targetUri = uri;
             if (!targetUri) {
@@ -115,7 +115,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Compare markdown files as text
     context.subscriptions.push(
-        vscode.commands.registerCommand('any-md.compareAsText', async (uri?: vscode.Uri, uris?: vscode.Uri[]) => {
+        vscode.commands.registerCommand('any-markdown.compareAsText', async (uri?: vscode.Uri, uris?: vscode.Uri[]) => {
             const fs = require('fs');
             const path = require('path');
             const os = require('os');

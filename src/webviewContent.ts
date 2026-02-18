@@ -15,8 +15,6 @@ function getNonce(): string {
 interface EditorConfig {
     theme: string;
     fontSize: number;
-    lineNumbers: boolean;
-    autoPair: boolean;
     documentBaseUri?: string;
     webviewMessages?: WebviewMessages;
     enableDebugLogging?: boolean;
@@ -44,8 +42,6 @@ export function getWebviewContent(
     const safeConfig: EditorConfig = {
         theme: config?.theme ?? 'github',
         fontSize: config?.fontSize ?? 16,
-        lineNumbers: config?.lineNumbers ?? false,
-        autoPair: config?.autoPair ?? true,
         documentBaseUri: config?.documentBaseUri ?? '',
         webviewMessages: config?.webviewMessages,
         enableDebugLogging: config?.enableDebugLogging ?? false

@@ -2,7 +2,7 @@
   "name": "any-markdown",
   "displayName": "Any Markdown Editor",
   "description": "A WYSIWYG markdown editor for VS Code with seamless live preview",
-  "version": "0.195.209",
+  "version": "0.195.210",
   "publisher": "imaken",
   "icon": "media/icon.png",
   "license": "MIT",
@@ -38,39 +38,39 @@
   "contributes": {
     "commands": [
       {
-        "command": "any-md.openEditor",
+        "command": "any-markdown.openEditor",
         "title": "Open with Any Markdown Editor",
         "category": "Any MD"
       },
       {
-        "command": "any-md.exportToPdf",
+        "command": "any-markdown.exportToPdf",
         "title": "Export to PDF",
         "category": "Any MD"
       },
       {
-        "command": "any-md.insertTable",
+        "command": "any-markdown.insertTable",
         "title": "Insert Table",
         "category": "Any MD"
       },
       {
-        "command": "any-md.insertToc",
+        "command": "any-markdown.insertToc",
         "title": "Insert Table of Contents",
         "category": "Any MD"
       },
       {
-        "command": "any-md.openAsText",
+        "command": "any-markdown.openAsText",
         "title": "Open as Text Editor",
         "category": "Any MD"
       },
       {
-        "command": "any-md.compareAsText",
+        "command": "any-markdown.compareAsText",
         "title": "Compare as Text",
         "category": "Any MD"
       }
     ],
     "customEditors": [
       {
-        "viewType": "any-md.editor",
+        "viewType": "any-markdown.editor",
         "displayName": "Any Markdown",
         "selector": [
           {
@@ -86,12 +86,7 @@
     "configuration": {
       "title": "Any Markdown",
       "properties": {
-        "any-md.autoSave": {
-          "type": "boolean",
-          "default": true,
-          "description": "Auto-save changes"
-        },
-        "any-md.theme": {
+        "any-markdown.theme": {
           "type": "string",
           "enum": [
             "github",
@@ -103,32 +98,22 @@
           "default": "github",
           "description": "Editor theme"
         },
-        "any-md.fontSize": {
+        "any-markdown.fontSize": {
           "type": "number",
           "default": 16,
           "description": "Base font size in pixels"
         },
-        "any-md.lineNumbers": {
-          "type": "boolean",
-          "default": false,
-          "description": "Show line numbers in code blocks"
-        },
-        "any-md.autoPair": {
-          "type": "boolean",
-          "default": true,
-          "description": "Auto-pair brackets and markdown symbols"
-        },
-        "any-md.imageDefaultDir": {
+        "any-markdown.imageDefaultDir": {
           "type": "string",
           "default": "",
           "description": "画像保存のデフォルトディレクトリ。空の場合はMarkdownファイルと同じディレクトリを使用。絶対パス（/path/to/dir）または相対パス（./images、images/）を指定可能。"
         },
-        "any-md.forceRelativeImagePath": {
+        "any-markdown.forceRelativeImagePath": {
           "type": "boolean",
           "default": false,
           "description": "画像パスを常に相対パスで挿入します。絶対パスでimageDefaultDirを指定した場合でも、Markdownには相対パスが挿入されます。"
         },
-        "any-md.language": {
+        "any-markdown.language": {
           "type": "string",
           "enum": [
             "default",
@@ -143,7 +128,7 @@
           "default": "default",
           "description": "UI language. 'default' uses VS Code's display language. / UI言語。'default'はVS Codeの表示言語を使用します。"
         },
-        "any-md.enableDebugLogging": {
+        "any-markdown.enableDebugLogging": {
           "type": "boolean",
           "default": false,
           "description": "Enable debug logging in the editor. Useful for troubleshooting. / エディタのデバッグログを有効にします。トラブルシューティングに便利です。"
@@ -153,31 +138,31 @@
     "menus": {
       "editor/context": [
         {
-          "command": "any-md.insertTable",
+          "command": "any-markdown.insertTable",
           "when": "resourceLangId == markdown",
           "group": "anymd"
         },
         {
-          "command": "any-md.insertToc",
+          "command": "any-markdown.insertToc",
           "when": "resourceLangId == markdown",
           "group": "anymd"
         }
       ],
       "explorer/context": [
         {
-          "command": "any-md.openAsText",
+          "command": "any-markdown.openAsText",
           "when": "resourceLangId == markdown",
           "group": "navigation@99"
         },
         {
-          "command": "any-md.compareAsText",
+          "command": "any-markdown.compareAsText",
           "when": "resourceLangId == markdown",
           "group": "3_compare"
         }
       ],
       "editor/title/context": [
         {
-          "command": "any-md.openAsText",
+          "command": "any-markdown.openAsText",
           "when": "resourceLangId == markdown",
           "group": "navigation"
         }

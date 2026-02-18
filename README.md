@@ -50,7 +50,7 @@ npm run compile
 
 1. Open any `.md` or `.markdown` file
 2. Right-click and select **"Open with Any Markdown Editor"**
-3. Or use Command Palette: `Any MD: Open with Any Markdown Editor`
+3. Or use Command Palette: `Any Markdown: Open with Any Markdown Editor`
 
 ---
 
@@ -196,8 +196,8 @@ Images can be saved to custom directories when pasting or drag-and-dropping.
 
 ```json
 {
-  "any-md.imageDefaultDir": "./images",
-  "any-md.forceRelativeImagePath": true
+  "any-markdown.imageDefaultDir": "./images",
+  "any-markdown.forceRelativeImagePath": true
 }
 ```
 
@@ -234,12 +234,12 @@ FORCE_RELATIVE_PATH: true
 
 | Setting | Description | Default |
 | --- | --- | --- |
-| `any-md.theme` | Editor theme (`github`, `sepia`, `night`, `dark`, `minimal`) | `github` |
-| `any-md.fontSize` | Base font size (px) | `16` |
-| `any-md.imageDefaultDir` | Default directory for saved images | `""` (same as markdown file) |
-| `any-md.forceRelativeImagePath` | Force relative paths for images | `false` |
-| `any-md.language` | UI language (`auto`, `en`, `ja`, `zh-cn`, `zh-tw`, `ko`, `es`, `fr`) | `auto` |
-| `any-md.enableDebugLogging` | Enable debug logging in browser console | `false` |
+| `any-markdown.theme` | Editor theme (`github`, `sepia`, `night`, `dark`, `minimal`) | `github` |
+| `any-markdown.fontSize` | Base font size (px) | `16` |
+| `any-markdown.imageDefaultDir` | Default directory for saved images | `""` (same as markdown file) |
+| `any-markdown.forceRelativeImagePath` | Force relative paths for images | `false` |
+| `any-markdown.language` | UI language (`auto`, `en`, `ja`, `zh-cn`, `zh-tw`, `ko`, `es`, `fr`) | `auto` |
+| `any-markdown.enableDebugLogging` | Enable debug logging in browser console | `false` |
 
 ### Themes
 
@@ -267,7 +267,7 @@ The editor UI supports the following languages:
 | Spanish | `es` |
 | French | `fr` |
 
-Set via `any-md.language` or use `auto` to follow VS Code's display language.
+Set via `any-markdown.language` or use `auto` to follow VS Code's display language.
 
 ---
 

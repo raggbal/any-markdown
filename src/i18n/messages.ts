@@ -125,7 +125,7 @@ function resolveLocale(lang: string): string {
  * Get configured language from settings
  */
 function getConfiguredLanguage(): string {
-  const config = vscode.workspace.getConfiguration('any-md');
+  const config = vscode.workspace.getConfiguration('any-markdown');
   const configLang = config.get<string>('language', 'default');
   
   if (!configLang || configLang === 'default') {

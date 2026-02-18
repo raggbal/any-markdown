@@ -223,7 +223,7 @@ class ImageDirectoryManager {
         }
         
         // 3. VS Code設定のimageDefaultDirをチェック
-        const config = vscode.workspace.getConfiguration('any-md');
+        const config = vscode.workspace.getConfiguration('any-markdown');
         const defaultDir = config.get<string>('imageDefaultDir', '');
         if (defaultDir) {
             const normalized = normalizeTrailingSlash(defaultDir);
@@ -256,7 +256,7 @@ class ImageDirectoryManager {
         }
         
         // 2. VS Code設定をチェック
-        const config = vscode.workspace.getConfiguration('any-md');
+        const config = vscode.workspace.getConfiguration('any-markdown');
         return config.get<boolean>('forceRelativeImagePath', false);
     }
     
@@ -314,7 +314,7 @@ class ImageDirectoryManager {
 const imageDirectoryManager = new ImageDirectoryManager();
 
 export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvider {
-    private static readonly viewType = 'any-md.editor';
+    private static readonly viewType = 'any-markdown.editor';
 
     constructor(private readonly context: vscode.ExtensionContext) {}
 
@@ -378,7 +378,7 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
         
         const updateWebview = () => {
             try {
-                const config = vscode.workspace.getConfiguration('any-md');
+                const config = vscode.workspace.getConfiguration('any-markdown');
                 const content = convertImagePaths(document.getText());
                 webviewPanel.webview.html = getWebviewContent(
                     webviewPanel.webview,
@@ -387,8 +387,6 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
                     {
                         theme: config.get<string>('theme', 'github'),
                         fontSize: config.get<number>('fontSize', 16),
-                        lineNumbers: config.get<boolean>('lineNumbers', false),
-                        autoPair: config.get<boolean>('autoPair', true),
                         documentBaseUri: documentBaseUri,
                         webviewMessages: getWebviewMessages(),
                         enableDebugLogging: config.get<boolean>('enableDebugLogging', false)
@@ -495,9 +493,9 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
 
         // Listen for configuration changes
         const changeConfigSubscription = vscode.workspace.onDidChangeConfiguration(e => {
-            if (e.affectsConfiguration('any-md')) {
+            if (e.affectsConfiguration('any-markdown')) {
                 // Re-initialize locale if language setting changed
-                if (e.affectsConfiguration('any-md.language')) {
+                if (e.affectsConfiguration('any-markdown.language')) {
                     initLocale();
                 }
                 updateWebview();
@@ -701,7 +699,7 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
                 case 'getImageDir':
                     // Return current IMAGE_DIR to webview
                     const currentImageDir = extractImageDir(document.getText()) || '';
-                    const config = vscode.workspace.getConfiguration('any-md');
+                    const config = vscode.workspace.getConfiguration('any-markdown');
                     const defaultImageDir = config.get<string>('imageDefaultDir', '');
                     webviewPanel.webview.postMessage({
                         type: 'imageDirInfo',
