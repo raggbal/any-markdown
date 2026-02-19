@@ -376,6 +376,9 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
             });
         };
         
+        // Remember the original line ending style to preserve on save
+        const originalEol = document.eol;
+
         const updateWebview = () => {
             try {
                 const config = vscode.workspace.getConfiguration('any-markdown');
@@ -564,10 +567,14 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
         webviewPanel.webview.onDidReceiveMessage(async message => {
             switch (message.type) {
                 case 'edit':
+                    // Restore original line endings if document uses CRLF
+                    const editContent = originalEol === vscode.EndOfLine.CRLF
+                        ? message.content.replace(/\n/g, '\r\n')
+                        : message.content;
                     // Track content from webview to detect bounce-backs in onDidChangeTextDocument
-                    lastContentFromWebview = message.content;
+                    lastContentFromWebview = editContent;
                     // Queue the edit with debouncing for better performance
-                    scheduleEdit(message.content);
+                    scheduleEdit(editContent);
                     break;
 
                 case 'save':

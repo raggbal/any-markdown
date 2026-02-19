@@ -36,7 +36,13 @@ export function getWebviewContent(
     }
     
     // Ensure content is a string (can be undefined/null after extension update)
-    const safeContent = content ?? '';
+    let safeContent = content ?? '';
+    // Strip BOM (Byte Order Mark) if present - some editors add this to UTF-8 files
+    if (safeContent.charCodeAt(0) === 0xFEFF) {
+        safeContent = safeContent.slice(1);
+    }
+    // Normalize line endings: \r\n (Windows) and lone \r (old Mac) → \n
+    safeContent = safeContent.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
     
     // Ensure config has all required properties with defaults
     const safeConfig: EditorConfig = {

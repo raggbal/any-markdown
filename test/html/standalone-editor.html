@@ -277,7 +277,18 @@
 
     let isSourceMode = false;
     // Decode Base64-encoded content to avoid escaping issues with special characters
-    let markdown = decodeURIComponent(escape(atob(``)));
+    let markdown = '';
+    try {
+        markdown = decodeURIComponent(escape(atob(``)));
+        // Strip BOM (Byte Order Mark) if present - some editors add this to UTF-8 files
+        if (markdown.charCodeAt(0) === 0xFEFF) {
+            markdown = markdown.slice(1);
+        }
+        // Normalize line endings: \r\n → \n, lone \r → \n
+        markdown = markdown.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    } catch (e) {
+        console.error('[Any MD] Failed to decode Base64 content:', e);
+    }
     let saveTimeout = null;
     let syncTimeout = null;
     let pendingSync = false;
@@ -383,7 +394,9 @@
     }
 
     // Initialize
+    console.log('[Any MD] Starting init(), markdown length:', markdown.length, 'editor element:', !!editor);
     init();
+    console.log('[Any MD] init() completed, editor.innerHTML length:', editor.innerHTML.length);
 
     // Debounced sync for performance - uses requestIdleCallback to avoid blocking UI
     function debouncedSync() {
@@ -419,10 +432,14 @@
     }
 
     function init() {
-        renderFromMarkdown();
-        updateOutline();
-        updateWordCount();
-        updateStatus();
+        try {
+            renderFromMarkdown();
+        } catch (e) {
+            console.error('[Any MD] renderFromMarkdown() failed:', e);
+        }
+        try { updateOutline(); } catch (e) { console.error('[Any MD] updateOutline() failed:', e); }
+        try { updateWordCount(); } catch (e) { console.error('[Any MD] updateWordCount() failed:', e); }
+        try { updateStatus(); } catch (e) { console.error('[Any MD] updateStatus() failed:', e); }
     }
 
     // ========== CURSOR UTILITIES ==========
@@ -995,14 +1012,17 @@
     function renderFromMarkdown() {
         // Remove IMAGE_DIR and FORCE_RELATIVE_PATH directives before rendering (they're stored in variables)
         let markdownToRender = removeDirectivesFromMarkdown(markdown);
+        console.log('[Any MD] renderFromMarkdown: markdown length:', markdown.length, 'after directive removal:', markdownToRender.length);
         const html = markdownToHtmlFragment(markdownToRender);
+        console.log('[Any MD] renderFromMarkdown: html length:', html.length, 'first 100 chars:', html.substring(0, 100));
         editor.innerHTML = html || '<p><br></p>';
         setupInteractiveElements();
     }
     
     // Convert markdown to HTML fragment (reusable for both full render and partial paste)
     function markdownToHtmlFragment(markdownText) {
-        const lines = markdownText.split('\n');
+        // Normalize line endings: \r\n → \n, lone \r → \n
+        const lines = markdownText.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
         let html = '';
         let inCodeBlock = false;
         let codeContent = '';
@@ -9953,15 +9973,24 @@
     window.addEventListener('message', function(event) {
         const message = event.data;
         if (message.type === 'update') {
+            console.log('[Any MD] update message received, content length:', message.content?.length);
             // Skip if content hasn't changed (safety net for any remaining bounce-backs)
             if (message.content === markdown) {
+                console.log('[Any MD] update skipped: content identical');
                 return;
             }
             // Additional trimEnd comparison to catch VS Code normalization differences
             if (message.content.trimEnd() === markdown.trimEnd()) {
+                console.log('[Any MD] update skipped: content identical after trimEnd');
                 return;
             }
             markdown = message.content;
+            // Strip BOM if present
+            if (markdown.charCodeAt(0) === 0xFEFF) {
+                markdown = markdown.slice(1);
+            }
+            // Normalize line endings: \r\n → \n, lone \r → \n
+            markdown = markdown.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
             // Update currentImageDir from new content
             currentImageDir = extractImageDirFromMarkdown(markdown);
             if (isSourceMode) {
@@ -10717,19 +10746,28 @@
                 if (typeof turndownPluginGfm !== 'undefined') {
                     turndownService.use(turndownPluginGfm.gfm);
                 }
-                
-                // Custom rule: Ignore presentation tables (layout tables) and process their content
-                turndownService.addRule('presentationTable', {
-                    filter: function(node) {
-                        return node.nodeName === 'TABLE' && 
-                               node.getAttribute('role') === 'presentation';
-                    },
-                    replacement: function(content, node, options) {
-                        // Return the content inside the presentation table without table formatting
-                        return content;
+
+                // Override GFM tableCell rule to:
+                // 1. Escape pipe characters in cell content (prevents table structure breakage)
+                // 2. Convert newlines to <br> (table cells must be single-line in markdown)
+                turndownService.addRule('tableCellEscapePipe', {
+                    filter: ['th', 'td'],
+                    replacement: function(content, node) {
+                        var index = Array.prototype.indexOf.call(node.parentNode.childNodes, node);
+                        var prefix = ' ';
+                        if (index === 0) prefix = '| ';
+                        // Convert newlines to <br> (table cells must stay on one line)
+                        content = content.replace(/\n/g, '<br>');
+                        // Collapse multiple <br> into single
+                        content = content.replace(/(<br>)+/g, '<br>');
+                        // Trim leading/trailing <br>
+                        content = content.replace(/^(<br>)+/, '').replace(/(<br>)+$/, '');
+                        // Escape pipe characters in cell content
+                        content = content.replace(/\|/g, '\\|');
+                        return prefix + content + ' |';
                     }
                 });
-                
+
                 // Custom rule: Remove empty span tags and Apple-converted-space spans
                 turndownService.addRule('cleanupSpans', {
                     filter: function(node) {
@@ -10753,55 +10791,49 @@
                     }
                 });
                 
-                // Custom rule: Handle complex tables with block content in cells
-                // These tables cannot be properly represented as Markdown tables
-                turndownService.addRule('complexTable', {
+                // Custom rule: CSS style-based bold recognition
+                // Handles <span style="font-weight: bold"> etc. from Google Docs, web pages
+                turndownService.addRule('styledBold', {
                     filter: function(node) {
-                        if (node.nodeName !== 'TABLE') return false;
-                        // Skip presentation tables (handled by another rule)
-                        if (node.getAttribute('role') === 'presentation') return false;
-                        // Check if any cell contains block elements (p, div, ul, ol, etc.)
-                        const cells = node.querySelectorAll('td, th');
-                        for (let i = 0; i < cells.length; i++) {
-                            const cell = cells[i];
-                            const blockElements = cell.querySelectorAll('p, div, ul, ol, blockquote, pre, h1, h2, h3, h4, h5, h6');
-                            if (blockElements.length > 1) {
-                                return true; // Complex table with multiple block elements in a cell
-                            }
-                        }
-                        return false;
+                        if (node.nodeName !== 'SPAN') return false;
+                        const fw = node.style.fontWeight;
+                        return fw === 'bold' || fw === 'bolder' || (parseInt(fw) >= 700);
                     },
-                    replacement: function(content, node, options) {
-                        // Convert complex table to a series of sections
-                        let result = '';
-                        const rows = node.querySelectorAll('tr');
-                        rows.forEach(function(row) {
-                            const cells = row.querySelectorAll('td, th');
-                            if (cells.length >= 2) {
-                                // Two-column layout: first column as header, second as content
-                                const headerCell = cells[0];
-                                const contentCell = cells[1];
-                                const headerText = headerCell.textContent.trim();
-                                if (headerText) {
-                                    result += '\n\n**' + headerText + '**\n\n';
-                                }
-                                // Process content cell - let Turndown handle the inner content
-                                const tempDiv = document.createElement('div');
-                                tempDiv.innerHTML = contentCell.innerHTML;
-                                const cellContent = turndownService.turndown(tempDiv.innerHTML);
-                                result += cellContent;
-                            } else if (cells.length === 1) {
-                                // Single column - just process content
-                                const tempDiv = document.createElement('div');
-                                tempDiv.innerHTML = cells[0].innerHTML;
-                                const cellContent = turndownService.turndown(tempDiv.innerHTML);
-                                result += '\n\n' + cellContent;
-                            }
-                        });
-                        return result;
+                    replacement: function(content) {
+                        content = content.trim();
+                        if (!content) return '';
+                        return '**' + content + '**';
                     }
                 });
-                
+
+                // Custom rule: CSS style-based italic recognition
+                turndownService.addRule('styledItalic', {
+                    filter: function(node) {
+                        if (node.nodeName !== 'SPAN') return false;
+                        const fs = node.style.fontStyle;
+                        return fs === 'italic' || fs === 'oblique';
+                    },
+                    replacement: function(content) {
+                        content = content.trim();
+                        if (!content) return '';
+                        return '*' + content + '*';
+                    }
+                });
+
+                // Custom rule: CSS style-based strikethrough recognition
+                turndownService.addRule('styledStrikethrough', {
+                    filter: function(node) {
+                        if (node.nodeName !== 'SPAN') return false;
+                        const td = node.style.textDecoration || node.style.textDecorationLine || '';
+                        return td.includes('line-through');
+                    },
+                    replacement: function(content) {
+                        content = content.trim();
+                        if (!content) return '';
+                        return '~~' + content + '~~';
+                    }
+                });
+
                 pastedMd = turndownService.turndown(html);
                 logger.log('Converted external HTML to markdown via Turndown');
             } catch (err) {
@@ -11276,7 +11308,7 @@
 
     // Save when editor loses focus
     editor.addEventListener('blur', function() {
-        if (!isSourceMode) {
+        if (!isSourceMode && hasUserEdited) {
             // Cancel debounced sync and sync immediately
             clearTimeout(syncTimeout);
             markdown = htmlToMarkdown();
@@ -11286,7 +11318,7 @@
 
     // Save when source editor loses focus
     sourceEditor.addEventListener('blur', function() {
-        if (isSourceMode) {
+        if (isSourceMode && hasUserEdited) {
             markdown = sourceEditor.value;
             vscode.postMessage({ type: 'edit', content: markdown });
         }
@@ -11294,7 +11326,7 @@
 
     // Also save when the webview itself loses visibility
     document.addEventListener('visibilitychange', function() {
-        if (document.visibilityState === 'hidden') {
+        if (document.visibilityState === 'hidden' && hasUserEdited) {
             if (isSourceMode) {
                 markdown = sourceEditor.value;
             } else {
