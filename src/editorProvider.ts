@@ -424,15 +424,21 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
         const changeDocumentSubscription = vscode.workspace.onDidChangeTextDocument(e => {
             if (e.document.uri.toString() === document.uri.toString()) {
                 const currentContent = document.getText();
-                // Skip bounce-back from webview's own edit (latest or currently being applied)
-                if (currentContent === lastContentFromWebview || currentContent === contentBeingApplied) {
-                    return;
-                }
-                // Skip VS Code normalization events (e.g. trailing newline added after applyEdit)
-                if (Date.now() - lastApplyEditTime < 500) {
+
+                // Guard 1: Skip if we're currently applying our own edit
+                if (isApplyingEdit) {
                     lastContentFromWebview = currentContent;
                     return;
                 }
+
+                // Guard 2: Content comparison with trimEnd() for normalization
+                // Prevents bounce-back when VS Code adds/removes trailing whitespace
+                const currentTrimmed = currentContent.trimEnd();
+                if (currentTrimmed === lastContentFromWebview?.trimEnd() || currentTrimmed === contentBeingApplied?.trimEnd()) {
+                    lastContentFromWebview = currentContent;
+                    return;
+                }
+
                 // This is a genuine external change — cancel any pending webview edit
                 pendingContent = null;
                 if (editDebounceTimer) {
@@ -508,8 +514,7 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
         let editDebounceTimer: NodeJS.Timeout | null = null;
         // Track content currently being applied to detect bounce-backs during race conditions
         let contentBeingApplied: string | null = null;
-        // Cooldown after applyEdit to suppress VS Code normalization events
-        let lastApplyEditTime = 0;
+
 
         const applyPendingEdit = async () => {
             if (isApplyingEdit || pendingContent === null) return;
@@ -533,8 +538,6 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
             } finally {
                 isApplyingEdit = false;
                 contentBeingApplied = null;
-                // Record time so normalization events from VS Code are suppressed
-                lastApplyEditTime = Date.now();
                 // Sync with actual document content (VS Code may normalize content, e.g. trailing newline)
                 lastContentFromWebview = document.getText();
                 // Process any pending edit that came in while we were applying

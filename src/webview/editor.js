@@ -18,7 +18,72 @@
     const statusRight = document.getElementById('statusRight');
     const sidebar = document.getElementById('sidebar');
     const toolbar = document.getElementById('toolbar');
-    
+
+    // Lucide Icons (inline SVG) - unified icon set for all toolbars
+    const LUCIDE_ICONS = {
+        // Group A: Inline formatting
+        'bold': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12h9a4 4 0 0 1 0 8H7a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h7a4 4 0 0 1 0 8"/></svg>',
+        'italic': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" x2="10" y1="4" y2="4"/><line x1="14" x2="5" y1="20" y2="20"/><line x1="15" x2="9" y1="4" y2="20"/></svg>',
+        'strikethrough': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4H9a3 3 0 0 0-2.83 4"/><path d="M14 12a4 4 0 0 1 0 8H6"/><line x1="4" x2="20" y1="12" y2="12"/></svg>',
+        'code': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/></svg>',
+        // Group B: Block elements
+        'heading1': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h8"/><path d="M4 18V6"/><path d="M12 18V6"/><path d="m17 12 3-2v8"/></svg>',
+        'heading2': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h8"/><path d="M4 18V6"/><path d="M12 18V6"/><path d="M21 18h-4c0-4 4-3 4-6 0-1.5-2-2.5-4-1"/></svg>',
+        'heading3': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h8"/><path d="M4 18V6"/><path d="M12 18V6"/><path d="M17.5 10.5c1.7-1 3.5 0 3.5 1.5a2 2 0 0 1-2 2"/><path d="M17 17.5c2 1.5 4 .3 4-1.5a2 2 0 0 0-2-2"/></svg>',
+        'heading4': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 18V6"/><path d="M17 10v3a1 1 0 0 0 1 1h3"/><path d="M21 10v8"/><path d="M4 12h8"/><path d="M4 18V6"/></svg>',
+        'heading5': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h8"/><path d="M4 18V6"/><path d="M12 18V6"/><path d="M17 13v-3h4"/><path d="M17 17.7c.4.2.8.3 1.3.3 1.5 0 2.7-1.1 2.7-2.5S19.8 13 18.3 13H17"/></svg>',
+        'heading6': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h8"/><path d="M4 18V6"/><path d="M12 18V6"/><circle cx="19" cy="16" r="2"/><path d="M20 10c-2 2-3 3.5-3 6"/></svg>',
+        'ul': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h.01"/><path d="M3 12h.01"/><path d="M3 19h.01"/><path d="M8 5h13"/><path d="M8 12h13"/><path d="M8 19h13"/></svg>',
+        'ol': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5h10"/><path d="M11 12h10"/><path d="M11 19h10"/><path d="M4 4h1v5"/><path d="M4 9h2"/><path d="M6.5 20H3.4c0-1 2.6-1.925 2.6-3.5a1.5 1.5 0 0 0-2.6-1.02"/></svg>',
+        'task': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 5h8"/><path d="M13 12h8"/><path d="M13 19h8"/><path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/></svg>',
+        'quote': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 5H3"/><path d="M21 12H8"/><path d="M21 19H8"/><path d="M3 12v7"/></svg>',
+        'codeblock': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m10 9-3 3 3 3"/><path d="m14 15 3-3-3-3"/><rect x="3" y="3" width="18" height="18" rx="2"/></svg>',
+        'hr': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/></svg>',
+        // Group C: Insert/Media
+        'link': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>',
+        'image': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>',
+        'imageDir': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></svg>',
+        'table': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/></svg>',
+        // Utility
+        'openOutline': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg>',
+        'source': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/><path d="M10 12.5 8 15l2 2.5"/><path d="m14 12.5 2 2.5-2 2.5"/></svg>',
+        // Table toolbar icons
+        'add-col-left': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="13" x="3" y="8" rx="1"/><path d="m15 2-3 3-3-3"/><rect width="7" height="13" x="14" y="8" rx="1"/></svg>',
+        'add-col-right': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="13" x="3" y="3" rx="1"/><path d="m9 22 3-3 3 3"/><rect width="7" height="13" x="14" y="3" rx="1"/></svg>',
+        'del-col': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>',
+        'add-row-above': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="13" height="7" x="8" y="3" rx="1"/><path d="m2 9 3 3-3 3"/><rect width="13" height="7" x="8" y="14" rx="1"/></svg>',
+        'add-row-below': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="13" height="7" x="3" y="3" rx="1"/><path d="m22 15-3-3 3-3"/><rect width="13" height="7" x="3" y="14" rx="1"/></svg>',
+        'del-row': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>',
+        'align-left': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 5H3"/><path d="M15 12H3"/><path d="M17 19H3"/></svg>',
+        'align-center': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 5H3"/><path d="M17 12H7"/><path d="M19 19H5"/></svg>',
+        'align-right': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 5H3"/><path d="M21 12H9"/><path d="M21 19H7"/></svg>',
+    };
+
+    // Populate toolbar buttons with Lucide icons
+    function initToolbarIcons() {
+        toolbar.querySelectorAll('button[data-action]').forEach(function(btn) {
+            var icon = LUCIDE_ICONS[btn.dataset.action];
+            if (icon) btn.innerHTML = icon;
+        });
+    }
+    initToolbarIcons();
+
+    // Toolbar narrow/wide mode toggle
+    var toolbarWideTimeout = null;
+    toolbar.addEventListener('mouseenter', function() {
+        if (toolbarWideTimeout) {
+            clearTimeout(toolbarWideTimeout);
+            toolbarWideTimeout = null;
+        }
+        toolbar.classList.add('toolbar--wide');
+    });
+    toolbar.addEventListener('mouseleave', function() {
+        toolbarWideTimeout = setTimeout(function() {
+            toolbar.classList.remove('toolbar--wide');
+            toolbarWideTimeout = null;
+        }, 300);
+    });
+
     // Search & Replace elements
     const searchReplaceBox = document.getElementById('searchReplaceBox');
     const searchInput = document.getElementById('searchInput');
@@ -1912,30 +1977,45 @@
 
     function createTableToolbar() {
         if (tableToolbar) return;
-        
+
         tableToolbar = document.createElement('div');
         tableToolbar.className = 'table-toolbar';
-        tableToolbar.innerHTML = 
-            '<button data-action="add-col-left" title="' + i18n.addColLeft + '">←Col</button>' +
-            '<button data-action="add-col-right" title="' + i18n.addColRight + '">Col→</button>' +
-            '<button data-action="del-col" title="' + i18n.deleteCol + '">-Col</button>' +
-            '<span class="separator"></span>' +
-            '<button data-action="add-row-above" title="' + i18n.addRowAbove + '">↑Row</button>' +
-            '<button data-action="add-row-below" title="' + i18n.addRowBelow + '">Row↓</button>' +
-            '<button data-action="del-row" title="' + i18n.deleteRow + '">-Row</button>' +
-            '<span class="separator"></span>' +
-            '<button data-action="align-left" title="' + i18n.alignLeft + '">⫷</button>' +
-            '<button data-action="align-center" title="' + i18n.alignCenter + '">⫶</button>' +
-            '<button data-action="align-right" title="' + i18n.alignRight + '">⫸</button>';
-        
+
+        var tableToolbarItems = [
+            { action: 'add-col-left', title: i18n.addColLeft },
+            { action: 'add-col-right', title: i18n.addColRight },
+            { action: 'del-col', title: i18n.deleteCol },
+            null,
+            { action: 'add-row-above', title: i18n.addRowAbove },
+            { action: 'add-row-below', title: i18n.addRowBelow },
+            { action: 'del-row', title: i18n.deleteRow },
+            null,
+            { action: 'align-left', title: i18n.alignLeft },
+            { action: 'align-center', title: i18n.alignCenter },
+            { action: 'align-right', title: i18n.alignRight },
+        ];
+        tableToolbarItems.forEach(function(item) {
+            if (!item) {
+                var sep = document.createElement('span');
+                sep.className = 'separator';
+                tableToolbar.appendChild(sep);
+            } else {
+                var btn = document.createElement('button');
+                btn.dataset.action = item.action;
+                btn.title = item.title || '';
+                btn.innerHTML = LUCIDE_ICONS[item.action] || item.action;
+                tableToolbar.appendChild(btn);
+            }
+        });
+
         tableToolbar.addEventListener('mousedown', function(e) {
             e.preventDefault(); // Prevent losing focus from table
         });
-        
+
         tableToolbar.addEventListener('click', function(e) {
             const btn = e.target.closest('button');
             if (!btn) return;
-            
+
             const action = btn.dataset.action;
             switch(action) {
                 case 'add-col-left': insertTableColumnLeft(); break;
@@ -1949,7 +2029,7 @@
                 case 'align-right': setColumnAlignment('right'); break;
             }
         });
-        
+
         document.body.appendChild(tableToolbar);
     }
 
@@ -1958,7 +2038,7 @@
         
         const rect = table.getBoundingClientRect();
         const toolbarHeight = 40;
-        const topOffset = 50; // Height of the fixed header toolbar
+        const topOffset = toolbar ? toolbar.offsetHeight : 50; // Dynamic toolbar height
         
         // Calculate ideal position (above table)
         let top = rect.top - toolbarHeight;
@@ -4423,7 +4503,7 @@
             
             const range = sel.getRangeAt(0);
             
-            // Handle selection deletion (e.g., triple-click then backspace)
+            // Handle selection deletion (e.g., triple-click then backspace, or partial text selection)
             if (!range.collapsed) {
                 logger.log('Backspace with selection (early handler) - range:', {
                     startContainer: range.startContainer.nodeName,
@@ -4431,7 +4511,7 @@
                     endContainer: range.endContainer.nodeName,
                     endOffset: range.endOffset
                 });
-                
+
                 // Find the li element that contains the selection start
                 let liElement = null;
                 let node = range.startContainer;
@@ -4442,18 +4522,23 @@
                     }
                     node = node.parentNode;
                 }
-                
+
                 if (liElement) {
                     logger.log('Backspace with selection - li found, handling');
                     e.preventDefault();
-                    
+
                     // Get nested list before deletion
                     const nestedList = liElement.querySelector(':scope > ul, :scope > ol');
                     const checkbox = liElement.querySelector(':scope > input[type="checkbox"]');
-                    
-                    // Delete the selected content
+
+                    // Save cursor position before deletion - after deleteContents,
+                    // the range collapses to the start of the deleted region
                     range.deleteContents();
-                    
+
+                    // After deleteContents, the selection range is collapsed at the deletion point.
+                    // We preserve this cursor position for partial text deletions.
+                    const cursorRange = sel.getRangeAt(0);
+
                     // Check if li is now empty (only has br, checkbox, or nested list)
                     let hasDirectText = false;
                     for (const child of liElement.childNodes) {
@@ -4471,7 +4556,7 @@
                             }
                         }
                     }
-                    
+
                     // If no direct text content, ensure there's a <br> for cursor positioning
                     if (!hasDirectText) {
                         // Remove any existing empty text nodes
@@ -4482,7 +4567,7 @@
                             }
                         }
                         emptyTextNodes.forEach(n => n.remove());
-                        
+
                         // Check if there's already a <br>
                         let hasBr = false;
                         for (const child of liElement.childNodes) {
@@ -4491,7 +4576,7 @@
                                 break;
                             }
                         }
-                        
+
                         // Add <br> if needed, after checkbox if present
                         if (!hasBr) {
                             const br = document.createElement('br');
@@ -4503,37 +4588,27 @@
                                 liElement.insertBefore(br, liElement.firstChild);
                             }
                         }
-                    }
-                    
-                    // Position cursor in the li
-                    const newRange = document.createRange();
-                    const brInLi = liElement.querySelector(':scope > br');
-                    if (brInLi) {
-                        newRange.setStartBefore(brInLi);
-                    } else {
-                        // Find first text node or position at start
-                        let firstTextNode = null;
-                        for (const child of liElement.childNodes) {
-                            if (child.nodeType === 3 && child.textContent) {
-                                firstTextNode = child;
-                                break;
-                            }
-                        }
-                        if (firstTextNode) {
-                            newRange.setStart(firstTextNode, 0);
+
+                        // Only reposition cursor when li is empty (need to place at br)
+                        const newRange = document.createRange();
+                        const brInLi = liElement.querySelector(':scope > br');
+                        if (brInLi) {
+                            newRange.setStartBefore(brInLi);
                         } else {
                             newRange.setStart(liElement, checkbox ? 1 : 0);
                         }
+                        newRange.collapse(true);
+                        sel.removeAllRanges();
+                        sel.addRange(newRange);
                     }
-                    newRange.collapse(true);
-                    sel.removeAllRanges();
-                    sel.addRange(newRange);
-                    
+                    // When hasDirectText is true, the cursor stays at the deletion point
+                    // (where deleteContents left it) - no need to reposition
+
                     syncMarkdownSync();
                     logger.log('Handled selection deletion in list item (early handler)');
                     return;
                 }
-                
+
                 // Not in a list item, let browser handle it
                 return;
             }
@@ -9707,10 +9782,12 @@
         if (message.type === 'update') {
             // Skip if content hasn't changed (safety net for any remaining bounce-backs)
             if (message.content === markdown) {
-                logger.log('Skipping update: content unchanged');
                 return;
             }
-            logger.log('Accepting external update');
+            // Additional trimEnd comparison to catch VS Code normalization differences
+            if (message.content.trimEnd() === markdown.trimEnd()) {
+                return;
+            }
             markdown = message.content;
             // Update currentImageDir from new content
             currentImageDir = extractImageDirFromMarkdown(markdown);

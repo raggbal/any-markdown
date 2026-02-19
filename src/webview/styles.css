@@ -141,7 +141,7 @@ body {
 .outline-item[data-level="5"] { padding-left: 64px; font-size: 12px; color: var(--text-muted); }
 .outline-item[data-level="6"] { padding-left: 76px; font-size: 11px; color: var(--text-muted); }
 
-.toolbar .menu-btn { margin-right: 8px; }
+.toolbar .menu-btn { margin-right: 4px; }
 .toolbar .menu-btn.hidden { display: none; }
 .word-count {
     padding: 12px 16px;
@@ -153,34 +153,77 @@ body {
 .word-count div { margin: 4px 0; }
 
 .editor-container { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+/* ===== Toolbar: Narrow/Wide Mode ===== */
 .toolbar {
     display: flex;
     align-items: center;
-    padding: 8px 16px;
+    padding: 4px 12px;
     background: var(--toolbar-bg);
     border-bottom: 1px solid var(--border-color);
-    gap: 4px;
+    gap: 2px;
+    /* Narrow mode (default): single row, horizontal scroll */
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    max-height: 40px;
+    transition: max-height 0.25s ease-out, padding 0.15s ease-out;
+    scrollbar-width: none; /* Firefox */
 }
+.toolbar::-webkit-scrollbar { display: none; } /* Chrome/Safari */
+/* Wide mode: wrap to multiple rows, fit editor width */
+.toolbar.toolbar--wide {
+    flex-wrap: wrap;
+    overflow-x: visible;
+    overflow-y: visible;
+    max-height: 500px;
+    padding: 6px 12px;
+}
+/* Toolbar groups */
+.toolbar-group {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    flex-shrink: 0;
+}
+/* Group separator via pseudo-element (replaces .divider spans) */
+.toolbar-group + .toolbar-group::before {
+    content: '';
+    display: block;
+    width: 1px;
+    height: 20px;
+    background: var(--border-color);
+    margin: 0 6px;
+    flex-shrink: 0;
+}
+/* Utility group: pushed to right end */
+.toolbar-group[data-group="utility"] {
+    margin-left: auto;
+}
+/* Toolbar buttons */
 .toolbar button {
     background: none;
     border: none;
-    padding: 6px 10px;
+    padding: 5px 7px;
     cursor: pointer;
     border-radius: 4px;
-    font-size: 14px;
     color: var(--text-color);
     display: flex;
     align-items: center;
     justify-content: center;
+    flex-shrink: 0;
+    min-width: 28px;
+    min-height: 28px;
 }
+.toolbar button:hover { background: var(--selection-bg); }
 .toolbar button svg {
     width: 16px;
     height: 16px;
-    fill: currentColor;
+    flex-shrink: 0;
 }
-.toolbar button:hover { background: var(--selection-bg); }
-.toolbar .divider { width: 1px; height: 20px; background: var(--border-color); margin: 0 4px; }
-.toolbar .flex-spacer { flex: 1; }
+/* Lucide stroke-based icons */
+.toolbar button svg[fill="none"] { fill: none; }
+/* Legacy fill-based icons (e.g. VS Code logo) */
+.toolbar button svg:not([fill="none"]) { fill: currentColor; }
 
 .editor-wrapper { flex: 1; overflow: auto; position: relative; }
 .editor {
@@ -571,7 +614,8 @@ body {
     padding: 4px 8px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.15);
     z-index: 1000;
-    gap: 4px;
+    gap: 2px;
+    align-items: center;
 }
 .table-toolbar.visible {
     display: flex;
@@ -579,17 +623,28 @@ body {
 .table-toolbar button {
     background: transparent;
     border: none;
-    padding: 4px 8px;
+    padding: 4px 6px;
     cursor: pointer;
     border-radius: 4px;
-    font-size: 12px;
     color: var(--text-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 26px;
+    min-height: 26px;
 }
 .table-toolbar button:hover {
     background: var(--selection-bg);
 }
+.table-toolbar button svg {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+}
+.table-toolbar button svg[fill="none"] { fill: none; }
 .table-toolbar .separator {
     width: 1px;
+    height: 18px;
     background: var(--border-color);
     margin: 0 4px;
 }
