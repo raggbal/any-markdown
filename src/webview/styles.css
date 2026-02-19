@@ -642,6 +642,12 @@ body {
     flex-shrink: 0;
 }
 .table-toolbar button svg[fill="none"] { fill: none; }
+.table-toolbar button.text-btn {
+    font-size: 11px;
+    font-weight: 500;
+    white-space: nowrap;
+    padding: 4px 8px;
+}
 .table-toolbar .separator {
     width: 1px;
     height: 18px;
