@@ -11069,6 +11069,55 @@
             return;
         }
         
+        // URL auto-link on paste
+        // If clipboard contains a URL (not from internal copy), auto-create a link
+        if (!internalMd) {
+            const plainText = (text || '').trim();
+            const urlRegex = /^https?:\/\/[^\s]+$/;
+            if (plainText && !plainText.includes('\n') && urlRegex.test(plainText)) {
+                const selectedText = range.toString();
+
+                if (selectedText && !selectedText.includes('\n')) {
+                    // Case 2: Text is selected + URL in clipboard → wrap selected text as link
+                    logger.log('URL paste: wrapping selected text as link:', selectedText, '->', plainText);
+                    const a = document.createElement('a');
+                    a.href = plainText;
+                    a.textContent = selectedText;
+                    range.deleteContents();
+                    range.insertNode(a);
+
+                    // Move cursor after the link
+                    const newRange = document.createRange();
+                    newRange.setStartAfter(a);
+                    newRange.collapse(true);
+                    sel.removeAllRanges();
+                    sel.addRange(newRange);
+
+                    syncMarkdown();
+                    return;
+                } else if (!selectedText || selectedText.trim() === '') {
+                    // Case 1: No selection + URL paste → auto-create link with URL as text
+                    logger.log('URL paste: auto-linking URL:', plainText);
+                    const a = document.createElement('a');
+                    a.href = plainText;
+                    a.textContent = plainText;
+                    range.deleteContents();
+                    range.insertNode(a);
+
+                    // Move cursor after the link
+                    const newRange = document.createRange();
+                    newRange.setStartAfter(a);
+                    newRange.collapse(true);
+                    sel.removeAllRanges();
+                    sel.addRange(newRange);
+
+                    syncMarkdown();
+                    return;
+                }
+                // If selection spans multiple lines, fall through to normal paste
+            }
+        }
+
         // Detect triple-click selection pattern for paste
         // Triple-click typically selects from start of element to start of next element
         const isTripleClickSelection = (
