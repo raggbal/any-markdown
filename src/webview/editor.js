@@ -126,6 +126,13 @@
     let syncTimeout = null;
     let pendingSync = false;
     let hasUserEdited = false; // Flag to track if user has made any edits
+    // Track recently sent edit contents to detect delayed bounce-backs
+    const recentSentEdits = new Set();
+    function trackSentEdit(content) {
+        const key = content.trimEnd();
+        recentSentEdits.add(key);
+        setTimeout(() => recentSentEdits.delete(key), 3000);
+    }
     let currentImageDir = null; // IMAGE_DIR directive value (preserved during sync)
     let currentForceRelativePath = null; // FORCE_RELATIVE_PATH directive value (preserved during sync)
     
@@ -5866,11 +5873,42 @@
                 
                 syncMarkdown();
             } else {
-                // #region agent log
-                logger.log('Not in LI, inserting spaces');
-                // #endregion
-                // Insert tab or spaces when not in a list
-                document.execCommand('insertText', false, '    ');
+                if (e.shiftKey) {
+                    // Shift+Tab: remove up to 4 leading spaces from current line
+                    const sel2 = window.getSelection();
+                    if (!sel2 || !sel2.rangeCount) { return; }
+                    const range2 = sel2.getRangeAt(0);
+                    const curNode = range2.startContainer;
+                    const curOffset = range2.startOffset;
+
+                    // Find the text node containing the current line start
+                    // The cursor is in a text node: find the line start within it
+                    // (lines are separated by <br> or \n within text nodes)
+                    if (curNode.nodeType === 3) {
+                        const text = curNode.textContent;
+                        // Find start of current line by looking backwards for \n
+                        let lineStart = text.lastIndexOf('\n', curOffset - 1) + 1;
+                        // Count leading spaces from line start (up to 4)
+                        let spaces = 0;
+                        while (spaces < 4 && lineStart + spaces < text.length && text[lineStart + spaces] === ' ') {
+                            spaces++;
+                        }
+                        if (spaces > 0) {
+                            curNode.textContent = text.slice(0, lineStart) + text.slice(lineStart + spaces);
+                            // Adjust cursor position
+                            const newOffset = Math.max(lineStart, curOffset - spaces);
+                            const newRange = document.createRange();
+                            newRange.setStart(curNode, newOffset);
+                            newRange.collapse(true);
+                            sel2.removeAllRanges();
+                            sel2.addRange(newRange);
+                            syncMarkdown();
+                        }
+                    }
+                } else {
+                    // Tab: insert 4 spaces
+                    document.execCommand('insertText', false, '    ');
+                }
             }
             return;
         }
@@ -9279,18 +9317,20 @@
     function notifyChangeImmediate() {
         // Only save if user has made edits (prevents saving on initial load)
         if (!hasUserEdited) return;
+        trackSentEdit(markdown);
         vscode.postMessage({ type: 'edit', content: markdown });
         updateOutline();
         updateWordCount();
         updateStatus();
     }
-    
+
     // Debounced notification - for syncMarkdown() calls
     function notifyChange() {
         // Only save if user has made edits (prevents saving on initial load)
         if (!hasUserEdited) return;
         clearTimeout(saveTimeout);
         saveTimeout = setTimeout(() => {
+            trackSentEdit(markdown);
             vscode.postMessage({ type: 'edit', content: markdown });
             updateOutline();
             updateWordCount();
@@ -9807,23 +9847,30 @@
         const message = event.data;
         if (message.type === 'update') {
             logger.log('[Any MD] update message received, content length:', message.content?.length);
+            // Normalize incoming content before comparison:
+            // Strip BOM, normalize \r\n → \n (webview always uses \n internally)
+            let incomingContent = message.content || '';
+            if (incomingContent.charCodeAt(0) === 0xFEFF) {
+                incomingContent = incomingContent.slice(1);
+            }
+            incomingContent = incomingContent.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
             // Skip if content hasn't changed (safety net for any remaining bounce-backs)
-            if (message.content === markdown) {
+            if (incomingContent === markdown) {
                 logger.log('[Any MD] update skipped: content identical');
                 return;
             }
             // Additional trimEnd comparison to catch VS Code normalization differences
-            if (message.content.trimEnd() === markdown.trimEnd()) {
+            if (incomingContent.trimEnd() === markdown.trimEnd()) {
                 logger.log('[Any MD] update skipped: content identical after trimEnd');
                 return;
             }
-            markdown = message.content;
-            // Strip BOM if present
-            if (markdown.charCodeAt(0) === 0xFEFF) {
-                markdown = markdown.slice(1);
+            // Guard 3: Check against recently sent edits (catches delayed bounce-backs
+            // where markdown has already been updated by further user input)
+            if (recentSentEdits.has(incomingContent.trimEnd())) {
+                logger.log('[Any MD] update skipped: matches recently sent edit');
+                return;
             }
-            // Normalize line endings: \r\n → \n, lone \r → \n
-            markdown = markdown.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+            markdown = incomingContent;
             // Update currentImageDir from new content
             currentImageDir = extractImageDirFromMarkdown(markdown);
             if (isSourceMode) {

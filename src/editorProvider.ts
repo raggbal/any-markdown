@@ -434,10 +434,11 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
                     return;
                 }
 
-                // Guard 2: Content comparison with trimEnd() for normalization
-                // Prevents bounce-back when VS Code adds/removes trailing whitespace
-                const currentTrimmed = currentContent.trimEnd();
-                if (currentTrimmed === lastContentFromWebview?.trimEnd() || currentTrimmed === contentBeingApplied?.trimEnd()) {
+                // Guard 2: Content comparison with normalization
+                // Normalize \r for comparison (CRLF documents: webview uses \n, document uses \r\n)
+                const normalize = (s: string | null) => s?.replace(/\r/g, '').trimEnd();
+                const currentNormalized = normalize(currentContent);
+                if (currentNormalized === normalize(lastContentFromWebview) || currentNormalized === normalize(contentBeingApplied)) {
                     lastContentFromWebview = currentContent;
                     return;
                 }
