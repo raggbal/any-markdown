@@ -423,6 +423,8 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
         // Focus-based sync policy: when webview has focus, it is the authoritative source.
         // All onDidChangeTextDocument events are ignored while focused (no bounce-back possible).
         let webviewHasFocus = false;
+        let missedExternalChange = false;
+        let isApplyingOwnEdit = false;
 
         // Listen for document changes — focus policy makes this dramatically simple
         const changeDocumentSubscription = vscode.workspace.onDidChangeTextDocument(e => {
@@ -430,7 +432,10 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
             if (e.contentChanges.length === 0) return; // Skip metadata-only changes
 
             if (webviewHasFocus) {
-                // Webview is authoritative — ignore all changes while focused
+                // Webview is authoritative — but track truly external changes
+                if (!isApplyingOwnEdit) {
+                    missedExternalChange = true;
+                }
                 return;
             }
 
@@ -504,6 +509,10 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
         let applyEditQueue: Promise<void> = Promise.resolve();
 
         const scheduleEdit = (content: string) => {
+            // Don't overwrite external changes — preserve them for reload on blur
+            if (missedExternalChange) {
+                return;
+            }
             pendingContent = content;
             if (editDebounceTimer) {
                 clearTimeout(editDebounceTimer);
@@ -517,10 +526,10 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
                 applyEditQueue = applyEditQueue.then(async () => {
                     try {
                         // Skip if content is identical — prevents unnecessary dirty marking
-                        // Normalize line endings for comparison (CRLF/LF agnostic)
                         const normalize = (s: string) => s.replace(/\r\n/g, '\n');
                         if (normalize(contentToApply) === normalize(document.getText())) return;
 
+                        isApplyingOwnEdit = true;
                         const edit = new vscode.WorkspaceEdit();
                         edit.replace(
                             document.uri,
@@ -530,6 +539,8 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
                         await vscode.workspace.applyEdit(edit);
                     } catch (e) {
                         console.log('[Any MD] Edit error (ignored):', e);
+                    } finally {
+                        isApplyingOwnEdit = false;
                     }
                 });
             }, 100);
@@ -552,10 +563,27 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
 
                 case 'webviewFocus':
                     webviewHasFocus = true;
+                    missedExternalChange = false;
                     break;
 
                 case 'webviewBlur':
                     webviewHasFocus = false;
+                    if (missedExternalChange) {
+                        missedExternalChange = false;
+                        // Cancel pending webview edit — external content takes priority
+                        if (editDebounceTimer) {
+                            clearTimeout(editDebounceTimer);
+                            editDebounceTimer = null;
+                        }
+                        pendingContent = null;
+                        // Reload webview with current document content
+                        const currentContent = document.getText();
+                        const content = convertImagePaths(currentContent);
+                        webviewPanel.webview.postMessage({
+                            type: 'update',
+                            content: content
+                        });
+                    }
                     break;
 
                 case 'insertImage':

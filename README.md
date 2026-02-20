@@ -285,6 +285,16 @@ Available in Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`):
 
 ---
 
+## External File Changes
+
+When another tool (e.g., AI coding assistants like Claude Code, Cursor, etc.) modifies the same markdown file while you have it open in Any Markdown:
+
+- **While the editor has focus**: External changes are **not reflected** in the editor. This is by design to prevent cursor jumps and editing disruptions.
+- **After losing focus** (clicking outside the editor): External changes are **automatically reloaded** into the editor.
+- **Important**: If you are editing in the WYSIWYG editor while an external tool modifies the same file, **your in-progress edits may be lost** when focus is removed, as the editor reloads the externally modified version. To avoid this, save your work before switching to another tool that modifies the same file.
+
+---
+
 ## Development
 
 ```bash
