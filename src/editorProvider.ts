@@ -420,53 +420,39 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
         // Initialize IMAGE_DIR tracking
         imageDirectoryManager.initializeForDocument(document.uri, document.getText());
 
-        // lastContentFromWebview: bounce-back detection for webview edits
-        let lastContentFromWebview: string | null = null;
+        // Focus-based sync policy: when webview has focus, it is the authoritative source.
+        // All onDidChangeTextDocument events are ignored while focused (no bounce-back possible).
+        let webviewHasFocus = false;
 
-        // Listen for document changes — single path for ALL webview messaging
+        // Listen for document changes — focus policy makes this dramatically simple
         const changeDocumentSubscription = vscode.workspace.onDidChangeTextDocument(e => {
-            if (e.document.uri.toString() === document.uri.toString()) {
-                const currentContent = document.getText();
+            if (e.document.uri.toString() !== document.uri.toString()) return;
+            if (e.contentChanges.length === 0) return; // Skip metadata-only changes
 
-                // Guard 1: Skip if we're currently applying our own edit
-                if (isApplyingEdit) {
-                    lastContentFromWebview = currentContent;
-                    return;
-                }
+            if (webviewHasFocus) {
+                // Webview is authoritative — ignore all changes while focused
+                return;
+            }
 
-                // Guard 2: Content comparison with normalization
-                // Normalize \r for comparison (CRLF documents: webview uses \n, document uses \r\n)
-                const normalize = (s: string | null) => s?.replace(/\r/g, '').trimEnd();
-                const currentNormalized = normalize(currentContent);
-                if (currentNormalized === normalize(lastContentFromWebview) || currentNormalized === normalize(contentBeingApplied)) {
-                    lastContentFromWebview = currentContent;
-                    return;
-                }
+            // External change — update webview
+            const currentContent = document.getText();
+            const content = convertImagePaths(currentContent);
+            webviewPanel.webview.postMessage({
+                type: 'update',
+                content: content
+            });
 
-                // This is a genuine external change — cancel any pending webview edit
-                pendingContent = null;
-                if (editDebounceTimer) {
-                    clearTimeout(editDebounceTimer);
-                    editDebounceTimer = null;
-                }
-                const content = convertImagePaths(currentContent);
-                webviewPanel.webview.postMessage({
-                    type: 'update',
-                    content: content
+            // Check for IMAGE_DIR changes (external edit)
+            if (imageDirectoryManager.checkAndWarnIfChanged(document.uri, currentContent)) {
+                vscode.window.showInformationMessage(
+                    t('imageDirChanged'),
+                    t('reload')
+                ).then(selection => {
+                    if (selection === t('reload')) {
+                        updateWebview();
+                        imageDirectoryManager.initializeForDocument(document.uri, document.getText());
+                    }
                 });
-
-                // Check for IMAGE_DIR changes (external edit)
-                if (imageDirectoryManager.checkAndWarnIfChanged(document.uri, currentContent)) {
-                    vscode.window.showInformationMessage(
-                        t('imageDirChanged'),
-                        t('reload')
-                    ).then(selection => {
-                        if (selection === t('reload')) {
-                            updateWebview();
-                            imageDirectoryManager.initializeForDocument(document.uri, document.getText());
-                        }
-                    });
-                }
             }
         });
 
@@ -512,55 +498,40 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
             }
         });
 
-        // Edit queue to prevent concurrent workspace edits
+        // Serialized edit queue — debounce + promise chain (no recursive retry, no freeze)
         let pendingContent: string | null = null;
-        let isApplyingEdit = false;
         let editDebounceTimer: NodeJS.Timeout | null = null;
-        // Track content currently being applied to detect bounce-backs during race conditions
-        let contentBeingApplied: string | null = null;
+        let applyEditQueue: Promise<void> = Promise.resolve();
 
-
-        const applyPendingEdit = async () => {
-            if (isApplyingEdit || pendingContent === null) return;
-
-            isApplyingEdit = true;
-            const content = pendingContent;
-            pendingContent = null;
-            contentBeingApplied = content;
-
-            try {
-                const edit = new vscode.WorkspaceEdit();
-                edit.replace(
-                    document.uri,
-                    new vscode.Range(0, 0, document.lineCount, 0),
-                    content
-                );
-                await vscode.workspace.applyEdit(edit);
-            } catch (e) {
-                // Ignore edit errors (e.g., file changed in the meantime)
-                console.log('Edit error (ignored):', e);
-            } finally {
-                isApplyingEdit = false;
-                contentBeingApplied = null;
-                // Sync with actual document content (VS Code may normalize content, e.g. trailing newline)
-                lastContentFromWebview = document.getText();
-                // Process any pending edit that came in while we were applying
-                if (pendingContent !== null) {
-                    setTimeout(applyPendingEdit, 100);
-                }
-            }
-        };
-        
-        // Debounced edit scheduling - batches rapid edits
         const scheduleEdit = (content: string) => {
             pendingContent = content;
             if (editDebounceTimer) {
                 clearTimeout(editDebounceTimer);
             }
-            // Small debounce to batch rapid sequential edits
             editDebounceTimer = setTimeout(() => {
                 editDebounceTimer = null;
-                applyPendingEdit();
+                const contentToApply = pendingContent;
+                pendingContent = null;
+                if (contentToApply === null) return;
+
+                applyEditQueue = applyEditQueue.then(async () => {
+                    try {
+                        // Skip if content is identical — prevents unnecessary dirty marking
+                        // Normalize line endings for comparison (CRLF/LF agnostic)
+                        const normalize = (s: string) => s.replace(/\r\n/g, '\n');
+                        if (normalize(contentToApply) === normalize(document.getText())) return;
+
+                        const edit = new vscode.WorkspaceEdit();
+                        edit.replace(
+                            document.uri,
+                            new vscode.Range(0, 0, document.lineCount, 0),
+                            contentToApply
+                        );
+                        await vscode.workspace.applyEdit(edit);
+                    } catch (e) {
+                        console.log('[Any MD] Edit error (ignored):', e);
+                    }
+                });
             }, 100);
         };
 
@@ -572,14 +543,19 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
                     const editContent = originalEol === vscode.EndOfLine.CRLF
                         ? message.content.replace(/\n/g, '\r\n')
                         : message.content;
-                    // Track content from webview to detect bounce-backs in onDidChangeTextDocument
-                    lastContentFromWebview = editContent;
-                    // Queue the edit with debouncing for better performance
                     scheduleEdit(editContent);
                     break;
 
                 case 'save':
                     await document.save();
+                    break;
+
+                case 'webviewFocus':
+                    webviewHasFocus = true;
+                    break;
+
+                case 'webviewBlur':
+                    webviewHasFocus = false;
                     break;
 
                 case 'insertImage':

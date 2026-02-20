@@ -10,7 +10,9 @@ export interface Messages {
   enterValidNumber: string;
   pdfExportComingSoon: string;
   imageDirChanged: string;
+  fileModifiedExternally: string;
   reload: string;
+  ignore: string;
   enterUrl: string;
   enterLinkText: string;
   enterImageDir: string;

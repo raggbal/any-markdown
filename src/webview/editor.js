@@ -126,13 +126,6 @@
     let syncTimeout = null;
     let pendingSync = false;
     let hasUserEdited = false; // Flag to track if user has made any edits
-    // Track recently sent edit contents to detect delayed bounce-backs
-    const recentSentEdits = new Set();
-    function trackSentEdit(content) {
-        const key = content.trimEnd();
-        recentSentEdits.add(key);
-        setTimeout(() => recentSentEdits.delete(key), 3000);
-    }
     let currentImageDir = null; // IMAGE_DIR directive value (preserved during sync)
     let currentForceRelativePath = null; // FORCE_RELATIVE_PATH directive value (preserved during sync)
     
@@ -9317,7 +9310,6 @@
     function notifyChangeImmediate() {
         // Only save if user has made edits (prevents saving on initial load)
         if (!hasUserEdited) return;
-        trackSentEdit(markdown);
         vscode.postMessage({ type: 'edit', content: markdown });
         updateOutline();
         updateWordCount();
@@ -9330,12 +9322,11 @@
         if (!hasUserEdited) return;
         clearTimeout(saveTimeout);
         saveTimeout = setTimeout(() => {
-            trackSentEdit(markdown);
             vscode.postMessage({ type: 'edit', content: markdown });
             updateOutline();
             updateWordCount();
             updateStatus();
-        }, 300); // Reduced from 500ms since we already debounce typing
+        }, 300);
     }
     
     // Mark document as edited by user
@@ -9440,7 +9431,14 @@
         if (isMod && e.key === 's') {
             e.preventDefault();
             e.stopPropagation();
+            // Flush pending sync before save, then reset edit flag
+            clearTimeout(syncTimeout);
+            if (hasUserEdited) {
+                markdown = htmlToMarkdown();
+                vscode.postMessage({ type: 'edit', content: markdown });
+            }
             vscode.postMessage({ type: 'save' });
+            hasUserEdited = false;
             return;
         }
         
@@ -9847,29 +9845,21 @@
         const message = event.data;
         if (message.type === 'update') {
             logger.log('[Any MD] update message received, content length:', message.content?.length);
-            // Normalize incoming content before comparison:
-            // Strip BOM, normalize \r\n → \n (webview always uses \n internally)
+
+            // Focus-based guard: if webview truly has focus, ignore updates (webview is authoritative)
+            // Use document.hasFocus() — activeElement alone is unreliable in iframes
+            // (it retains the last focused element even after the iframe loses focus)
+            if (document.hasFocus()) {
+                logger.log('[Any MD] update skipped: webview has focus');
+                return;
+            }
+
+            // Normalize incoming content: strip BOM, normalize line endings
             let incomingContent = message.content || '';
             if (incomingContent.charCodeAt(0) === 0xFEFF) {
                 incomingContent = incomingContent.slice(1);
             }
             incomingContent = incomingContent.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-            // Skip if content hasn't changed (safety net for any remaining bounce-backs)
-            if (incomingContent === markdown) {
-                logger.log('[Any MD] update skipped: content identical');
-                return;
-            }
-            // Additional trimEnd comparison to catch VS Code normalization differences
-            if (incomingContent.trimEnd() === markdown.trimEnd()) {
-                logger.log('[Any MD] update skipped: content identical after trimEnd');
-                return;
-            }
-            // Guard 3: Check against recently sent edits (catches delayed bounce-backs
-            // where markdown has already been updated by further user input)
-            if (recentSentEdits.has(incomingContent.trimEnd())) {
-                logger.log('[Any MD] update skipped: matches recently sent edit');
-                return;
-            }
             markdown = incomingContent;
             // Update currentImageDir from new content
             currentImageDir = extractImageDirFromMarkdown(markdown);
@@ -11235,22 +11225,29 @@
         }
     });
 
-    // Save when editor loses focus
+    // Focus/blur notifications for focus-based sync policy
+    editor.addEventListener('focus', function() {
+        vscode.postMessage({ type: 'webviewFocus' });
+    });
     editor.addEventListener('blur', function() {
         if (!isSourceMode && hasUserEdited) {
-            // Cancel debounced sync and sync immediately
+            // Cancel debounced sync and sync immediately before blur
             clearTimeout(syncTimeout);
             markdown = htmlToMarkdown();
             vscode.postMessage({ type: 'edit', content: markdown });
         }
+        vscode.postMessage({ type: 'webviewBlur' });
     });
 
-    // Save when source editor loses focus
+    sourceEditor.addEventListener('focus', function() {
+        vscode.postMessage({ type: 'webviewFocus' });
+    });
     sourceEditor.addEventListener('blur', function() {
         if (isSourceMode && hasUserEdited) {
             markdown = sourceEditor.value;
             vscode.postMessage({ type: 'edit', content: markdown });
         }
+        vscode.postMessage({ type: 'webviewBlur' });
     });
 
     // Also save when the webview itself loses visibility
