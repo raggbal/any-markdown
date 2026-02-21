@@ -883,13 +883,16 @@
         const blockIndex = Array.from(editor.children).indexOf(block);
         if (blockIndex === -1) return null;
 
+        // Save block text content for text-based matching (robust against insertions above)
+        const blockText = block.textContent || '';
+
         // Calculate text offset within the block
         try {
             const preRange = document.createRange();
             preRange.setStart(block, 0);
             preRange.setEnd(range.startContainer, range.startOffset);
             const textOffset = preRange.toString().length;
-            return { blockIndex, textOffset };
+            return { blockIndex, blockText, textOffset };
         } catch (e) {
             logger.log('[Any MD] saveCursorState failed:', e);
             return null;
@@ -949,8 +952,35 @@
         const blocks = Array.from(editor.children);
         if (blocks.length === 0) return;
 
-        const targetIndex = Math.min(state.blockIndex, blocks.length - 1);
-        const block = blocks[targetIndex];
+        // Try text-based matching first (robust against insertions/deletions above)
+        // If multiple blocks have the same text, pick the one closest to the original blockIndex
+        let block = null;
+        if (state.blockText) {
+            var candidates = [];
+            for (let i = 0; i < blocks.length; i++) {
+                if ((blocks[i].textContent || '') === state.blockText) {
+                    candidates.push({ block: blocks[i], index: i });
+                }
+            }
+            if (candidates.length === 1) {
+                block = candidates[0].block;
+            } else if (candidates.length > 1) {
+                // Pick closest to original blockIndex
+                var closest = candidates[0];
+                for (let j = 1; j < candidates.length; j++) {
+                    if (Math.abs(candidates[j].index - state.blockIndex) < Math.abs(closest.index - state.blockIndex)) {
+                        closest = candidates[j];
+                    }
+                }
+                block = closest.block;
+            }
+        }
+
+        // Fallback: use blockIndex (same as before)
+        if (!block) {
+            const targetIndex = Math.min(state.blockIndex, blocks.length - 1);
+            block = blocks[targetIndex];
+        }
 
         try {
             const position = findPositionByTextOffset(block, state.textOffset);
