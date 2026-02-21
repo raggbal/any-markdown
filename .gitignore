@@ -25,6 +25,6 @@ Thumbs.db
 # Sample and documentation files (not needed for extension)
 samples/
 docs/
-images/
-images2/
+/images/
+/images2/
 test2/
