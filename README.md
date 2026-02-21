@@ -3,8 +3,12 @@
 
 A seamless WYSIWYG markdown editor for VS Code inspired by Typora, Notion, and Obsidian. Experience smooth markdown editing with live preview - what you see is what you get!
 
-![VS Code Markdown Editor](https://img.shields.io/badge/VS%20Code-Markdown-blue)
+![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/imaken.any-markdown?label=VS%20Code%20Marketplace)
+![Open VSX](https://img.shields.io/open-vsx/v/imaken/any-markdown?label=Open%20VSX)
 ![License](https://img.shields.io/badge/license-MIT-green)
+![GitHub Sponsors](https://img.shields.io/github/sponsors/raggbal?label=Sponsor)
+
+![assets/images/1771689676522.png](assets/images/1771689676522.png)
 
 ## Features
 
@@ -29,6 +33,19 @@ A seamless WYSIWYG markdown editor for VS Code inspired by Typora, Notion, and O
 ---
 
 ## Installation
+
+### From VS Code Marketplace
+
+1. Open VS Code
+2. Go to Extensions (`Ctrl+Shift+X`)
+3. Search for **"Any Markdown Editor"**
+4. Click **Install**
+
+Or install directly: [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=imaken.any-markdown)
+
+### From Open VSX (VSCodium / Gitpod / Eclipse Theia)
+
+[Open VSX Registry](https://open-vsx.org/extension/imaken/any-markdown)
 
 ### From VSIX
 ```bash
@@ -320,10 +337,10 @@ vsce package --no-dependencies
 
 If you find this extension useful, please consider:
 
-- **Star** this repository on GitHub
-- **Report issues** or suggest features
+- [**Sponsor** on GitHub](https://github.com/sponsors/raggbal) - Help keep this project maintained
+- **Star** this repository on [GitHub](https://github.com/raggbal/any-markdown)
+- **Report issues** or suggest features on [Issues](https://github.com/raggbal/any-markdown/issues)
 - **Contribute** with pull requests
-- **Sponsor** the development
 
 Your support helps keep this project maintained and improved!
 
@@ -339,3 +356,7 @@ MIT License - feel free to use this extension in your projects.
 
 - Inspired by [Typora](https://typora.io/), [Notion](https://notion.so/), and [Obsidian](https://obsidian.md/)
 - Built with love for the VS Code community
+
+---
+IMAGE_DIR: ./assets/images
+FORCE_RELATIVE_PATH: true

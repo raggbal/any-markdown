@@ -2,7 +2,7 @@
   "name": "any-markdown",
   "displayName": "Any Markdown Editor",
   "description": "A WYSIWYG markdown editor for VS Code with seamless live preview",
-  "version": "0.195.259",
+  "version": "0.195.260",
   "publisher": "imaken",
   "icon": "media/icon.png",
   "license": "MIT",
@@ -14,6 +14,9 @@
     "url": "https://github.com/raggbal/any-markdown/issues"
   },
   "homepage": "https://github.com/raggbal/any-markdown#readme",
+  "sponsor": {
+    "url": "https://github.com/sponsors/raggbal"
+  },
   "engines": {
     "vscode": "^1.85.0"
   },
