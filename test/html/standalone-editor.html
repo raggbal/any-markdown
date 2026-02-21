@@ -6610,7 +6610,91 @@
                                 // At first row, exit table upward
                                 const prevElement = table.previousElementSibling;
                                 if (prevElement) {
-                                    setCursorToEnd(prevElement);
+                                    const prevTag = prevElement.tagName.toLowerCase();
+                                    if (prevTag === 'pre') {
+                                        // Enter code block edit mode, cursor at last line start
+                                        enterEditMode(prevElement);
+                                        setTimeout(() => {
+                                            const code = prevElement.querySelector('code');
+                                            if (code) {
+                                                setCursorToLastLineStart(code);
+                                            }
+                                        }, 0);
+                                    } else if (prevTag === 'div' && prevElement.classList.contains('mermaid-wrapper')) {
+                                        // Enter mermaid edit mode, cursor at last line start
+                                        prevElement.setAttribute('data-mode', 'edit');
+                                        setTimeout(() => {
+                                            const mermaidPre = prevElement.querySelector('pre[data-lang="mermaid"]');
+                                            if (mermaidPre) {
+                                                const code = mermaidPre.querySelector('code');
+                                                if (code) {
+                                                    code.focus();
+                                                    setCursorToLastLineStart(code);
+                                                }
+                                            }
+                                        }, 0);
+                                    } else if (prevTag === 'blockquote') {
+                                        // Use setTimeout to ensure cursor is set after browser finishes table focus cleanup
+                                        const bqEl = prevElement;
+                                        setTimeout(() => {
+                                            const bqSel = window.getSelection();
+                                            const bqBrTags = bqEl.querySelectorAll('br');
+                                            const bqText = bqEl.textContent || '';
+                                            const bqNewlineCount = (bqText.match(/\n/g) || []).length;
+                                            const bqTotalLines = bqBrTags.length + bqNewlineCount + 1;
+                                            if (bqTotalLines <= 1) {
+                                                setCursorToStart(bqEl);
+                                                return;
+                                            }
+                                            // Find the last line start by walking nodes
+                                            const bqLastLineIndex = bqTotalLines - 1;
+                                            let bqLineCount = 0;
+                                            const bqWalker = document.createTreeWalker(bqEl, NodeFilter.SHOW_ALL, null, false);
+                                            let bqNode;
+                                            let bqFound = false;
+                                            while ((bqNode = bqWalker.nextNode())) {
+                                                if (bqNode.nodeType === 1 && bqNode.tagName === 'BR') {
+                                                    bqLineCount++;
+                                                    if (bqLineCount === bqLastLineIndex) {
+                                                        const bqRange = document.createRange();
+                                                        const bqNextNode = bqNode.nextSibling;
+                                                        if (bqNextNode && bqNextNode.nodeType === 3) {
+                                                            bqRange.setStart(bqNextNode, 0);
+                                                        } else {
+                                                            bqRange.setStartAfter(bqNode);
+                                                        }
+                                                        bqRange.collapse(true);
+                                                        bqSel.removeAllRanges();
+                                                        bqSel.addRange(bqRange);
+                                                        bqFound = true;
+                                                        break;
+                                                    }
+                                                } else if (bqNode.nodeType === 3) {
+                                                    const bqNodeText = bqNode.textContent;
+                                                    for (let bi = 0; bi < bqNodeText.length; bi++) {
+                                                        if (bqNodeText[bi] === '\n') {
+                                                            bqLineCount++;
+                                                            if (bqLineCount === bqLastLineIndex) {
+                                                                const bqRange = document.createRange();
+                                                                bqRange.setStart(bqNode, bi + 1);
+                                                                bqRange.collapse(true);
+                                                                bqSel.removeAllRanges();
+                                                                bqSel.addRange(bqRange);
+                                                                bqFound = true;
+                                                                break;
+                                                            }
+                                                        }
+                                                    }
+                                                    if (bqFound) break;
+                                                }
+                                            }
+                                            if (!bqFound) {
+                                                setCursorToEnd(bqEl);
+                                            }
+                                        }, 0);
+                                    } else {
+                                        setCursorToLastLineStart(prevElement);
+                                    }
                                 } else {
                                     const p = document.createElement('p');
                                     p.innerHTML = '<br>';
@@ -6620,6 +6704,7 @@
                                 hideTableToolbar();
                                 activeTable = null;
                                 activeTableCell = null;
+                                return;
                             }
                         }
                     } else if (e.key === 'ArrowDown') {
@@ -6649,18 +6734,32 @@
                                 // At last row, exit table downward
                                 const nextElement = table.nextElementSibling;
                                 if (nextElement) {
-                                    // Move cursor to start of next element
-                                    const range = document.createRange();
-                                    const sel = window.getSelection();
-                                    if (nextElement.firstChild) {
-                                        range.setStart(nextElement.firstChild, 0);
+                                    const nextTag = nextElement.tagName.toLowerCase();
+                                    if (nextTag === 'pre') {
+                                        // Enter code block edit mode, cursor at first line start
+                                        enterEditMode(nextElement);
+                                        setTimeout(() => {
+                                            const code = nextElement.querySelector('code');
+                                            if (code) {
+                                                setCursorToStart(code);
+                                            }
+                                        }, 0);
+                                    } else if (nextTag === 'div' && nextElement.classList.contains('mermaid-wrapper')) {
+                                        // Enter mermaid edit mode, cursor at first line start
+                                        nextElement.setAttribute('data-mode', 'edit');
+                                        setTimeout(() => {
+                                            const mermaidPre = nextElement.querySelector('pre[data-lang="mermaid"]');
+                                            if (mermaidPre) {
+                                                const code = mermaidPre.querySelector('code');
+                                                if (code) {
+                                                    code.focus();
+                                                    setCursorToStart(code);
+                                                }
+                                            }
+                                        }, 0);
                                     } else {
-                                        range.selectNodeContents(nextElement);
+                                        setCursorToStart(nextElement);
                                     }
-                                    range.collapse(true);
-                                    sel.removeAllRanges();
-                                    sel.addRange(range);
-                                    nextElement.focus();
                                 } else {
                                     // No next element, create a paragraph after table
                                     const p = document.createElement('p');
@@ -6671,9 +6770,13 @@
                                 hideTableToolbar();
                                 activeTable = null;
                                 activeTableCell = null;
+                                return;
                             }
                         }
                     }
+                    // IMPORTANT: return after table cell arrow handling to prevent
+                    // the "invasion code" below from also running and overwriting cursor position
+                    return;
                 }
             }
         }
@@ -6970,8 +7073,21 @@
                                     }, 0);
                                 } else if (prev.tagName.toLowerCase() === 'blockquote') {
                                     setCursorToBlockLastLineStart(prev);
+                                } else if (prev.tagName.toLowerCase() === 'table') {
+                                    // Enter table from above (ArrowUp exit) - last row, first cell, last line start
+                                    const rows = prev.querySelectorAll('tr');
+                                    if (rows.length > 0) {
+                                        const lastRow = rows[rows.length - 1];
+                                        const firstCell = lastRow.cells[0];
+                                        if (firstCell) {
+                                            activeTable = prev;
+                                            activeTableCell = firstCell;
+                                            setCursorToLastLineStart(firstCell);
+                                            showTableToolbar(prev);
+                                        }
+                                    }
                                 } else {
-                                    setCursorToEnd(prev);
+                                    setCursorToLastLineStart(prev);
                                 }
                             }
                         } else {
@@ -7006,8 +7122,21 @@
                                     }, 0);
                                 } else if (prev.tagName.toLowerCase() === 'blockquote') {
                                     setCursorToBlockLastLineStart(prev);
+                                } else if (prev.tagName.toLowerCase() === 'table') {
+                                    // Enter table from above (ArrowUp exit) - last row, first cell, last line start
+                                    const rows = prev.querySelectorAll('tr');
+                                    if (rows.length > 0) {
+                                        const lastRow = rows[rows.length - 1];
+                                        const firstCell = lastRow.cells[0];
+                                        if (firstCell) {
+                                            activeTable = prev;
+                                            activeTableCell = firstCell;
+                                            setCursorToLastLineStart(firstCell);
+                                            showTableToolbar(prev);
+                                        }
+                                    }
                                 } else {
-                                    setCursorToEnd(prev);
+                                    setCursorToLastLineStart(prev);
                                 }
                             } else {
                                 // No previous element, create a new paragraph
@@ -7061,6 +7190,19 @@
                                             }
                                         }
                                     }, 0);
+                                } else if (nextTag === 'table') {
+                                    // Enter table from below (ArrowDown exit) - first row, first cell, first line start
+                                    const rows = next.querySelectorAll('tr');
+                                    if (rows.length > 0) {
+                                        const firstRow = rows[0];
+                                        const firstCell = firstRow.cells[0];
+                                        if (firstCell) {
+                                            activeTable = next;
+                                            activeTableCell = firstCell;
+                                            setCursorToStart(firstCell);
+                                            showTableToolbar(next);
+                                        }
+                                    }
                                 } else {
                                     setCursorToBlockStart(next);
                                 }
@@ -7086,7 +7228,7 @@
                                     setTimeout(() => {
                                         const code = next.querySelector('code');
                                         if (code) {
-                                            setCursorToBlockStart(next);
+                                            setCursorToBlockStart(code);
                                         }
                                     }, 0);
                                 } else if (nextTag === 'div' && next.classList.contains('mermaid-wrapper')) {
@@ -7102,6 +7244,19 @@
                                             }
                                         }
                                     }, 0);
+                                } else if (nextTag === 'table') {
+                                    // Enter table from below (ArrowDown exit) - first row, first cell, first line start
+                                    const rows = next.querySelectorAll('tr');
+                                    if (rows.length > 0) {
+                                        const firstRow = rows[0];
+                                        const firstCell = firstRow.cells[0];
+                                        if (firstCell) {
+                                            activeTable = next;
+                                            activeTableCell = firstCell;
+                                            setCursorToStart(firstCell);
+                                            showTableToolbar(next);
+                                        }
+                                    }
                                 } else {
                                     setCursorToBlockStart(next);
                                 }
@@ -7135,8 +7290,47 @@
                 while (currentElement.parentNode && currentElement.parentNode !== editor) {
                     currentElement = currentElement.parentNode;
                 }
-                
+
+                // Helper: check if cursor is at the first visual line of the element
+                // Uses getBoundingClientRect to compare cursor Y with the element's first line Y
+                function isCursorAtFirstLine(element) {
+                    const range = sel.getRangeAt(0);
+                    // Get cursor rect
+                    let cursorRect = range.getBoundingClientRect();
+                    // If collapsed range has no rect, insert temp span
+                    if (cursorRect.height === 0) {
+                        const tempSpan = document.createElement('span');
+                        tempSpan.textContent = '\u200B';
+                        range.insertNode(tempSpan);
+                        cursorRect = tempSpan.getBoundingClientRect();
+                        tempSpan.parentNode.removeChild(tempSpan);
+                    }
+                    // Get element's first line rect
+                    const elemRect = element.getBoundingClientRect();
+                    // Cursor is at first line if its top is close to element's top
+                    return cursorRect.top < elemRect.top + cursorRect.height;
+                }
+
+                // Helper: check if cursor is at the last visual line of the element
+                function isCursorAtLastLine(element) {
+                    const range = sel.getRangeAt(0);
+                    let cursorRect = range.getBoundingClientRect();
+                    if (cursorRect.height === 0) {
+                        const tempSpan = document.createElement('span');
+                        tempSpan.textContent = '\u200B';
+                        range.insertNode(tempSpan);
+                        cursorRect = tempSpan.getBoundingClientRect();
+                        tempSpan.parentNode.removeChild(tempSpan);
+                    }
+                    const elemRect = element.getBoundingClientRect();
+                    // Cursor is at last line if its bottom is close to element's bottom
+                    return cursorRect.bottom > elemRect.bottom - cursorRect.height;
+                }
+
                 if (e.key === 'ArrowUp') {
+                    // Only enter adjacent block if cursor is at the first line of current element
+                    if (!isCursorAtFirstLine(currentElement)) return;
+
                     const prev = currentElement.previousElementSibling;
                     if (prev) {
                         const tag = prev.tagName.toLowerCase();
@@ -7175,16 +7369,16 @@
                             return;
                         }
                         if (tag === 'table') {
-                            // Enter table from below - go to last row, first column
+                            // Enter table from below - go to last row, first column, last line start
                             e.preventDefault();
                             const rows = prev.querySelectorAll('tr');
                             if (rows.length > 0) {
                                 const lastRow = rows[rows.length - 1];
-                                const firstCell = lastRow.cells[0]; // First column, not last
+                                const firstCell = lastRow.cells[0];
                                 if (firstCell) {
                                     activeTable = prev;
                                     activeTableCell = firstCell;
-                                    setCursorToEnd(firstCell);
+                                    setCursorToLastLineStart(firstCell);
                                     showTableToolbar(prev);
                                 }
                             }
@@ -7192,6 +7386,9 @@
                         }
                     }
                 } else if (e.key === 'ArrowDown') {
+                    // Only enter adjacent block if cursor is at the last line of current element
+                    if (!isCursorAtLastLine(currentElement)) return;
+
                     const next = currentElement.nextElementSibling;
                     if (next) {
                         const tag = next.tagName.toLowerCase();
@@ -7223,7 +7420,7 @@
                             return;
                         }
                         if (tag === 'table') {
-                            // Enter table from above - go to first row, first column
+                            // Enter table from above - go to first row, first column, first line start
                             e.preventDefault();
                             const rows = next.querySelectorAll('tr');
                             if (rows.length > 0) {
@@ -7232,17 +7429,7 @@
                                 if (firstCell) {
                                     activeTable = next;
                                     activeTableCell = firstCell;
-                                    // Set cursor to start of cell
-                                    const range = document.createRange();
-                                    const sel = window.getSelection();
-                                    if (firstCell.firstChild) {
-                                        range.setStart(firstCell.firstChild, 0);
-                                    } else {
-                                        range.selectNodeContents(firstCell);
-                                    }
-                                    range.collapse(true);
-                                    sel.removeAllRanges();
-                                    sel.addRange(range);
+                                    setCursorToStart(firstCell);
                                     showTableToolbar(next);
                                 }
                             }
