@@ -80,4 +80,5 @@ export const webviewMessages = {
   livePreviewMode: 'Live Preview Mode',
   sourceMode: 'Source Mode',
   relativePath: 'Relative Path',
+  externalChangeToast: 'File modified externally. Changes won\'t appear while editing. Click outside the editor to reload.',
 };

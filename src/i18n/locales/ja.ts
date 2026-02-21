@@ -80,4 +80,5 @@ export const webviewMessages = {
   livePreviewMode: 'ライブプレビューモード',
   sourceMode: 'ソースモード',
   relativePath: '相対パス',
+  externalChangeToast: 'ファイルが外部で変更されました。編集中は反映されません。エディタ外をクリックしてフォーカスを外すと反映されます。',
 };

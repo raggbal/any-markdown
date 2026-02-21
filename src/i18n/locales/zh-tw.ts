@@ -80,4 +80,5 @@ export const webviewMessages = {
   livePreviewMode: '即時預覽模式',
   sourceMode: '原始碼模式',
   relativePath: '相對路徑',
+  externalChangeToast: '檔案已被外部修改。編輯中不會反映變更。請點擊編輯器外部以重新載入。',
 };

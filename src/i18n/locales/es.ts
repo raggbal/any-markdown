@@ -80,4 +80,5 @@ export const webviewMessages = {
   livePreviewMode: 'Modo vista previa',
   sourceMode: 'Modo fuente',
   relativePath: 'Ruta relativa',
+  externalChangeToast: 'Archivo modificado externamente. Los cambios no se reflejan mientras edita. Haga clic fuera del editor para recargar.',
 };

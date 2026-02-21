@@ -358,6 +358,35 @@ body {
     display: none;
 }
 
+/* External change toast notification */
+.external-change-toast {
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    background: var(--toolbar-bg, #f6f8fa);
+    color: var(--text-color, #24292f);
+    border: 1px solid var(--border-color, #d0d7de);
+    border-left: 3px solid var(--link-color, #0969da);
+    border-radius: 6px;
+    padding: 10px 14px;
+    font-size: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    z-index: 10001;
+    opacity: 0;
+    transform: translateX(100%);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    pointer-events: none;
+    max-width: 320px;
+}
+.external-change-toast.show {
+    opacity: 1;
+    transform: translateX(0);
+    pointer-events: auto;
+}
+.external-change-toast .toast-message {
+    line-height: 1.4;
+}
+
 .editor h1, .editor h2, .editor h3, .editor h4, .editor h5, .editor h6 {
     color: var(--heading-color);
     margin: 0.5em 0;

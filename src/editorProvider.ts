@@ -435,6 +435,12 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
                 // Webview is authoritative — but track truly external changes
                 if (!isApplyingOwnEdit) {
                     missedExternalChange = true;
+                    // Notify webview with toast
+                    const wm = getWebviewMessages();
+                    webviewPanel.webview.postMessage({
+                        type: 'externalChangeDetected',
+                        message: wm.externalChangeToast
+                    });
                 }
                 return;
             }
@@ -442,6 +448,16 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
             // External change — update webview
             const currentContent = document.getText();
             const content = convertImagePaths(currentContent);
+
+            // Notify with toast if this is a truly external change (not from our own edit)
+            if (!isApplyingOwnEdit) {
+                const wm = getWebviewMessages();
+                webviewPanel.webview.postMessage({
+                    type: 'externalChangeDetected',
+                    message: wm.externalChangeToast
+                });
+            }
+
             webviewPanel.webview.postMessage({
                 type: 'update',
                 content: content

@@ -9932,6 +9932,9 @@
             }
             syncMarkdown();
             editor.focus();
+        } else if (message.type === 'externalChangeDetected') {
+            // Show toast notification for external change
+            showExternalChangeToast(message.message);
         } else if (message.type === 'scrollToAnchor') {
             // Scroll to anchor (heading) in the document
             const anchor = message.anchor;
@@ -9961,6 +9964,32 @@
             }
         }
     });
+
+    // External change toast notification
+    let externalChangeToast = null;
+    let toastHideTimer = null;
+
+    function showExternalChangeToast(msg) {
+        if (!externalChangeToast) {
+            externalChangeToast = document.createElement('div');
+            externalChangeToast.className = 'external-change-toast';
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'toast-message';
+            externalChangeToast.appendChild(messageDiv);
+            document.body.appendChild(externalChangeToast);
+        }
+        const messageDiv = externalChangeToast.querySelector('.toast-message');
+        messageDiv.textContent = msg || 'File modified externally. Click outside editor to reload.';
+        // Show
+        if (toastHideTimer) clearTimeout(toastHideTimer);
+        requestAnimationFrame(() => {
+            externalChangeToast.classList.add('show');
+        });
+        // Auto-hide after 5 seconds
+        toastHideTimer = setTimeout(() => {
+            externalChangeToast.classList.remove('show');
+        }, 5000);
+    }
 
     // Drag cursor indicator element
     let dragCursor = null;

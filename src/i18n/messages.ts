@@ -81,6 +81,7 @@ export interface WebviewMessages {
   livePreviewMode: string;
   sourceMode: string;
   relativePath: string;
+  externalChangeToast: string;
 }
 
 // Supported locales
