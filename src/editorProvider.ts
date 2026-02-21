@@ -420,43 +420,24 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
         // Initialize IMAGE_DIR tracking
         imageDirectoryManager.initializeForDocument(document.uri, document.getText());
 
-        // Focus-based sync policy: when webview has focus, it is the authoritative source.
-        // All onDidChangeTextDocument events are ignored while focused (no bounce-back possible).
+        // Sync policy: when user is actively editing, external changes are queued in webview.
+        // When user is idle (even with focus), external changes are applied with cursor preservation.
         let webviewHasFocus = false;
-        let missedExternalChange = false;
+        let isActivelyEditing = false;
         let isApplyingOwnEdit = false;
 
-        // Listen for document changes — focus policy makes this dramatically simple
+        // Listen for document changes
         const changeDocumentSubscription = vscode.workspace.onDidChangeTextDocument(e => {
             if (e.document.uri.toString() !== document.uri.toString()) return;
             if (e.contentChanges.length === 0) return; // Skip metadata-only changes
 
-            if (webviewHasFocus) {
-                // Webview is authoritative — but track truly external changes
-                if (!isApplyingOwnEdit) {
-                    missedExternalChange = true;
-                    // Notify webview with toast
-                    const wm = getWebviewMessages();
-                    webviewPanel.webview.postMessage({
-                        type: 'externalChangeDetected',
-                        message: wm.externalChangeToast
-                    });
-                }
-                return;
-            }
+            // Skip our own edits — they are already reflected in the webview
+            if (isApplyingOwnEdit) return;
 
-            // External change — update webview
+            // External change detected — send update to webview.
+            // The webview will decide whether to apply immediately (idle) or queue (editing).
             const currentContent = document.getText();
             const content = convertImagePaths(currentContent);
-
-            // Notify with toast if this is a truly external change (not from our own edit)
-            if (!isApplyingOwnEdit) {
-                const wm = getWebviewMessages();
-                webviewPanel.webview.postMessage({
-                    type: 'externalChangeDetected',
-                    message: wm.externalChangeToast
-                });
-            }
 
             webviewPanel.webview.postMessage({
                 type: 'update',
@@ -493,6 +474,7 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
 
                         if (newContent !== currentContent) {
                             // Sync VS Code document with file content (triggers onDidChangeTextDocument)
+                            isApplyingOwnEdit = true;
                             const fullRange = new vscode.Range(
                                 document.positionAt(0),
                                 document.positionAt(currentContent.length)
@@ -500,8 +482,20 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
                             const edit = new vscode.WorkspaceEdit();
                             edit.replace(document.uri, fullRange, newContent);
                             await vscode.workspace.applyEdit(edit);
+                            isApplyingOwnEdit = false;
+
+                            // Save immediately to clear dirty state — file on disk is already up to date
+                            await document.save();
+
+                            // Notify webview directly (since isApplyingOwnEdit suppressed onDidChangeTextDocument)
+                            const content = convertImagePaths(newContent);
+                            webviewPanel.webview.postMessage({
+                                type: 'update',
+                                content: content
+                            });
                         }
                     } catch (error) {
+                        isApplyingOwnEdit = false;
                         console.error('[Any MD] Error reading file after external change:', error);
                     }
                 }, 100);
@@ -525,10 +519,6 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
         let applyEditQueue: Promise<void> = Promise.resolve();
 
         const scheduleEdit = (content: string) => {
-            // Don't overwrite external changes — preserve them for reload on blur
-            if (missedExternalChange) {
-                return;
-            }
             pendingContent = content;
             if (editDebounceTimer) {
                 clearTimeout(editDebounceTimer);
@@ -577,29 +567,17 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
                     await document.save();
                     break;
 
+                case 'editingStateChanged':
+                    isActivelyEditing = message.editing;
+                    break;
+
                 case 'webviewFocus':
                     webviewHasFocus = true;
-                    missedExternalChange = false;
                     break;
 
                 case 'webviewBlur':
                     webviewHasFocus = false;
-                    if (missedExternalChange) {
-                        missedExternalChange = false;
-                        // Cancel pending webview edit — external content takes priority
-                        if (editDebounceTimer) {
-                            clearTimeout(editDebounceTimer);
-                            editDebounceTimer = null;
-                        }
-                        pendingContent = null;
-                        // Reload webview with current document content
-                        const currentContent = document.getText();
-                        const content = convertImagePaths(currentContent);
-                        webviewPanel.webview.postMessage({
-                            type: 'update',
-                            content: content
-                        });
-                    }
+                    isActivelyEditing = false;
                     break;
 
                 case 'insertImage':

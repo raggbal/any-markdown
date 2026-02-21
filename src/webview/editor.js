@@ -128,6 +128,12 @@
     let hasUserEdited = false; // Flag to track if user has made any edits
     let currentImageDir = null; // IMAGE_DIR directive value (preserved during sync)
     let currentForceRelativePath = null; // FORCE_RELATIVE_PATH directive value (preserved during sync)
+
+    // Active editing detection — replaces simple focus-based guard
+    let isActivelyEditing = false;
+    let editingIdleTimer = null;
+    let queuedExternalContent = null; // Queued external change waiting for idle
+    const EDITING_IDLE_TIMEOUT = 1500; // 1.5 seconds of inactivity = idle
     
     // Supported languages for syntax highlighting (must be defined before init())
     const SUPPORTED_LANGUAGES = [
@@ -850,6 +856,216 @@
         logger.log('[Any MD] renderFromMarkdown: html length:', html.length, 'first 100 chars:', html.substring(0, 100));
         editor.innerHTML = html || '<p><br></p>';
         setupInteractiveElements();
+    }
+
+    // ========== CURSOR-PRESERVING DOM UPDATE ==========
+    // Used for external changes only. Initial render and mode switch use renderFromMarkdown().
+
+    /**
+     * Save cursor state as block index + text offset within the block.
+     * Returns null if no valid cursor.
+     */
+    function saveCursorState() {
+        const sel = window.getSelection();
+        if (!sel || !sel.rangeCount) return null;
+
+        const range = sel.getRangeAt(0);
+        const anchorNode = sel.anchorNode;
+        if (!anchorNode) return null;
+
+        // Find which top-level block contains the cursor
+        let block = anchorNode;
+        while (block && block !== editor && block.parentNode !== editor) {
+            block = block.parentNode;
+        }
+        if (!block || block === editor) return null;
+
+        const blockIndex = Array.from(editor.children).indexOf(block);
+        if (blockIndex === -1) return null;
+
+        // Calculate text offset within the block
+        try {
+            const preRange = document.createRange();
+            preRange.setStart(block, 0);
+            preRange.setEnd(range.startContainer, range.startOffset);
+            const textOffset = preRange.toString().length;
+            return { blockIndex, textOffset };
+        } catch (e) {
+            logger.log('[Any MD] saveCursorState failed:', e);
+            return null;
+        }
+    }
+
+    /**
+     * Find a DOM position by walking text nodes until reaching the target offset.
+     */
+    function findPositionByTextOffset(root, targetOffset) {
+        let currentOffset = 0;
+
+        function walk(node) {
+            if (node.nodeType === Node.TEXT_NODE) {
+                const len = node.textContent.length;
+                if (currentOffset + len >= targetOffset) {
+                    return { node: node, offset: targetOffset - currentOffset };
+                }
+                currentOffset += len;
+                return null;
+            }
+            if (node.nodeType === Node.ELEMENT_NODE) {
+                if (node.tagName === 'BR') {
+                    if (currentOffset >= targetOffset) {
+                        const parent = node.parentNode;
+                        const idx = Array.from(parent.childNodes).indexOf(node);
+                        return { node: parent, offset: idx };
+                    }
+                    currentOffset += 1;
+                    return null;
+                }
+                for (const child of node.childNodes) {
+                    const result = walk(child);
+                    if (result) return result;
+                }
+            }
+            return null;
+        }
+
+        const result = walk(root);
+        if (!result) {
+            // Fallback: end of block
+            if (root.childNodes.length > 0) {
+                return { node: root, offset: root.childNodes.length };
+            }
+            return { node: root, offset: 0 };
+        }
+        return result;
+    }
+
+    /**
+     * Restore cursor to the saved state.
+     */
+    function restoreCursorState(state) {
+        if (!state) return;
+
+        const blocks = Array.from(editor.children);
+        if (blocks.length === 0) return;
+
+        const targetIndex = Math.min(state.blockIndex, blocks.length - 1);
+        const block = blocks[targetIndex];
+
+        try {
+            const position = findPositionByTextOffset(block, state.textOffset);
+            if (!position) return;
+
+            const range = document.createRange();
+            range.setStart(position.node, position.offset);
+            range.collapse(true);
+
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
+        } catch (e) {
+            logger.log('[Any MD] restoreCursorState failed:', e);
+        }
+    }
+
+    /**
+     * Normalize block HTML for comparison (collapse whitespace differences).
+     */
+    function normalizeBlockHtml(html) {
+        return html
+            .replace(/\s+/g, ' ')
+            .replace(/>\s+</g, '><')
+            .replace(/\s*contenteditable="[^"]*"/g, '')  // Ignore contenteditable attr diffs
+            .trim();
+    }
+
+    /**
+     * Check if two block elements are semantically equal.
+     */
+    function blocksAreEqual(a, b) {
+        if (a.tagName !== b.tagName) return false;
+        if (a.tagName === 'HR' && b.tagName === 'HR') return true;
+        if (a.getAttribute('data-lang') !== b.getAttribute('data-lang')) return false;
+        if (a.className !== b.className) return false;
+        return normalizeBlockHtml(a.innerHTML) === normalizeBlockHtml(b.innerHTML);
+    }
+
+    /**
+     * Check if a block is in a special interactive state that should not be replaced.
+     */
+    function isProtectedBlock(block) {
+        // Code block in edit mode
+        if (block.tagName === 'PRE' && block.getAttribute('data-mode') === 'edit') {
+            return true;
+        }
+        // Mermaid block in edit mode
+        if (block.classList && block.classList.contains('mermaid-wrapper') &&
+            block.getAttribute('data-mode') === 'edit') {
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Cursor-preserving DOM update for external changes.
+     * Diffs at block level and only replaces changed blocks.
+     */
+    function updateFromMarkdown() {
+        logger.log('[Any MD] updateFromMarkdown: cursor-preserving update');
+
+        // 1. Save cursor state
+        const cursorState = saveCursorState();
+
+        // 2. Generate new HTML into a temporary container
+        let markdownToRender = removeDirectivesFromMarkdown(markdown);
+        const newHtml = markdownToHtmlFragment(markdownToRender);
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = newHtml || '<p><br></p>';
+
+        // 3. Block-level diff and patch
+        const oldBlocks = Array.from(editor.children);
+        const newBlocks = Array.from(tempDiv.children);
+        const maxLen = Math.max(oldBlocks.length, newBlocks.length);
+        let changed = false;
+
+        for (let i = 0; i < maxLen; i++) {
+            const oldBlock = oldBlocks[i];
+            const newBlock = newBlocks[i];
+
+            if (!oldBlock && newBlock) {
+                // Block added
+                editor.appendChild(newBlock.cloneNode(true));
+                changed = true;
+            } else if (oldBlock && !newBlock) {
+                // Block removed
+                editor.removeChild(oldBlock);
+                changed = true;
+                // Adjust index since we removed an element
+                oldBlocks.splice(i, 1);
+                i--;
+            } else if (oldBlock && newBlock) {
+                if (!blocksAreEqual(oldBlock, newBlock)) {
+                    if (isProtectedBlock(oldBlock)) {
+                        logger.log('[Any MD] updateFromMarkdown: skipping protected block at index', i);
+                        continue;
+                    }
+                    const replacement = newBlock.cloneNode(true);
+                    editor.replaceChild(replacement, oldBlock);
+                    changed = true;
+                }
+            }
+        }
+
+        if (changed) {
+            // Re-setup interactive elements for the updated DOM
+            setupInteractiveElements();
+            logger.log('[Any MD] updateFromMarkdown: DOM patched');
+        } else {
+            logger.log('[Any MD] updateFromMarkdown: no changes detected');
+        }
+
+        // 4. Restore cursor
+        restoreCursorState(cursorState);
     }
     
     // Convert markdown to HTML fragment (reusable for both full render and partial paste)
@@ -4518,6 +4734,11 @@
     editor.addEventListener('keydown', function(e) {
         logger.log('Editor keydown:', e.key);
         if (isSourceMode) return;
+
+        // Mark as actively editing for non-navigation keys
+        if (!e.key.startsWith('Arrow') && !['Shift', 'Control', 'Alt', 'Meta', 'CapsLock', 'Escape', 'Tab'].includes(e.key)) {
+            markActivelyEditing();
+        }
 
         // Backspace key - handle nested list items
         // Case: Cursor at beginning of non-empty li that is the first child of a nested list
@@ -8936,6 +9157,7 @@
     // Input handler - debounced sync for performance
     editor.addEventListener('input', function(e) {
         if (isSourceMode) return;
+        markActivelyEditing();
         markAsEdited(); // User has made an edit
         // Debounced sync - only updates markdown after user stops typing
         debouncedSync();
@@ -9335,6 +9557,57 @@
             hasUserEdited = true;
             logger.log('Document marked as edited by user');
         }
+    }
+
+    /**
+     * Mark the user as actively editing. Resets the idle timer.
+     * While actively editing, external changes are queued instead of applied.
+     */
+    function markActivelyEditing() {
+        const wasIdle = !isActivelyEditing;
+        isActivelyEditing = true;
+
+        if (wasIdle) {
+            vscode.postMessage({ type: 'editingStateChanged', editing: true });
+        }
+
+        clearTimeout(editingIdleTimer);
+        editingIdleTimer = setTimeout(function() {
+            // Flush any pending sync before going idle
+            if (pendingSync) {
+                clearTimeout(syncTimeout);
+                markdown = htmlToMarkdown();
+                notifyChangeImmediate();
+                pendingSync = false;
+            }
+
+            isActivelyEditing = false;
+            vscode.postMessage({ type: 'editingStateChanged', editing: false });
+
+            // Apply queued external changes now that we're idle
+            applyQueuedExternalChange();
+        }, EDITING_IDLE_TIMEOUT);
+    }
+
+    /**
+     * Apply queued external change with cursor preservation.
+     */
+    function applyQueuedExternalChange() {
+        if (queuedExternalContent === null) return;
+
+        logger.log('[Any MD] applying queued external change');
+        markdown = queuedExternalContent;
+        queuedExternalContent = null;
+        currentImageDir = extractImageDirFromMarkdown(markdown);
+        currentForceRelativePath = extractForceRelativePathFromMarkdown(markdown);
+        if (isSourceMode) {
+            sourceEditor.value = markdown;
+        } else {
+            updateFromMarkdown();
+        }
+        updateOutline();
+        updateWordCount();
+        updateStatus();
     }
 
     function updateOutline() {
@@ -9846,27 +10119,28 @@
         if (message.type === 'update') {
             logger.log('[Any MD] update message received, content length:', message.content?.length);
 
-            // Focus-based guard: if webview truly has focus, ignore updates (webview is authoritative)
-            // Use document.hasFocus() — activeElement alone is unreliable in iframes
-            // (it retains the last focused element even after the iframe loses focus)
-            if (document.hasFocus()) {
-                logger.log('[Any MD] update skipped: webview has focus');
-                return;
-            }
-
             // Normalize incoming content: strip BOM, normalize line endings
             let incomingContent = message.content || '';
             if (incomingContent.charCodeAt(0) === 0xFEFF) {
                 incomingContent = incomingContent.slice(1);
             }
             incomingContent = incomingContent.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+            // Active editing guard: queue external changes while user is typing
+            if (isActivelyEditing) {
+                queuedExternalContent = incomingContent;
+                logger.log('[Any MD] update queued: user is actively editing');
+                return;
+            }
+
+            // Idle state — apply external change immediately with cursor preservation
             markdown = incomingContent;
-            // Update currentImageDir from new content
             currentImageDir = extractImageDirFromMarkdown(markdown);
+            currentForceRelativePath = extractForceRelativePathFromMarkdown(markdown);
             if (isSourceMode) {
                 sourceEditor.value = markdown;
             } else {
-                renderFromMarkdown();
+                updateFromMarkdown();
             }
             updateOutline();
             updateWordCount();
@@ -11254,18 +11528,26 @@
         }
     });
 
-    // Focus/blur notifications for focus-based sync policy
+    // Focus/blur notifications for sync policy
     editor.addEventListener('focus', function() {
         vscode.postMessage({ type: 'webviewFocus' });
     });
     editor.addEventListener('blur', function() {
+        // Flush pending edits immediately on blur
         if (!isSourceMode && hasUserEdited) {
-            // Cancel debounced sync and sync immediately before blur
             clearTimeout(syncTimeout);
             markdown = htmlToMarkdown();
             vscode.postMessage({ type: 'edit', content: markdown });
         }
+
+        // Force idle state on blur
+        clearTimeout(editingIdleTimer);
+        isActivelyEditing = false;
+        vscode.postMessage({ type: 'editingStateChanged', editing: false });
         vscode.postMessage({ type: 'webviewBlur' });
+
+        // Apply queued external changes now that we're definitely idle
+        applyQueuedExternalChange();
     });
 
     sourceEditor.addEventListener('focus', function() {
@@ -11276,7 +11558,13 @@
             markdown = sourceEditor.value;
             vscode.postMessage({ type: 'edit', content: markdown });
         }
+
+        clearTimeout(editingIdleTimer);
+        isActivelyEditing = false;
+        vscode.postMessage({ type: 'editingStateChanged', editing: false });
         vscode.postMessage({ type: 'webviewBlur' });
+
+        applyQueuedExternalChange();
     });
 
     // Also save when the webview itself loses visibility
