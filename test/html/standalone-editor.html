@@ -1050,13 +1050,16 @@
         const blockIndex = Array.from(editor.children).indexOf(block);
         if (blockIndex === -1) return null;
 
+        // Save block text content for text-based matching (robust against insertions above)
+        const blockText = block.textContent || '';
+
         // Calculate text offset within the block
         try {
             const preRange = document.createRange();
             preRange.setStart(block, 0);
             preRange.setEnd(range.startContainer, range.startOffset);
             const textOffset = preRange.toString().length;
-            return { blockIndex, textOffset };
+            return { blockIndex, blockText, textOffset };
         } catch (e) {
             logger.log('[Any MD] saveCursorState failed:', e);
             return null;
@@ -1116,8 +1119,35 @@
         const blocks = Array.from(editor.children);
         if (blocks.length === 0) return;
 
-        const targetIndex = Math.min(state.blockIndex, blocks.length - 1);
-        const block = blocks[targetIndex];
+        // Try text-based matching first (robust against insertions/deletions above)
+        // If multiple blocks have the same text, pick the one closest to the original blockIndex
+        let block = null;
+        if (state.blockText) {
+            var candidates = [];
+            for (let i = 0; i < blocks.length; i++) {
+                if ((blocks[i].textContent || '') === state.blockText) {
+                    candidates.push({ block: blocks[i], index: i });
+                }
+            }
+            if (candidates.length === 1) {
+                block = candidates[0].block;
+            } else if (candidates.length > 1) {
+                // Pick closest to original blockIndex
+                var closest = candidates[0];
+                for (let j = 1; j < candidates.length; j++) {
+                    if (Math.abs(candidates[j].index - state.blockIndex) < Math.abs(closest.index - state.blockIndex)) {
+                        closest = candidates[j];
+                    }
+                }
+                block = closest.block;
+            }
+        }
+
+        // Fallback: use blockIndex (same as before)
+        if (!block) {
+            const targetIndex = Math.min(state.blockIndex, blocks.length - 1);
+            block = blocks[targetIndex];
+        }
 
         try {
             const position = findPositionByTextOffset(block, state.textOffset);
@@ -4260,8 +4290,19 @@
                 } else {
                     codeContent = node.textContent;
                 }
-                // Ensure code content ends with exactly one newline before closing fence
-                if (!codeContent.endsWith('\n')) {
+                // Check if this is an empty code block (only a placeholder <br>)
+                // Empty code blocks have a single <br> for cursor placement (9A-22),
+                // which processCodeNode converts to "\n". This is NOT real content.
+                const isEmptyCodeBlock = code && code.childNodes.length === 1 &&
+                    code.firstChild.nodeType === 1 &&
+                    code.firstChild.tagName.toLowerCase() === 'br';
+                if (isEmptyCodeBlock) {
+                    codeContent = '\n';
+                } else {
+                    // Always add a newline for the closing fence.
+                    // This preserves trailing empty lines: a trailing <br> in HTML
+                    // represents a real empty line, and its \n should NOT be reused
+                    // as the closing fence newline.
                     codeContent += '\n';
                 }
                 // Determine fence length: if content contains triple backticks, use more backticks

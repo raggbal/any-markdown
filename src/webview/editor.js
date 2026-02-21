@@ -4123,8 +4123,19 @@
                 } else {
                     codeContent = node.textContent;
                 }
-                // Ensure code content ends with exactly one newline before closing fence
-                if (!codeContent.endsWith('\n')) {
+                // Check if this is an empty code block (only a placeholder <br>)
+                // Empty code blocks have a single <br> for cursor placement (9A-22),
+                // which processCodeNode converts to "\n". This is NOT real content.
+                const isEmptyCodeBlock = code && code.childNodes.length === 1 &&
+                    code.firstChild.nodeType === 1 &&
+                    code.firstChild.tagName.toLowerCase() === 'br';
+                if (isEmptyCodeBlock) {
+                    codeContent = '\n';
+                } else {
+                    // Always add a newline for the closing fence.
+                    // This preserves trailing empty lines: a trailing <br> in HTML
+                    // represents a real empty line, and its \n should NOT be reused
+                    // as the closing fence newline.
                     codeContent += '\n';
                 }
                 // Determine fence length: if content contains triple backticks, use more backticks
