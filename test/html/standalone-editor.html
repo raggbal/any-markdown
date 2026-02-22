@@ -531,21 +531,29 @@
     function scrollCursorIntoView() {
         const sel = window.getSelection();
         if (!sel || !sel.rangeCount) return;
-        
+
         try {
-            const range = sel.getRangeAt(0).cloneRange();
-            // Create a temporary span to get cursor position
-            const tempSpan = document.createElement('span');
-            tempSpan.style.cssText = 'position:absolute;width:1px;height:1em;';
-            range.insertNode(tempSpan);
-            
-            // Scroll the span into view
-            tempSpan.scrollIntoView({ block: 'nearest', behavior: 'instant' });
-            
-            // Remove the temporary span
-            tempSpan.parentNode.removeChild(tempSpan);
+            const range = sel.getRangeAt(0);
+            // Try to get cursor position from range rect (no DOM modification needed)
+            const rects = range.getClientRects();
+            const rect = rects.length > 0 ? rects[0] : range.getBoundingClientRect();
+
+            if (rect && (rect.height > 0 || rect.width > 0)) {
+                // Use the rect to check if cursor is visible
+                const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+                if (rect.top < 0 || rect.bottom > viewportHeight) {
+                    // Scroll the cursor's parent element into view
+                    let el = range.startContainer;
+                    if (el.nodeType === 3) el = el.parentElement;
+                    if (el) el.scrollIntoView({ block: 'nearest', behavior: 'instant' });
+                }
+            } else {
+                // Collapsed range with zero-size rect: scroll parent element
+                let el = range.startContainer;
+                if (el.nodeType === 3) el = el.parentElement;
+                if (el) el.scrollIntoView({ block: 'nearest', behavior: 'instant' });
+            }
         } catch (e) {
-            // Fallback: do nothing if scroll fails
             logger.log('scrollCursorIntoView failed:', e);
         }
     }
@@ -611,17 +619,27 @@
         // Find the last line break
         var lastBreak = lineBreaks[lineBreaks.length - 1];
 
+        // Helper: check if a sibling is real editable content (not UI elements like resize handles)
+        function isEditableContent(node) {
+            if (node.nodeType === 3) {
+                return node.textContent.length > 0 && node.textContent !== '\n' && node.textContent.trim() !== '';
+            }
+            if (node.nodeType === 1) {
+                // Skip non-editable UI elements (e.g., table resize handles)
+                if (node.getAttribute && node.getAttribute('contenteditable') === 'false') return false;
+                if (node.tagName === 'BR') return false;
+                return true;
+            }
+            return false;
+        }
+
         // Determine if there's content after the last line break (i.e., the last line is non-empty)
         var hasContentAfterLastBreak = false;
         if (lastBreak.type === 'br') {
             // Check siblings after the BR for non-empty, non-newline content
             var sib = lastBreak.node.nextSibling;
             while (sib) {
-                if (sib.nodeType === 3 && sib.textContent.length > 0 && sib.textContent !== '\n' && sib.textContent.trim() !== '') {
-                    hasContentAfterLastBreak = true;
-                    break;
-                }
-                if (sib.nodeType === 1 && sib.tagName !== 'BR') {
+                if (isEditableContent(sib)) {
                     hasContentAfterLastBreak = true;
                     break;
                 }
@@ -636,11 +654,7 @@
                 // Check next siblings
                 var sib = lastBreak.node.nextSibling;
                 while (sib) {
-                    if (sib.nodeType === 3 && sib.textContent.length > 0 && sib.textContent !== '\n' && sib.textContent.trim() !== '') {
-                        hasContentAfterLastBreak = true;
-                        break;
-                    }
-                    if (sib.nodeType === 1 && sib.tagName !== 'BR') {
+                    if (isEditableContent(sib)) {
                         hasContentAfterLastBreak = true;
                         break;
                     }
@@ -683,17 +697,32 @@
             }
         } else {
             // Last line is empty (trailing line break)
-            // We need to position at the start of this empty last line
-            // That means: position right after the last line break
-            if (lastBreak.type === 'br') {
-                var parent = lastBreak.node.parentNode;
-                var brIndex = Array.from(parent.childNodes).indexOf(lastBreak.node);
-                range.setStart(parent, brIndex + 1);
-                logger.log('setCursorToLastLineStart: positioned after last BR (empty last line)');
+            // For navigation purposes, position at the previous content line's start
+            // (if available), not the empty trailing line
+            if (lineBreaks.length >= 2) {
+                // Use the second-to-last break to find the previous content line
+                var prevBreak = lineBreaks[lineBreaks.length - 2];
+                if (prevBreak.type === 'br') {
+                    var target = prevBreak.node.nextSibling;
+                    while (target && target !== lastBreak.node) {
+                        if (target.nodeType === 3 && target.textContent.length > 0 && target.textContent !== '\n') {
+                            range.setStart(target, 0);
+                            logger.log('setCursorToLastLineStart: positioned at previous content line (before trailing BR)');
+                            break;
+                        }
+                        target = target.nextSibling;
+                    }
+                } else {
+                    // \n - position after the second-to-last \n
+                    range.setStart(prevBreak.node, prevBreak.offset + 1);
+                    logger.log('setCursorToLastLineStart: positioned after second-to-last \\n');
+                }
             } else {
-                // \n at end - position right after the \n
-                range.setStart(lastBreak.node, lastBreak.offset + 1);
-                logger.log('setCursorToLastLineStart: positioned after last \\n (empty last line)');
+                // Only one line break and it's trailing - the only content line is before this break
+                // Position at the start of the element (the single content line)
+                setCursorToStart(element);
+                logger.log('setCursorToLastLineStart: single trailing break, positioned at element start');
+                return;
             }
         }
 
@@ -1592,9 +1621,10 @@
                     const afterFence = fenceMatch[2] || '';
                     if (fenceCharacter === codeFenceChar && fenceLen >= codeFenceLength && afterFence.trim() === '') {
                         // Valid closing fence
-                        // Keep the code content as-is, preserving trailing empty lines
-                        // Only remove the very last newline that was added by the line processing loop
-                        // (each line adds '\n', so the last line also has an extra '\n')
+                        // Remove ALL trailing newlines from code content.
+                        // The line processing loop adds '\n' after each line, and trailing
+                        // empty lines also contribute '\n'. Per requirement 9A-21, non-empty
+                        // code blocks should not have trailing <br> elements.
                         const trimmedContent = codeContent.replace(/\n$/, '');
                         // Convert newlines to <br> for proper display in contenteditable
                         // For empty code blocks, add a <br> for minimum height
@@ -7252,7 +7282,14 @@
                 // Count total lines: <br> tags + \n in textContent + 1
                 const brTags = targetNode.querySelectorAll('br');
                 const text = targetNode.textContent || '';
-                const newlineCount = (text.match(/\n/g) || []).length;
+                let newlineCount = (text.match(/\n/g) || []).length;
+                // When insertLineBreak is used at the end of content, the browser adds
+                // a sentinel \n to make the new empty line visible/cursor-able.
+                // This sentinel inflates the line count by 1, causing an extra arrow key
+                // press to be needed when navigating out. Subtract 1 if text ends with \n.
+                if (text.endsWith('\n')) {
+                    newlineCount = Math.max(0, newlineCount - 1);
+                }
                 const totalLines = brTags.length + newlineCount + 1;
                 
                 try {
