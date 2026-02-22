@@ -160,7 +160,7 @@
     
     // Supported languages for syntax highlighting (must be defined before init())
     const SUPPORTED_LANGUAGES = [
-        'mermaid',
+        'mermaid', 'math',
         'javascript', 'typescript', 'python', 'json', 'bash', 'shell', 'css', 'html', 'xml',
         'sql', 'java', 'go', 'rust', 'yaml', 'markdown', 'c', 'cpp', 'csharp', 'php',
         'ruby', 'swift', 'kotlin', 'dockerfile', 'plaintext'
@@ -438,28 +438,44 @@
         // we need to position after the second-to-last BR.
         
         const lastBr = brElements[brElements.length - 1];
-        const nodeAfterLastBr = lastBr.nextSibling;
-        
-        // Check if there's text content after the last BR
-        const hasTextAfterLastBr = nodeAfterLastBr && nodeAfterLastBr.nodeType === 3 && nodeAfterLastBr.textContent.length > 0;
-        
-        if (hasTextAfterLastBr) {
+
+        // Find first non-empty text node after the last BR
+        // (there may be empty text nodes between BR and actual content)
+        let textNodeAfterLastBr = null;
+        let sibling = lastBr.nextSibling;
+        while (sibling) {
+            if (sibling.nodeType === 3 && sibling.textContent.length > 0) {
+                textNodeAfterLastBr = sibling;
+                break;
+            }
+            if (sibling.nodeType === 1) break; // stop at element nodes
+            sibling = sibling.nextSibling;
+        }
+
+        if (textNodeAfterLastBr) {
             // Last line has text - position at the start of that text
-            range.setStart(nodeAfterLastBr, 0);
+            range.setStart(textNodeAfterLastBr, 0);
             logger.log('setCursorToLastLineStart: positioned at text node start after last BR');
         } else {
             // Last line is empty - position after the second-to-last BR
             // This is the START of the last line (which is empty)
             if (brElements.length >= 2) {
                 const secondToLastBr = brElements[brElements.length - 2];
-                const nodeAfterSecondToLastBr = secondToLastBr.nextSibling;
-                
-                if (nodeAfterSecondToLastBr && nodeAfterSecondToLastBr.nodeType === 3 && nodeAfterSecondToLastBr.textContent.length > 0) {
-                    // There's text after second-to-last BR - position at its start
-                    range.setStart(nodeAfterSecondToLastBr, 0);
+                // Find first non-empty text node after second-to-last BR
+                let textAfterSecond = null;
+                let sib = secondToLastBr.nextSibling;
+                while (sib && sib !== lastBr) {
+                    if (sib.nodeType === 3 && sib.textContent.length > 0) {
+                        textAfterSecond = sib;
+                        break;
+                    }
+                    sib = sib.nextSibling;
+                }
+
+                if (textAfterSecond) {
+                    range.setStart(textAfterSecond, 0);
                     logger.log('setCursorToLastLineStart: positioned at text node start after second-to-last BR');
                 } else {
-                    // No text after second-to-last BR - position after it
                     const parent = secondToLastBr.parentNode;
                     const brIndex = Array.from(parent.childNodes).indexOf(secondToLastBr);
                     range.setStart(parent, brIndex + 1);
@@ -485,6 +501,43 @@
         // Verify cursor position
         const newSel = window.getSelection();
         logger.log('setCursorToLastLineStart: AFTER - anchorNode =', newSel.anchorNode, 'anchorOffset =', newSel.anchorOffset);
+    }
+
+    // Set cursor to start of element (first line)
+    // Same approach for both pre and blockquote - find first text node
+    function setCursorToBlockStart(el) {
+        const range = document.createRange();
+        const s = window.getSelection();
+        const tag = el.tagName.toLowerCase();
+        const targetNode = (tag === 'pre') ? (el.querySelector('code') || el) : el;
+
+        // Find the first text node
+        function findFirstTextNode(node) {
+            if (node.nodeType === 3) {
+                return node;
+            } else if (node.nodeType === 1) {
+                for (const child of node.childNodes) {
+                    const result = findFirstTextNode(child);
+                    if (result) return result;
+                }
+            }
+            return null;
+        }
+
+        const textNode = findFirstTextNode(targetNode);
+        if (textNode) {
+            range.setStart(textNode, 0);
+        } else if (targetNode.firstChild) {
+            range.setStart(targetNode.firstChild, 0);
+        } else {
+            range.setStart(targetNode, 0);
+        }
+
+        range.collapse(true);
+        s.removeAllRanges();
+        s.addRange(range);
+        // Scroll cursor into view
+        scrollCursorIntoView();
     }
 
     // Get all list items that are within or intersect with the selection range
@@ -1051,12 +1104,50 @@
         if (block.tagName === 'PRE' && block.getAttribute('data-mode') === 'edit') {
             return true;
         }
-        // Mermaid block in edit mode
-        if (block.classList && block.classList.contains('mermaid-wrapper') &&
+        // Mermaid/Math block in edit mode
+        if (block.classList &&
+            (block.classList.contains('mermaid-wrapper') || block.classList.contains('math-wrapper')) &&
             block.getAttribute('data-mode') === 'edit') {
             return true;
         }
         return false;
+    }
+
+    // Helper: check if element is a special wrapper (mermaid or math)
+    function isSpecialWrapper(el) {
+        return el && el.tagName === 'DIV' && el.classList &&
+            (el.classList.contains('mermaid-wrapper') || el.classList.contains('math-wrapper'));
+    }
+
+    // Helper: enter special wrapper edit mode and set cursor
+    function enterSpecialWrapperEditMode(wrapper, cursorPosition) {
+        wrapper.setAttribute('data-mode', 'edit');
+        var preSelector = wrapper.classList.contains('mermaid-wrapper')
+            ? 'pre[data-lang="mermaid"]' : 'pre[data-lang="math"]';
+        var pre = wrapper.querySelector(preSelector);
+        if (pre) {
+            var code = pre.querySelector('code');
+            if (code) {
+                code.focus();
+                if (cursorPosition === 'end') {
+                    setCursorToEnd(code);
+                } else if (cursorPosition === 'start') {
+                    setCursorToBlockStart(code);
+                } else if (cursorPosition === 'lastLineStart') {
+                    setCursorToLastLineStart(code);
+                }
+            }
+        }
+    }
+
+    // Helper: exit special wrapper to display mode and re-render
+    function exitSpecialWrapperDisplayMode(wrapper) {
+        wrapper.setAttribute('data-mode', 'display');
+        if (wrapper.classList.contains('mermaid-wrapper')) {
+            renderMermaidDiagram(wrapper);
+        } else if (wrapper.classList.contains('math-wrapper')) {
+            renderMathBlock(wrapper);
+        }
     }
 
     /**
@@ -1315,6 +1406,12 @@
                                 '<pre data-lang="mermaid" contenteditable="true"><code>' + codeHtml + '</code></pre>' +
                                 '<div class="mermaid-diagram"></div>' +
                                 '</div>';
+                        } else if (codeLang === 'math') {
+                            // Math: wrap in container with both code and rendered math display
+                            html += '<div class="math-wrapper" data-mode="display" contenteditable="false">' +
+                                '<pre data-lang="math" contenteditable="true"><code>' + codeHtml + '</code></pre>' +
+                                '<div class="math-display"></div>' +
+                                '</div>';
                         } else {
                             html += '<pre data-lang="' + escapeHtml(codeLang) + '" data-mode="display"><code contenteditable="false">' + codeHtml + '</code></pre>';
                         }
@@ -1545,13 +1642,16 @@
     // Setup all code blocks in the editor
     function setupAllCodeBlocks() {
         editor.querySelectorAll('pre').forEach(pre => {
-            // Skip mermaid code blocks (they are handled by setupMermaidDiagrams)
+            // Skip mermaid/math code blocks (they are handled by their own setup functions)
             if (pre.getAttribute('data-lang') === 'mermaid') return;
+            if (pre.getAttribute('data-lang') === 'math') return;
             setupCodeBlockUI(pre);
         });
-        
+
         // Setup Mermaid diagrams
         setupMermaidDiagrams();
+        // Setup Math blocks
+        setupMathBlocks();
     }
     
     // ========== MERMAID DIAGRAM FUNCTIONALITY ==========
@@ -1712,6 +1812,111 @@
         });
     }
     
+    // ========== KATEX MATH BLOCK FUNCTIONALITY ==========
+
+    function waitForKatex(callback, maxAttempts) {
+        maxAttempts = maxAttempts || 50;
+        var attempts = 0;
+        var check = function() {
+            if (typeof katex !== 'undefined') {
+                callback();
+            } else if (attempts < maxAttempts) {
+                attempts++;
+                setTimeout(check, 100);
+            } else {
+                logger.warn('KaTeX library failed to load after', maxAttempts, 'attempts');
+            }
+        };
+        check();
+    }
+
+    function renderMathBlock(wrapper) {
+        var pre = wrapper.querySelector('pre[data-lang="math"]');
+        var displayDiv = wrapper.querySelector('.math-display');
+        if (!pre || !displayDiv) return;
+
+        var code = pre.querySelector('code');
+        var texCode = code ? getCodePlainText(code).trim() : '';
+
+        if (!texCode) {
+            displayDiv.innerHTML = '<div class="math-error">Empty expression</div>';
+            return;
+        }
+
+        try {
+            var lines = texCode.split('\n').filter(function(l) { return l.trim() !== ''; });
+            var html = '';
+            for (var i = 0; i < lines.length; i++) {
+                html += katex.renderToString(lines[i].trim(), {
+                    displayMode: true,
+                    throwOnError: false,
+                    output: 'html'
+                });
+            }
+            displayDiv.innerHTML = html;
+        } catch (err) {
+            displayDiv.innerHTML = '<div class="math-error">Error: ' +
+                escapeHtml(err.message || 'Invalid LaTeX') + '</div>';
+        }
+    }
+
+    function setupMathBlocks() {
+        var wrappers = editor.querySelectorAll('.math-wrapper');
+        if (wrappers.length === 0) return;
+
+        waitForKatex(function() {
+            wrappers.forEach(function(wrapper) {
+                if (wrapper.dataset.mathSetup) return;
+                wrapper.dataset.mathSetup = 'true';
+
+                renderMathBlock(wrapper);
+
+                // Click → edit mode
+                wrapper.addEventListener('click', function(e) {
+                    if (wrapper.getAttribute('data-mode') !== 'edit') {
+                        wrapper.setAttribute('data-mode', 'edit');
+                        var pre = wrapper.querySelector('pre[data-lang="math"]');
+                        if (pre) {
+                            var code = pre.querySelector('code');
+                            if (code) {
+                                code.focus();
+                                setCursorToEnd(code);
+                            }
+                        }
+                    }
+                });
+
+                // Input → debounce re-render
+                var pre = wrapper.querySelector('pre[data-lang="math"]');
+                if (pre) {
+                    var renderTimeout = null;
+                    pre.addEventListener('input', function() {
+                        if (renderTimeout) clearTimeout(renderTimeout);
+                        renderTimeout = setTimeout(function() {
+                            renderMathBlock(wrapper);
+                        }, 500);
+                    });
+
+                    var code = pre.querySelector('code');
+                    if (code) {
+                        // Focusout → display mode
+                        code.addEventListener('focusout', function(e) {
+                            setTimeout(function() {
+                                if (!wrapper.contains(document.activeElement)) {
+                                    if (wrapper.getAttribute('data-mode') === 'edit') {
+                                        wrapper.setAttribute('data-mode', 'display');
+                                        renderMathBlock(wrapper);
+                                        syncMarkdown();
+                                    }
+                                }
+                            }, 100);
+                        });
+                    }
+                }
+            });
+        });
+    }
+
     // Setup UI for a single code block (header, highlight)
     function setupCodeBlockUI(pre) {
         // Skip if already setup
@@ -1941,6 +2146,45 @@
         syncMarkdownSync();
     }
     
+    function convertToMathBlock(pre) {
+        logger.log('convertToMathBlock');
+
+        const code = pre.querySelector('code');
+        if (!code) return;
+
+        const codeContent = getCodePlainText(code);
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'math-wrapper';
+        wrapper.setAttribute('data-mode', 'display');
+        wrapper.setAttribute('contenteditable', 'false');
+
+        const mathPre = document.createElement('pre');
+        mathPre.setAttribute('data-lang', 'math');
+        mathPre.setAttribute('contenteditable', 'true');
+
+        const mathCode = document.createElement('code');
+        if (!codeContent || codeContent === '' || codeContent === '\n') {
+            mathCode.innerHTML = '<br>';
+        } else {
+            mathCode.innerHTML = escapeHtml(codeContent).replace(/\n/g, '<br>');
+        }
+        mathPre.appendChild(mathCode);
+
+        const displayDiv = document.createElement('div');
+        displayDiv.className = 'math-display';
+
+        wrapper.appendChild(mathPre);
+        wrapper.appendChild(displayDiv);
+
+        pre.parentNode.replaceChild(wrapper, pre);
+
+        wrapper.dataset.mathSetup = 'true';
+        renderMathBlock(wrapper);
+
+        syncMarkdownSync();
+    }
+
     // Apply syntax highlighting to a code block
     function applyHighlighting(pre) {
         const code = pre.querySelector('code');
@@ -2191,9 +2435,13 @@
             item.addEventListener('click', () => {
                 selector.remove();
                 
-                // Special handling for mermaid: convert to mermaid block
+                // Special handling for mermaid/math: convert to wrapper block
                 if (lang === 'mermaid') {
                     convertToMermaidBlock(pre);
+                    return;
+                }
+                if (lang === 'math') {
+                    convertToMathBlock(pre);
                     return;
                 }
                 
@@ -2920,12 +3168,11 @@
             }
         });
         
-        // Handle mermaid wrapper edit mode exit on click outside
-        const clickedMermaidWrapper = e.target.closest ? e.target.closest('.mermaid-wrapper') : null;
-        editor.querySelectorAll('.mermaid-wrapper[data-mode="edit"]').forEach(wrapper => {
-            if (wrapper !== clickedMermaidWrapper) {
-                wrapper.setAttribute('data-mode', 'display');
-                renderMermaidDiagram(wrapper);
+        // Handle mermaid/math wrapper edit mode exit on click outside
+        const clickedSpecialWrapper = e.target.closest ? (e.target.closest('.mermaid-wrapper') || e.target.closest('.math-wrapper')) : null;
+        editor.querySelectorAll('.mermaid-wrapper[data-mode="edit"], .math-wrapper[data-mode="edit"]').forEach(wrapper => {
+            if (wrapper !== clickedSpecialWrapper) {
+                exitSpecialWrapperDisplayMode(wrapper);
                 syncMarkdown();
             }
         });
@@ -3375,7 +3622,75 @@
                 syncMarkdown();
                 return true;
             }
-            
+
+            // Special handling for math
+            if (lang === 'math') {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'math-wrapper';
+                wrapper.setAttribute('data-mode', 'edit');
+                wrapper.setAttribute('contenteditable', 'false');
+
+                const pre = document.createElement('pre');
+                pre.setAttribute('data-lang', 'math');
+                pre.setAttribute('contenteditable', 'true');
+
+                const code = document.createElement('code');
+                code.appendChild(document.createTextNode('\n'));
+                pre.appendChild(code);
+
+                const displayDiv = document.createElement('div');
+                displayDiv.className = 'math-display';
+                displayDiv.innerHTML = '<div class="math-error">Empty expression</div>';
+
+                wrapper.appendChild(pre);
+                wrapper.appendChild(displayDiv);
+
+                const p = document.createElement('p');
+                p.innerHTML = '<br>';
+                node.replaceWith(wrapper);
+                wrapper.after(p);
+
+                wrapper.dataset.mathSetup = 'true';
+
+                wrapper.addEventListener('click', function(e) {
+                    if (wrapper.getAttribute('data-mode') !== 'edit') {
+                        wrapper.setAttribute('data-mode', 'edit');
+                        code.focus();
+                        setCursorToEnd(code);
+                    }
+                });
+
+                let renderTimeout = null;
+                pre.addEventListener('input', function() {
+                    if (renderTimeout) clearTimeout(renderTimeout);
+                    renderTimeout = setTimeout(function() {
+                        renderMathBlock(wrapper);
+                    }, 500);
+                });
+
+                code.addEventListener('focusout', function(e) {
+                    setTimeout(function() {
+                        if (!wrapper.contains(document.activeElement)) {
+                            if (wrapper.getAttribute('data-mode') === 'edit') {
+                                wrapper.setAttribute('data-mode', 'display');
+                                renderMathBlock(wrapper);
+                                syncMarkdown();
+                            }
+                        }
+                    }, 100);
+                });
+
+                const range = document.createRange();
+                const sel = window.getSelection();
+                range.setStart(code.firstChild, 0);
+                range.collapse(true);
+                sel.removeAllRanges();
+                sel.addRange(range);
+                code.focus();
+                syncMarkdown();
+                return true;
+            }
+
             const pre = document.createElement('pre');
             pre.setAttribute('contenteditable', 'true');
             pre.setAttribute('data-mode', 'edit'); // Start in edit mode
@@ -4074,21 +4389,22 @@
                 return pContent + '\n';
             case 'div': 
                 // Check if this is a mermaid wrapper
-                if (node.classList.contains('mermaid-wrapper')) {
-                    const pre = node.querySelector('pre[data-lang="mermaid"]');
+                if (node.classList.contains('mermaid-wrapper') || node.classList.contains('math-wrapper')) {
+                    const wrapperLang = node.classList.contains('mermaid-wrapper') ? 'mermaid' : 'math';
+                    const pre = node.querySelector('pre[data-lang="' + wrapperLang + '"]');
                     if (pre) {
                         const code = pre.querySelector('code');
-                        let mermaidContent = '';
+                        let wrapperContent = '';
                         if (code) {
                             // Recursively process all nodes to handle <br> elements
                             const processCodeNode = (n) => {
                                 for (const child of n.childNodes) {
                                     if (child.nodeType === 3) {
-                                        mermaidContent += child.textContent;
+                                        wrapperContent += child.textContent;
                                     } else if (child.nodeType === 1) {
                                         const tagName = child.tagName.toLowerCase();
                                         if (tagName === 'br') {
-                                            mermaidContent += '\n';
+                                            wrapperContent += '\n';
                                         } else {
                                             processCodeNode(child);
                                         }
@@ -4097,12 +4413,12 @@
                             };
                             processCodeNode(code);
                         }
-                        if (!mermaidContent.endsWith('\n')) {
-                            mermaidContent += '\n';
+                        if (!wrapperContent.endsWith('\n')) {
+                            wrapperContent += '\n';
                         }
                         // Determine fence length: if content contains triple backticks, use more backticks
-                        const mermaidFence = getCodeFence(mermaidContent);
-                        return mermaidFence + 'mermaid\n' + mermaidContent + mermaidFence + '\n';
+                        const wrapperFence = getCodeFence(wrapperContent);
+                        return wrapperFence + wrapperLang + '\n' + wrapperContent + wrapperFence + '\n';
                     }
                 }
                 // Browser may create div elements - treat as paragraph if it has content
@@ -5422,14 +5738,13 @@
                     const p = document.createElement('p');
                     p.innerHTML = '<br>';
                     
-                    // Check if this pre is inside a mermaid-wrapper
-                    const mermaidWrapper = preElement.closest('.mermaid-wrapper');
-                    if (mermaidWrapper) {
-                        // For mermaid blocks, add paragraph after the wrapper and exit edit mode
-                        mermaidWrapper.setAttribute('data-mode', 'display');
-                        renderMermaidDiagram(mermaidWrapper);
-                        mermaidWrapper.after(p);
-                        logger.log('Exited mermaid block with Shift+Enter');
+                    // Check if this pre is inside a mermaid-wrapper or math-wrapper
+                    const specialWrapper = preElement.closest('.mermaid-wrapper') || preElement.closest('.math-wrapper');
+                    if (specialWrapper) {
+                        // For mermaid/math blocks, add paragraph after the wrapper and exit edit mode
+                        exitSpecialWrapperDisplayMode(specialWrapper);
+                        specialWrapper.after(p);
+                        logger.log('Exited special wrapper block with Shift+Enter');
                     } else {
                         // For regular code blocks, add paragraph after the pre
                         preElement.after(p);
@@ -6476,18 +6791,10 @@
                                                 setCursorToLastLineStart(code);
                                             }
                                         }, 0);
-                                    } else if (prevTag === 'div' && prevElement.classList.contains('mermaid-wrapper')) {
-                                        // Enter mermaid edit mode, cursor at last line start
-                                        prevElement.setAttribute('data-mode', 'edit');
+                                    } else if (prevTag === 'div' && isSpecialWrapper(prevElement)) {
+                                        // Enter mermaid/math edit mode, cursor at last line start
                                         setTimeout(() => {
-                                            const mermaidPre = prevElement.querySelector('pre[data-lang="mermaid"]');
-                                            if (mermaidPre) {
-                                                const code = mermaidPre.querySelector('code');
-                                                if (code) {
-                                                    code.focus();
-                                                    setCursorToLastLineStart(code);
-                                                }
-                                            }
+                                            enterSpecialWrapperEditMode(prevElement, 'lastLineStart');
                                         }, 0);
                                     } else if (prevTag === 'blockquote') {
                                         // Use setTimeout to ensure cursor is set after browser finishes table focus cleanup
@@ -6600,18 +6907,10 @@
                                                 setCursorToStart(code);
                                             }
                                         }, 0);
-                                    } else if (nextTag === 'div' && nextElement.classList.contains('mermaid-wrapper')) {
-                                        // Enter mermaid edit mode, cursor at first line start
-                                        nextElement.setAttribute('data-mode', 'edit');
+                                    } else if (nextTag === 'div' && isSpecialWrapper(nextElement)) {
+                                        // Enter mermaid/math edit mode, cursor at first line start
                                         setTimeout(() => {
-                                            const mermaidPre = nextElement.querySelector('pre[data-lang="mermaid"]');
-                                            if (mermaidPre) {
-                                                const code = mermaidPre.querySelector('code');
-                                                if (code) {
-                                                    code.focus();
-                                                    setCursorToStart(code);
-                                                }
-                                            }
+                                            enterSpecialWrapperEditMode(nextElement, 'start');
                                         }, 0);
                                     } else {
                                         setCursorToStart(nextElement);
@@ -6655,43 +6954,6 @@
                     }
                 }
                 node = node.parentNode;
-            }
-            
-            // Helper: set cursor to start of element (first line)
-            // Same approach for both pre and blockquote - find first text node
-            function setCursorToBlockStart(el) {
-                const range = document.createRange();
-                const s = window.getSelection();
-                const tag = el.tagName.toLowerCase();
-                const targetNode = (tag === 'pre') ? (el.querySelector('code') || el) : el;
-                
-                // Find the first text node
-                function findFirstTextNode(node) {
-                    if (node.nodeType === 3) {
-                        return node;
-                    } else if (node.nodeType === 1) {
-                        for (const child of node.childNodes) {
-                            const result = findFirstTextNode(child);
-                            if (result) return result;
-                        }
-                    }
-                    return null;
-                }
-                
-                const textNode = findFirstTextNode(targetNode);
-                if (textNode) {
-                    range.setStart(textNode, 0);
-                } else if (targetNode.firstChild) {
-                    range.setStart(targetNode.firstChild, 0);
-                } else {
-                    range.setStart(targetNode, 0);
-                }
-                
-                range.collapse(true);
-                s.removeAllRanges();
-                s.addRange(range);
-                // Scroll cursor into view
-                scrollCursorIntoView();
             }
             
             // Helper: set cursor to specific line in block
@@ -6883,13 +7145,13 @@
                     return;
                 }
                 
-                // Check if this block is inside a mermaid-wrapper
-                const mermaidWrapper = blockNode.closest('.mermaid-wrapper');
-                
+                // Check if this block is inside a mermaid-wrapper or math-wrapper
+                const specialWrapperBlock = blockNode.closest('.mermaid-wrapper') || blockNode.closest('.math-wrapper');
+
                 const { currentLineIndex, totalLines } = getCurrentLineInBlock(blockNode);
-                
+
                 // #region agent log
-                logger.log('Arrow in block:', { key: e.key, currentLineIndex, totalLines, tag: blockNode.tagName, inMermaid: !!mermaidWrapper });
+                logger.log('Arrow in block:', { key: e.key, currentLineIndex, totalLines, tag: blockNode.tagName, inSpecialWrapper: !!specialWrapperBlock });
                 // #endregion
                 
                 if (e.key === 'ArrowUp') {
@@ -6897,15 +7159,13 @@
                         // At first line, exit block upward
                         e.preventDefault();
                         
-                        if (mermaidWrapper) {
-                            // Exit mermaid wrapper - set display mode and go to previous sibling of wrapper
-                            mermaidWrapper.setAttribute('data-mode', 'display');
-                            renderMermaidDiagram(mermaidWrapper);
+                        if (specialWrapperBlock) {
+                            // Exit special wrapper - set display mode and go to previous sibling of wrapper
+                            exitSpecialWrapperDisplayMode(specialWrapperBlock);
                             syncMarkdown();
-                            const prev = mermaidWrapper.previousElementSibling;
+                            const prev = specialWrapperBlock.previousElementSibling;
                             if (prev) {
                                 const prevTag = prev.tagName.toLowerCase();
-                                // If previous element is a code block, enter edit mode
                                 if (prevTag === 'pre') {
                                     enterEditMode(prev);
                                     setTimeout(() => {
@@ -6914,23 +7174,13 @@
                                             setCursorToLastLineStart(code);
                                         }
                                     }, 0);
-                                } else if (prevTag === 'div' && prev.classList.contains('mermaid-wrapper')) {
-                                    // Previous element is a mermaid wrapper - enter edit mode
-                                    prev.setAttribute('data-mode', 'edit');
+                                } else if (prevTag === 'div' && isSpecialWrapper(prev)) {
                                     setTimeout(() => {
-                                        const mermaidPre = prev.querySelector('pre[data-lang="mermaid"]');
-                                        if (mermaidPre) {
-                                            const code = mermaidPre.querySelector('code');
-                                            if (code) {
-                                                code.focus();
-                                                setCursorToLastLineStart(code);
-                                            }
-                                        }
+                                        enterSpecialWrapperEditMode(prev, 'lastLineStart');
                                     }, 0);
                                 } else if (prev.tagName.toLowerCase() === 'blockquote') {
                                     setCursorToBlockLastLineStart(prev);
                                 } else if (prev.tagName.toLowerCase() === 'table') {
-                                    // Enter table from above (ArrowUp exit) - last row, first cell, last line start
                                     const rows = prev.querySelectorAll('tr');
                                     if (rows.length > 0) {
                                         const lastRow = rows[rows.length - 1];
@@ -6963,23 +7213,13 @@
                                             setCursorToLastLineStart(code);
                                         }
                                     }, 0);
-                                } else if (prevTag === 'div' && prev.classList.contains('mermaid-wrapper')) {
-                                    // Previous element is a mermaid wrapper - enter edit mode
-                                    prev.setAttribute('data-mode', 'edit');
+                                } else if (prevTag === 'div' && isSpecialWrapper(prev)) {
                                     setTimeout(() => {
-                                        const mermaidPre = prev.querySelector('pre[data-lang="mermaid"]');
-                                        if (mermaidPre) {
-                                            const code = mermaidPre.querySelector('code');
-                                            if (code) {
-                                                code.focus();
-                                                setCursorToLastLineStart(code);
-                                            }
-                                        }
+                                        enterSpecialWrapperEditMode(prev, 'lastLineStart');
                                     }, 0);
                                 } else if (prev.tagName.toLowerCase() === 'blockquote') {
                                     setCursorToBlockLastLineStart(prev);
                                 } else if (prev.tagName.toLowerCase() === 'table') {
-                                    // Enter table from above (ArrowUp exit) - last row, first cell, last line start
                                     const rows = prev.querySelectorAll('tr');
                                     if (rows.length > 0) {
                                         const lastRow = rows[rows.length - 1];
@@ -7009,22 +7249,20 @@
                     }
                     return;
                 }
-                
+
                 if (e.key === 'ArrowDown') {
                     if (currentLineIndex >= totalLines - 1) {
                         // At last line, exit block downward
                         logger.log('Last line, exiting block downward');
                         e.preventDefault();
-                        
-                        if (mermaidWrapper) {
-                            // Exit mermaid wrapper - set display mode and go to next sibling of wrapper
-                            mermaidWrapper.setAttribute('data-mode', 'display');
-                            renderMermaidDiagram(mermaidWrapper);
+
+                        if (specialWrapperBlock) {
+                            // Exit special wrapper - set display mode and go to next sibling of wrapper
+                            exitSpecialWrapperDisplayMode(specialWrapperBlock);
                             syncMarkdown();
-                            const next = mermaidWrapper.nextElementSibling;
+                            const next = specialWrapperBlock.nextElementSibling;
                             if (next) {
                                 const nextTag = next.tagName.toLowerCase();
-                                // If next element is a code block, enter edit mode
                                 if (nextTag === 'pre') {
                                     enterEditMode(next);
                                     setTimeout(() => {
@@ -7033,21 +7271,11 @@
                                             setCursorToBlockStart(code);
                                         }
                                     }, 0);
-                                } else if (nextTag === 'div' && next.classList.contains('mermaid-wrapper')) {
-                                    // Next element is a mermaid wrapper - enter edit mode
-                                    next.setAttribute('data-mode', 'edit');
+                                } else if (nextTag === 'div' && isSpecialWrapper(next)) {
                                     setTimeout(() => {
-                                        const mermaidPre = next.querySelector('pre[data-lang="mermaid"]');
-                                        if (mermaidPre) {
-                                            const code = mermaidPre.querySelector('code');
-                                            if (code) {
-                                                code.focus();
-                                                setCursorToBlockStart(code);
-                                            }
-                                        }
+                                        enterSpecialWrapperEditMode(next, 'start');
                                     }, 0);
                                 } else if (nextTag === 'table') {
-                                    // Enter table from below (ArrowDown exit) - first row, first cell, first line start
                                     const rows = next.querySelectorAll('tr');
                                     if (rows.length > 0) {
                                         const firstRow = rows[0];
@@ -7066,7 +7294,7 @@
                                 // No next element, create a new paragraph
                                 const newP = document.createElement('p');
                                 newP.innerHTML = '<br>';
-                                mermaidWrapper.parentNode.insertBefore(newP, mermaidWrapper.nextSibling);
+                                specialWrapperBlock.parentNode.insertBefore(newP, specialWrapperBlock.nextSibling);
                                 setCursorToEnd(newP);
                             }
                         } else {
@@ -7087,21 +7315,11 @@
                                             setCursorToBlockStart(code);
                                         }
                                     }, 0);
-                                } else if (nextTag === 'div' && next.classList.contains('mermaid-wrapper')) {
-                                    // Next element is a mermaid wrapper - enter edit mode
-                                    next.setAttribute('data-mode', 'edit');
+                                } else if (nextTag === 'div' && isSpecialWrapper(next)) {
                                     setTimeout(() => {
-                                        const mermaidPre = next.querySelector('pre[data-lang="mermaid"]');
-                                        if (mermaidPre) {
-                                            const code = mermaidPre.querySelector('code');
-                                            if (code) {
-                                                code.focus();
-                                                setCursorToBlockStart(code);
-                                            }
-                                        }
+                                        enterSpecialWrapperEditMode(next, 'start');
                                     }, 0);
                                 } else if (nextTag === 'table') {
-                                    // Enter table from below (ArrowDown exit) - first row, first cell, first line start
                                     const rows = next.querySelectorAll('tr');
                                     if (rows.length > 0) {
                                         const firstRow = rows[0];
@@ -7150,6 +7368,10 @@
                 // Helper: check if cursor is at the first visual line of the element
                 // Uses getBoundingClientRect to compare cursor Y with the element's first line Y
                 function isCursorAtFirstLine(element) {
+                    // Empty paragraph (<p><br></p>) is always first line
+                    if (element.tagName === 'P' && (element.innerHTML === '<br>' || element.textContent.trim() === '')) {
+                        return true;
+                    }
                     const range = sel.getRangeAt(0);
                     // Get cursor rect
                     let cursorRect = range.getBoundingClientRect();
@@ -7161,6 +7383,8 @@
                         cursorRect = tempSpan.getBoundingClientRect();
                         tempSpan.parentNode.removeChild(tempSpan);
                     }
+                    // If still zero height, assume first line
+                    if (cursorRect.height === 0) return true;
                     // Get element's first line rect
                     const elemRect = element.getBoundingClientRect();
                     // Cursor is at first line if its top is close to element's top
@@ -7169,6 +7393,10 @@
 
                 // Helper: check if cursor is at the last visual line of the element
                 function isCursorAtLastLine(element) {
+                    // Empty paragraph (<p><br></p>) is always last line
+                    if (element.tagName === 'P' && (element.innerHTML === '<br>' || element.textContent.trim() === '')) {
+                        return true;
+                    }
                     const range = sel.getRangeAt(0);
                     let cursorRect = range.getBoundingClientRect();
                     if (cursorRect.height === 0) {
@@ -7178,16 +7406,33 @@
                         cursorRect = tempSpan.getBoundingClientRect();
                         tempSpan.parentNode.removeChild(tempSpan);
                     }
+                    // If still zero height, assume last line
+                    if (cursorRect.height === 0) return true;
                     const elemRect = element.getBoundingClientRect();
                     // Cursor is at last line if its bottom is close to element's bottom
                     return cursorRect.bottom > elemRect.bottom - cursorRect.height;
+                }
+
+                // Helper: check if element is an empty paragraph (used for skipping blank lines between blocks)
+                function isEmptyParagraph(el) {
+                    return el && el.tagName === 'P' && (el.innerHTML === '<br>' || el.textContent.trim() === '');
                 }
 
                 if (e.key === 'ArrowUp') {
                     // Only enter adjacent block if cursor is at the first line of current element
                     if (!isCursorAtFirstLine(currentElement)) return;
 
-                    const prev = currentElement.previousElementSibling;
+                    // Skip empty paragraphs to find the real previous element
+                    // (Markdown generates empty <p> between blocks and paragraphs)
+                    let prev = currentElement.previousElementSibling;
+                    if (prev && isEmptyParagraph(prev) && prev.previousElementSibling) {
+                        const realPrev = prev.previousElementSibling;
+                        const realTag = realPrev.tagName.toLowerCase();
+                        if (realTag === 'pre' || realTag === 'blockquote' || realTag === 'table' ||
+                            (realTag === 'div' && isSpecialWrapper(realPrev))) {
+                            prev = realPrev;
+                        }
+                    }
                     if (prev) {
                         const tag = prev.tagName.toLowerCase();
                         if (tag === 'pre' || tag === 'blockquote') {
@@ -7195,10 +7440,8 @@
                             logger.log('Entering block from below:', tag);
                             // #endregion
                             e.preventDefault();
-                            // If entering a code block, switch to edit mode
                             if (tag === 'pre') {
                                 enterEditMode(prev);
-                                // Set cursor to last line start (not end)
                                 setTimeout(() => {
                                     const code = prev.querySelector('code');
                                     if (code) {
@@ -7210,22 +7453,12 @@
                             }
                             return;
                         }
-                        if (tag === 'div' && prev.classList.contains('mermaid-wrapper')) {
-                            // Enter mermaid wrapper from below
+                        if (tag === 'div' && isSpecialWrapper(prev)) {
                             e.preventDefault();
-                            prev.setAttribute('data-mode', 'edit');
-                            const mermaidPre = prev.querySelector('pre[data-lang="mermaid"]');
-                            if (mermaidPre) {
-                                const code = mermaidPre.querySelector('code');
-                                if (code) {
-                                    code.focus();
-                                    setCursorToLastLineStart(code);
-                                }
-                            }
+                            enterSpecialWrapperEditMode(prev, 'lastLineStart');
                             return;
                         }
                         if (tag === 'table') {
-                            // Enter table from below - go to last row, first column, last line start
                             e.preventDefault();
                             const rows = prev.querySelectorAll('tr');
                             if (rows.length > 0) {
@@ -7245,7 +7478,16 @@
                     // Only enter adjacent block if cursor is at the last line of current element
                     if (!isCursorAtLastLine(currentElement)) return;
 
-                    const next = currentElement.nextElementSibling;
+                    // Skip empty paragraphs to find the real next element
+                    let next = currentElement.nextElementSibling;
+                    if (next && isEmptyParagraph(next) && next.nextElementSibling) {
+                        const realNext = next.nextElementSibling;
+                        const realTag = realNext.tagName.toLowerCase();
+                        if (realTag === 'pre' || realTag === 'blockquote' || realTag === 'table' ||
+                            (realTag === 'div' && isSpecialWrapper(realNext))) {
+                            next = realNext;
+                        }
+                    }
                     if (next) {
                         const tag = next.tagName.toLowerCase();
                         if (tag === 'pre' || tag === 'blockquote') {
@@ -7253,7 +7495,6 @@
                             logger.log('Entering block from above:', tag);
                             // #endregion
                             e.preventDefault();
-                            // If entering a code block, switch to edit mode
                             if (tag === 'pre') {
                                 enterEditMode(next);
                             } else {
@@ -7261,22 +7502,12 @@
                             }
                             return;
                         }
-                        if (tag === 'div' && next.classList.contains('mermaid-wrapper')) {
-                            // Enter mermaid wrapper from above
+                        if (tag === 'div' && isSpecialWrapper(next)) {
                             e.preventDefault();
-                            next.setAttribute('data-mode', 'edit');
-                            const mermaidPre = next.querySelector('pre[data-lang="mermaid"]');
-                            if (mermaidPre) {
-                                const code = mermaidPre.querySelector('code');
-                                if (code) {
-                                    code.focus();
-                                    setCursorToBlockStart(code);
-                                }
-                            }
+                            enterSpecialWrapperEditMode(next, 'start');
                             return;
                         }
                         if (tag === 'table') {
-                            // Enter table from above - go to first row, first column, first line start
                             e.preventDefault();
                             const rows = next.querySelectorAll('tr');
                             if (rows.length > 0) {
@@ -8758,49 +8989,41 @@
                             return;
                         }
                         
-                        // If previous element is a mermaid wrapper, enter edit mode and set cursor to end
-                        if (prevTag === 'div' && prevElement.classList.contains('mermaid-wrapper')) {
+                        // If previous element is a mermaid/math wrapper, enter edit mode and set cursor to end
+                        if (prevTag === 'div' && isSpecialWrapper(prevElement)) {
                             e.preventDefault();
-                            
+
                             const currentContent = currentLine.innerHTML === '<br>' ? '' : currentLine.textContent;
                             const isCurrentEmpty = !currentContent || currentContent.trim() === '';
-                            
-                            // If current paragraph is empty, just remove it and enter mermaid edit mode
+
+                            // If current paragraph is empty, just remove it and enter wrapper edit mode
                             if (isCurrentEmpty) {
                                 currentLine.remove();
-                                // Enter edit mode and set cursor to end
-                                prevElement.setAttribute('data-mode', 'edit');
-                                const mermaidPre = prevElement.querySelector('pre[data-lang="mermaid"]');
-                                if (mermaidPre) {
-                                    const code = mermaidPre.querySelector('code');
-                                    if (code) {
-                                        setTimeout(() => {
-                                            setCursorToEnd(code);
-                                        }, 0);
-                                    }
-                                }
+                                enterSpecialWrapperEditMode(prevElement, 'end');
                                 syncMarkdown();
                                 return;
                             }
-                            
-                            // If paragraph has content, enter mermaid edit mode and append content as new line
+
+                            // If paragraph has content, enter wrapper edit mode and append content as new line
+                            var wrapperPreSelector = prevElement.classList.contains('mermaid-wrapper')
+                                ? 'pre[data-lang="mermaid"]' : 'pre[data-lang="math"]';
                             prevElement.setAttribute('data-mode', 'edit');
-                            const mermaidPre = prevElement.querySelector('pre[data-lang="mermaid"]');
-                            if (mermaidPre) {
-                                const code = mermaidPre.querySelector('code');
-                                if (code) {
-                                    setTimeout(() => {
+                            var wrapperPre = prevElement.querySelector(wrapperPreSelector);
+                            if (wrapperPre) {
+                                var wrapperCode = wrapperPre.querySelector('code');
+                                if (wrapperCode) {
+                                    setTimeout(function() {
                                         // Add the paragraph content as a new line
-                                        if (code.lastChild && code.lastChild.nodeName !== 'BR') {
-                                            code.appendChild(document.createElement('br'));
+                                        if (wrapperCode.lastChild && wrapperCode.lastChild.nodeName !== 'BR') {
+                                            wrapperCode.appendChild(document.createElement('br'));
                                         }
-                                        code.appendChild(document.createTextNode(currentContent));
-                                        setCursorToEnd(code);
+                                        wrapperCode.appendChild(document.createTextNode(currentContent));
+                                        setCursorToEnd(wrapperCode);
                                         syncMarkdown();
                                     }, 0);
                                 }
                             }
-                            
+
                             // Remove current paragraph
                             currentLine.remove();
                             return;

@@ -590,6 +590,49 @@ body {
     color: #f97583;
 }
 
+/* KaTeX math block styles */
+.editor .math-wrapper {
+    margin: 1em 0;
+    border-radius: 6px;
+    overflow: visible;
+}
+.editor .math-wrapper pre[data-lang="math"] {
+    display: none;
+    margin: 0;
+    border-radius: 6px 6px 0 0;
+}
+.editor .math-wrapper[data-mode="edit"] pre[data-lang="math"] {
+    display: block;
+}
+.editor .math-display {
+    background: var(--bg-color);
+    padding: 16px;
+    text-align: center;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    min-height: 40px;
+    overflow-x: auto;
+}
+.editor .math-wrapper[data-mode="edit"] .math-display {
+    border-radius: 0 0 6px 6px;
+    border-top: none;
+}
+.editor .math-display .math-error {
+    color: #d73a49;
+    font-size: 14px;
+    padding: 8px;
+    background: #ffeef0;
+    border-radius: 4px;
+}
+[data-theme="night"] .editor .math-display .math-error {
+    background: #3d1f1f;
+    color: #f97583;
+}
+[data-theme="dark"] .editor .math-display .math-error {
+    background: #3d1f1f;
+    color: #f97583;
+}
+
 /* Syntax highlighting colors */
 .hljs-keyword { color: #d73a49; }
 .hljs-string { color: #032f62; }

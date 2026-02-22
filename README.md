@@ -16,7 +16,7 @@ A WYSIWYG markdown editor designed for the AI coding era. Edit markdown visually
 
 **Edit markdown visually while AI modifies the same file — your edits and AI's edits coexist safely.**
 
-- **`Cmd+L` / `Ctrl+L`** — Select text in the WYSIWYG editor, press `Cmd+L`, and the source file opens in VS Code's text editor with the exact lines selected (even within lists and tables). Press `Cmd+L` again to send to AI chat. Works with VS Code, Cursor, Kiro, and more.
+- `Cmd+L`** / **`Ctrl+L` — Select text in the WYSIWYG editor, press `Cmd+L`, and the source file opens in VS Code's text editor with the exact lines selected (even within lists and tables). Press `Cmd+L` again to send to AI chat. Works with VS Code, Cursor, Kiro, and more.
 - **Real-time external change sync** — When AI assistants modify the file, only changed blocks are patched via block-level DOM diff. Your cursor position and in-progress edits are preserved. No "file modified externally" dialogs.
 
 ---
@@ -36,6 +36,7 @@ A WYSIWYG markdown editor designed for the AI coding era. Edit markdown visually
 - Horizontal rules
 - Links and Images (drag & drop, paste support)
 - Mermaid diagrams
+- KaTeX math equations
 - YAML Front Matter
 
 
@@ -203,6 +204,23 @@ graph TD
 
 - Click on diagram to edit source
 - Diagram re-renders when exiting edit mode
+
+### KaTeX Math Equations
+
+Code blocks with language `math` are rendered as mathematical equations using KaTeX:
+
+```math
+E = mc^2
+\int_0^\infty e^{-x} dx = 1
+\sum_{n=1}^{\infty} \frac{1}{n^2} = \frac{\pi^2}{6}
+```
+
+- Each line is rendered as an independent display-mode equation
+- Click on the rendered equation to edit the LaTeX source
+- Equations re-render automatically (500ms debounce) while editing
+- Invalid LaTeX is shown as a red error message (does not break the layout)
+- Empty blocks show "Empty expression"
+- Navigate in/out with arrow keys, just like code blocks and Mermaid diagrams
 
 ---
 
