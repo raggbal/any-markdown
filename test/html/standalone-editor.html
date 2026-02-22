@@ -577,96 +577,136 @@
     function setCursorToLastLineStart(element) {
         const sel = window.getSelection();
         const range = document.createRange();
-        
+
         // Debug: show full DOM structure
         logger.log('setCursorToLastLineStart: element.innerHTML =', element.innerHTML);
         logger.log('setCursorToLastLineStart: childNodes =', Array.from(element.childNodes).map(n => n.nodeType === 3 ? 'TEXT:"' + n.textContent + '"' : n.nodeName));
-        
-        // Find all BR elements
-        const brElements = element.querySelectorAll('br');
-        
-        logger.log('setCursorToLastLineStart: brElements.length =', brElements.length);
-        
-        if (brElements.length === 0) {
-            // No BR, single line - go to start
+
+        // Unified approach: collect ALL line break positions (both <br> and \n in text nodes)
+        // Each entry: { type: 'br'|'newline', node, offset (for text nodes) }
+        var lineBreaks = [];
+        var children = element.childNodes;
+        for (var i = 0; i < children.length; i++) {
+            var child = children[i];
+            if (child.nodeType === 1 && child.tagName === 'BR') {
+                lineBreaks.push({ type: 'br', node: child, index: i });
+            } else if (child.nodeType === 3) {
+                var text = child.textContent;
+                for (var j = 0; j < text.length; j++) {
+                    if (text[j] === '\n') {
+                        lineBreaks.push({ type: 'newline', node: child, offset: j, index: i });
+                    }
+                }
+            }
+        }
+
+        logger.log('setCursorToLastLineStart: lineBreaks count =', lineBreaks.length);
+
+        if (lineBreaks.length === 0) {
+            // No line breaks at all, single line - go to start
             setCursorToStart(element);
             return;
         }
-        
-        // Line structure in a cell:
-        // Line 0: content before first BR
-        // Line 1: content after first BR (brElements[0]), before second BR
-        // ...
-        // Line N: content after BR[N-1] (brElements[N-1])
-        //
-        // If the last line has text content (text node after last BR), 
-        // position at the start of that text node.
-        // If the last line is empty (last BR is the last child, or followed only by BR),
-        // we need to position after the second-to-last BR.
-        
-        const lastBr = brElements[brElements.length - 1];
 
-        // Find first non-empty text node after the last BR
-        // (there may be empty text nodes between BR and actual content)
-        let textNodeAfterLastBr = null;
-        let sibling = lastBr.nextSibling;
-        while (sibling) {
-            if (sibling.nodeType === 3 && sibling.textContent.length > 0) {
-                textNodeAfterLastBr = sibling;
-                break;
+        // Find the last line break
+        var lastBreak = lineBreaks[lineBreaks.length - 1];
+
+        // Determine if there's content after the last line break (i.e., the last line is non-empty)
+        var hasContentAfterLastBreak = false;
+        if (lastBreak.type === 'br') {
+            // Check siblings after the BR for non-empty, non-newline content
+            var sib = lastBreak.node.nextSibling;
+            while (sib) {
+                if (sib.nodeType === 3 && sib.textContent.length > 0 && sib.textContent !== '\n' && sib.textContent.trim() !== '') {
+                    hasContentAfterLastBreak = true;
+                    break;
+                }
+                if (sib.nodeType === 1 && sib.tagName !== 'BR') {
+                    hasContentAfterLastBreak = true;
+                    break;
+                }
+                sib = sib.nextSibling;
             }
-            if (sibling.nodeType === 1) break; // stop at element nodes
-            sibling = sibling.nextSibling;
-        }
-
-        if (textNodeAfterLastBr) {
-            // Last line has text - position at the start of that text
-            range.setStart(textNodeAfterLastBr, 0);
-            logger.log('setCursorToLastLineStart: positioned at text node start after last BR');
         } else {
-            // Last line is empty - position after the second-to-last BR
-            // This is the START of the last line (which is empty)
-            if (brElements.length >= 2) {
-                const secondToLastBr = brElements[brElements.length - 2];
-                // Find first non-empty text node after second-to-last BR
-                let textAfterSecond = null;
-                let sib = secondToLastBr.nextSibling;
-                while (sib && sib !== lastBr) {
-                    if (sib.nodeType === 3 && sib.textContent.length > 0) {
-                        textAfterSecond = sib;
+            // type === 'newline' - check if there's text after this \n
+            var afterInSameNode = lastBreak.node.textContent.substring(lastBreak.offset + 1);
+            if (afterInSameNode.length > 0 && afterInSameNode !== '\n') {
+                hasContentAfterLastBreak = true;
+            } else {
+                // Check next siblings
+                var sib = lastBreak.node.nextSibling;
+                while (sib) {
+                    if (sib.nodeType === 3 && sib.textContent.length > 0 && sib.textContent !== '\n' && sib.textContent.trim() !== '') {
+                        hasContentAfterLastBreak = true;
+                        break;
+                    }
+                    if (sib.nodeType === 1 && sib.tagName !== 'BR') {
+                        hasContentAfterLastBreak = true;
                         break;
                     }
                     sib = sib.nextSibling;
                 }
-
-                if (textAfterSecond) {
-                    range.setStart(textAfterSecond, 0);
-                    logger.log('setCursorToLastLineStart: positioned at text node start after second-to-last BR');
-                } else {
-                    const parent = secondToLastBr.parentNode;
-                    const brIndex = Array.from(parent.childNodes).indexOf(secondToLastBr);
-                    range.setStart(parent, brIndex + 1);
-                    logger.log('setCursorToLastLineStart: positioned after second-to-last BR at index', brIndex + 1);
-                }
-            } else {
-                // Only 1 BR - position after it (start of line 1, which is empty)
-                const parent = lastBr.parentNode;
-                const brIndex = Array.from(parent.childNodes).indexOf(lastBr);
-                range.setStart(parent, brIndex + 1);
-                logger.log('setCursorToLastLineStart: positioned after only BR at index', brIndex + 1);
             }
         }
-        
+
+        if (hasContentAfterLastBreak) {
+            // Last line has content - position cursor at the start of the last line
+            // Find the first text node with actual content after the last break
+            if (lastBreak.type === 'br') {
+                var target = lastBreak.node.nextSibling;
+                while (target) {
+                    if (target.nodeType === 3 && target.textContent.length > 0 && target.textContent !== '\n') {
+                        range.setStart(target, 0);
+                        logger.log('setCursorToLastLineStart: positioned at text after last BR');
+                        break;
+                    }
+                    target = target.nextSibling;
+                }
+            } else {
+                // \n in text node - position right after the \n
+                var afterText = lastBreak.node.textContent.substring(lastBreak.offset + 1);
+                if (afterText.length > 0 && afterText !== '\n') {
+                    range.setStart(lastBreak.node, lastBreak.offset + 1);
+                    logger.log('setCursorToLastLineStart: positioned after last \\n at offset', lastBreak.offset + 1);
+                } else {
+                    // Find next sibling with content
+                    var target = lastBreak.node.nextSibling;
+                    while (target) {
+                        if (target.nodeType === 3 && target.textContent.length > 0 && target.textContent !== '\n') {
+                            range.setStart(target, 0);
+                            logger.log('setCursorToLastLineStart: positioned at next text node after \\n');
+                            break;
+                        }
+                        target = target.nextSibling;
+                    }
+                }
+            }
+        } else {
+            // Last line is empty (trailing line break)
+            // We need to position at the start of this empty last line
+            // That means: position right after the last line break
+            if (lastBreak.type === 'br') {
+                var parent = lastBreak.node.parentNode;
+                var brIndex = Array.from(parent.childNodes).indexOf(lastBreak.node);
+                range.setStart(parent, brIndex + 1);
+                logger.log('setCursorToLastLineStart: positioned after last BR (empty last line)');
+            } else {
+                // \n at end - position right after the \n
+                range.setStart(lastBreak.node, lastBreak.offset + 1);
+                logger.log('setCursorToLastLineStart: positioned after last \\n (empty last line)');
+            }
+        }
+
         range.collapse(true);
         sel.removeAllRanges();
         sel.addRange(range);
         element.focus();
-        
+
         // Scroll cursor into view
         scrollCursorIntoView();
-        
+
         // Verify cursor position
-        const newSel = window.getSelection();
+        var newSel = window.getSelection();
         logger.log('setCursorToLastLineStart: AFTER - anchorNode =', newSel.anchorNode, 'anchorOffset =', newSel.anchorOffset);
     }
 
@@ -9329,9 +9369,29 @@
                     const codeContent = codeElement ? codeElement.textContent : currentLine.textContent;
                     // Check if code block is empty (only whitespace/newlines)
                     const isEmpty = !codeContent || codeContent.trim() === '' || codeContent === '\n';
-                    
+
                     logger.log('Backspace in pre:', { isEmpty, codeContent: JSON.stringify(codeContent) });
-                    
+
+                    if (isEmpty) {
+                        e.preventDefault();
+                        const p = document.createElement('p');
+                        p.innerHTML = '<br>';
+                        currentLine.replaceWith(p);
+                        setCursorToEnd(p);
+                        syncMarkdown();
+                        return;
+                    }
+                }
+
+                // Convert empty mermaid/math wrapper back to paragraph
+                if (tag === 'div' && isSpecialWrapper(currentLine)) {
+                    const wrapperPre = currentLine.querySelector('pre[data-lang="mermaid"], pre[data-lang="math"]');
+                    const wrapperCode = wrapperPre ? wrapperPre.querySelector('code') : null;
+                    const wrapperContent = wrapperCode ? wrapperCode.textContent : '';
+                    const isEmpty = !wrapperContent || wrapperContent.trim() === '' || wrapperContent === '\n';
+
+                    logger.log('Backspace in special wrapper:', { isEmpty, wrapperContent: JSON.stringify(wrapperContent), type: currentLine.className });
+
                     if (isEmpty) {
                         e.preventDefault();
                         const p = document.createElement('p');
@@ -12697,6 +12757,7 @@
         window.__testApi.setColumnAlignment = setColumnAlignment;
         window.__testApi.insertTableColumnRight = insertTableColumnRight;
         window.__testApi.syncMarkdown = syncMarkdown;
+        window.__testApi.setCursorToLastLineStart = setCursorToLastLineStart;
         
         // Also expose directly on window for backward compatibility with existing tests
         window.initializeTableColumnWidths = initializeTableColumnWidths;
