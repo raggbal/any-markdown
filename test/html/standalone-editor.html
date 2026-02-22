@@ -10257,6 +10257,28 @@
             toolbar.querySelector('[data-action="image"]')?.click();
             return;
         }
+
+        // Send selection to chat (Cmd+L / Ctrl+L)
+        if (isMod && e.key === 'l') {
+            var chatSel = window.getSelection();
+            if (!chatSel || chatSel.isCollapsed || !chatSel.rangeCount) return;
+            e.preventDefault();
+            e.stopPropagation();
+            // Convert selection to markdown
+            var chatRange = chatSel.getRangeAt(0);
+            var chatFragment = chatRange.cloneContents();
+            var chatTempDiv = document.createElement('div');
+            chatTempDiv.appendChild(chatFragment);
+            var chatMd = '';
+            for (var ci = 0; ci < chatTempDiv.childNodes.length; ci++) {
+                chatMd += mdProcessNode(chatTempDiv.childNodes[ci]);
+            }
+            chatMd = chatMd.trim();
+            if (chatMd) {
+                vscode.postMessage({ type: 'sendToChat', selectedMarkdown: chatMd });
+            }
+            return;
+        }
     });
     
     // ========== SHORTCUT HELPER FUNCTIONS ==========

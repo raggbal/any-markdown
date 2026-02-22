@@ -10090,6 +10090,72 @@
             toolbar.querySelector('[data-action="image"]')?.click();
             return;
         }
+
+        // Send selection to chat (Cmd+L / Ctrl+L)
+        if (isMod && e.key === 'l') {
+            var chatSel = window.getSelection();
+            if (!chatSel || chatSel.isCollapsed || !chatSel.rangeCount) return;
+            e.preventDefault();
+            e.stopPropagation();
+
+            // Find which editor block-level children are covered by the selection
+            var chatRange = chatSel.getRangeAt(0);
+            var startNode = chatRange.startContainer;
+            var endNode = chatRange.endContainer;
+
+            // Walk up to find direct children of editor
+            function findEditorChild(node) {
+                while (node && node.parentNode !== editor) {
+                    node = node.parentNode;
+                }
+                return node;
+            }
+            var startBlock = findEditorChild(startNode);
+            var endBlock = findEditorChild(endNode);
+            if (!startBlock || !endBlock) return;
+
+            // Convert blocks before selection to markdown to count start line
+            var editorChildren = Array.from(editor.childNodes);
+            var startIdx = editorChildren.indexOf(startBlock);
+            var endIdx = editorChildren.indexOf(endBlock);
+            if (startIdx < 0 || endIdx < 0) return;
+
+            // Markdown for everything before selection start → count lines
+            var mdBefore = '';
+            for (var bi = 0; bi < startIdx; bi++) {
+                mdBefore += mdProcessNode(editorChildren[bi]);
+            }
+            // startLine = number of lines in mdBefore (0-indexed)
+            var startLine = mdBefore === '' ? 0 : mdBefore.split('\n').length;
+            // Trim trailing empty lines from mdBefore to get exact start
+            while (startLine > 0 && mdBefore.split('\n')[startLine - 1] === '') {
+                startLine--;
+            }
+
+            // Markdown for selected blocks
+            var mdSelected = '';
+            for (var si = startIdx; si <= endIdx; si++) {
+                mdSelected += mdProcessNode(editorChildren[si]);
+            }
+            mdSelected = mdSelected.trim();
+
+            // Markdown up to and including selection end → count lines
+            var mdUpToEnd = mdBefore + mdSelected + '\n';
+            var endMdLines = mdUpToEnd.split('\n');
+            // endLine = last non-empty line (0-indexed)
+            var endLine = endMdLines.length - 1;
+            while (endLine > 0 && endMdLines[endLine] === '') {
+                endLine--;
+            }
+
+            vscode.postMessage({
+                type: 'sendToChat',
+                startLine: startLine,
+                endLine: endLine,
+                selectedMarkdown: mdSelected
+            });
+            return;
+        }
     });
     
     // ========== SHORTCUT HELPER FUNCTIONS ==========

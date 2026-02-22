@@ -657,6 +657,37 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
                     await vscode.commands.executeCommand('vscode.openWith', document.uri, 'default');
                     break;
 
+                case 'sendToChat':
+                    // Open text editor with selection based on line numbers from webview
+                    try {
+                        const chatStartLine = message.startLine as number;
+                        const chatEndLine = message.endLine as number;
+                        if (chatStartLine == null || chatEndLine == null) break;
+
+                        // Open the file in VS Code's text editor
+                        const textDoc = await vscode.workspace.openTextDocument(document.uri);
+                        const textEditor = await vscode.window.showTextDocument(textDoc, { preview: false });
+
+                        // Clamp line numbers to document range
+                        const maxLine = textDoc.lineCount - 1;
+                        const startLine = Math.max(0, Math.min(chatStartLine, maxLine));
+                        const endLine = Math.max(startLine, Math.min(chatEndLine, maxLine));
+
+                        const startPos = new vscode.Position(startLine, 0);
+                        const endPos = textDoc.lineAt(endLine).range.end;
+                        textEditor.selection = new vscode.Selection(startPos, endPos);
+                        textEditor.revealRange(new vscode.Range(startPos, endPos), vscode.TextEditorRevealType.InCenter);
+
+                        // Copy selected markdown to clipboard
+                        const selectedMd = message.selectedMarkdown as string;
+                        if (selectedMd) {
+                            await vscode.env.clipboard.writeText(selectedMd);
+                        }
+                    } catch (err) {
+                        console.error('[Any MD] sendToChat error:', err);
+                    }
+                    break;
+
                 case 'setImageDir':
                     // Set IMAGE_DIR and FORCE_RELATIVE_PATH directives via toolbar button
                     const inputDir = await vscode.window.showInputBox({
