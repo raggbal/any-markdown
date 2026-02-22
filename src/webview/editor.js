@@ -10098,10 +10098,7 @@
             e.preventDefault();
             e.stopPropagation();
 
-            // Find which editor block-level children are covered by the selection
             var chatRange = chatSel.getRangeAt(0);
-            var startNode = chatRange.startContainer;
-            var endNode = chatRange.endContainer;
 
             // Walk up to find direct children of editor
             function findEditorChild(node) {
@@ -10110,43 +10107,165 @@
                 }
                 return node;
             }
-            var startBlock = findEditorChild(startNode);
-            var endBlock = findEditorChild(endNode);
+
+            // Find the nearest li or tr ancestor (sub-block element)
+            function findSubBlockEl(node) {
+                while (node && node !== editor) {
+                    var tag = node.tagName && node.tagName.toLowerCase();
+                    if (tag === 'li' || tag === 'tr') return node;
+                    node = node.parentNode;
+                }
+                return null;
+            }
+
+            // Count total li elements in a list recursively
+            function countLisInList(listEl) {
+                var count = 0;
+                for (var i = 0; i < listEl.children.length; i++) {
+                    var li = listEl.children[i];
+                    if (!li.tagName || li.tagName.toLowerCase() !== 'li') continue;
+                    count++;
+                    for (var j = 0; j < li.children.length; j++) {
+                        var child = li.children[j];
+                        var ct = child.tagName && child.tagName.toLowerCase();
+                        if (ct === 'ul' || ct === 'ol') count += countLisInList(child);
+                    }
+                }
+                return count;
+            }
+
+            // Get 0-indexed line offset of targetLi within a list block
+            // Each li = 1 markdown line; nested lis follow their parent
+            function getListLineOffset(listEl, targetLi) {
+                var offset = 0;
+                var found = false;
+                function walk(ulOrOl) {
+                    if (found) return;
+                    for (var i = 0; i < ulOrOl.children.length; i++) {
+                        if (found) return;
+                        var li = ulOrOl.children[i];
+                        if (!li.tagName || li.tagName.toLowerCase() !== 'li') continue;
+                        if (li === targetLi) { found = true; return; }
+                        if (li.contains(targetLi)) {
+                            offset++; // this li's own line
+                            for (var j = 0; j < li.children.length; j++) {
+                                if (found) return;
+                                var child = li.children[j];
+                                var ct = child.tagName && child.tagName.toLowerCase();
+                                if (ct === 'ul' || ct === 'ol') walk(child);
+                            }
+                            return;
+                        }
+                        // li not related to target — count it + all descendants
+                        offset++;
+                        for (var j = 0; j < li.children.length; j++) {
+                            var child = li.children[j];
+                            var ct = child.tagName && child.tagName.toLowerCase();
+                            if (ct === 'ul' || ct === 'ol') offset += countLisInList(child);
+                        }
+                    }
+                }
+                walk(listEl);
+                return found ? offset : 0;
+            }
+
+            // Get line count for a single li (1 for itself + nested lis)
+            function getLiLineCount(li) {
+                var count = 1;
+                for (var j = 0; j < li.children.length; j++) {
+                    var child = li.children[j];
+                    var ct = child.tagName && child.tagName.toLowerCase();
+                    if (ct === 'ul' || ct === 'ol') count += countLisInList(child);
+                }
+                return count;
+            }
+
+            // Get 0-indexed markdown line offset of targetTr within a table
+            // Row 0 → line 0 (header), separator → line 1, Row N (N≥1) → line N+1
+            function getTableLineOffset(tableEl, targetTr) {
+                var rows = tableEl.querySelectorAll('tr');
+                for (var i = 0; i < rows.length; i++) {
+                    if (rows[i] === targetTr) return i === 0 ? 0 : i + 1;
+                }
+                return 0;
+            }
+
+            // Count line index where next content starts (includes trailing empty lines)
+            // "# Heading\n\n" → 2 (heading on line 0, empty on line 1, next starts at 2)
+            function countLinesTotal(md) {
+                if (!md) return 0;
+                return md.split('\n').length - 1;
+            }
+
+            // Count content lines only (excludes trailing empty lines)
+            // "# Heading\n\n" → 1 (only "# Heading" is content)
+            function countContentLines(md) {
+                if (!md) return 0;
+                var lines = md.split('\n');
+                while (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
+                return lines.length;
+            }
+
+            var startBlock = findEditorChild(chatRange.startContainer);
+            var endBlock = findEditorChild(chatRange.endContainer);
             if (!startBlock || !endBlock) return;
 
-            // Convert blocks before selection to markdown to count start line
             var editorChildren = Array.from(editor.childNodes);
             var startIdx = editorChildren.indexOf(startBlock);
             var endIdx = editorChildren.indexOf(endBlock);
             if (startIdx < 0 || endIdx < 0) return;
 
-            // Markdown for everything before selection start → count lines
-            var mdBefore = '';
+            var startSubEl = findSubBlockEl(chatRange.startContainer);
+            var endSubEl = findSubBlockEl(chatRange.endContainer);
+
+            // --- Calculate startLine ---
+            var mdBeforeStartBlock = '';
             for (var bi = 0; bi < startIdx; bi++) {
-                mdBefore += mdProcessNode(editorChildren[bi]);
+                mdBeforeStartBlock += mdProcessNode(editorChildren[bi]);
             }
-            // startLine = number of lines in mdBefore (0-indexed)
-            var startLine = mdBefore === '' ? 0 : mdBefore.split('\n').length;
-            // Trim trailing empty lines from mdBefore to get exact start
-            while (startLine > 0 && mdBefore.split('\n')[startLine - 1] === '') {
-                startLine--;
+            var startBaseLine = countLinesTotal(mdBeforeStartBlock);
+
+            var startInBlockOffset = 0;
+            var startBlockTag = startBlock.tagName && startBlock.tagName.toLowerCase();
+            if (startSubEl && startSubEl.tagName) {
+                var ssTag = startSubEl.tagName.toLowerCase();
+                if (ssTag === 'li' && (startBlockTag === 'ul' || startBlockTag === 'ol')) {
+                    startInBlockOffset = getListLineOffset(startBlock, startSubEl);
+                } else if (ssTag === 'tr' && startBlockTag === 'table') {
+                    startInBlockOffset = getTableLineOffset(startBlock, startSubEl);
+                }
+            }
+            var startLine = startBaseLine + startInBlockOffset;
+
+            // --- Calculate endLine ---
+            var mdBeforeEndBlock = '';
+            for (var bi2 = 0; bi2 < endIdx; bi2++) {
+                mdBeforeEndBlock += mdProcessNode(editorChildren[bi2]);
+            }
+            var endBaseLine = countLinesTotal(mdBeforeEndBlock);
+
+            var endLine;
+            var endBlockTag = endBlock.tagName && endBlock.tagName.toLowerCase();
+            if (endSubEl && endSubEl.tagName) {
+                var esTag = endSubEl.tagName.toLowerCase();
+                if (esTag === 'li' && (endBlockTag === 'ul' || endBlockTag === 'ol')) {
+                    var endInBlockOffset = getListLineOffset(endBlock, endSubEl);
+                    var endLiLines = getLiLineCount(endSubEl);
+                    endLine = endBaseLine + endInBlockOffset + endLiLines - 1;
+                } else if (esTag === 'tr' && endBlockTag === 'table') {
+                    endLine = endBaseLine + getTableLineOffset(endBlock, endSubEl);
+                } else {
+                    endLine = endBaseLine + countContentLines(mdProcessNode(endBlock)) - 1;
+                }
+            } else {
+                endLine = endBaseLine + countContentLines(mdProcessNode(endBlock)) - 1;
             }
 
-            // Markdown for selected blocks
-            var mdSelected = '';
-            for (var si = startIdx; si <= endIdx; si++) {
-                mdSelected += mdProcessNode(editorChildren[si]);
-            }
-            mdSelected = mdSelected.trim();
-
-            // Markdown up to and including selection end → count lines
-            var mdUpToEnd = mdBefore + mdSelected + '\n';
-            var endMdLines = mdUpToEnd.split('\n');
-            // endLine = last non-empty line (0-indexed)
-            var endLine = endMdLines.length - 1;
-            while (endLine > 0 && endMdLines[endLine] === '') {
-                endLine--;
-            }
+            // --- selectedMarkdown: slice from full document markdown ---
+            var fullMd = htmlToMarkdown();
+            var fullLines = fullMd.split('\n');
+            var safeEnd = Math.min(endLine, fullLines.length - 1);
+            var mdSelected = fullLines.slice(startLine, safeEnd + 1).join('\n').trim();
 
             vscode.postMessage({
                 type: 'sendToChat',

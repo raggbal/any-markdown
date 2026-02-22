@@ -1,7 +1,7 @@
-<img src="media/icon.png" alt="Any Markdown" width="48" align="absmiddle"> Any Markdown - WYSIWYG Markdown Editor for VS Code
+<img src="media/icon.png" alt="Any Markdown" width="48" align="absmiddle"> Any Markdown - AI-Friendly WYSIWYG Markdown Editor for VS Code
 =
 
-A seamless WYSIWYG markdown editor for VS Code inspired by Typora, Notion, and Obsidian. Experience smooth markdown editing with live preview - what you see is what you get!
+A WYSIWYG markdown editor designed for the AI coding era. Edit markdown visually while AI assistants (Claude Code, Cursor, GitHub Copilot, etc.) modify the same file in real-time — your edits and AI's edits coexist safely. Inspired by Typora, Notion, and Obsidian.
 
 ![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/imaken.any-markdown?label=VS%20Code%20Marketplace)
 ![Open VSX](https://img.shields.io/open-vsx/v/imaken/any-markdown?label=Open%20VSX)
@@ -11,6 +11,15 @@ A seamless WYSIWYG markdown editor for VS Code inspired by Typora, Notion, and O
 ![assets/images/1771689676522.png](assets/images/1771689676522.png)
 
 ## Features
+
+### AI-Friendly Editing
+
+**Edit markdown visually while AI modifies the same file — your edits and AI's edits coexist safely.**
+
+- **`Cmd+L` / `Ctrl+L`** — Select text in the WYSIWYG editor, press `Cmd+L`, and the source file opens in VS Code's text editor with the exact lines selected (even within lists and tables). Press `Cmd+L` again to send to AI chat. Works with VS Code, Cursor, Kiro, and more.
+- **Real-time external change sync** — When AI assistants modify the file, only changed blocks are patched via block-level DOM diff. Your cursor position and in-progress edits are preserved. No "file modified externally" dialogs.
+
+---
 
 ### Seamless Live Preview
 - **WYSIWYG Editing** - Edit markdown in a beautifully rendered view
