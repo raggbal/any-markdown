@@ -69,21 +69,44 @@
     }
     initToolbarIcons();
 
-    // Toolbar narrow/wide mode toggle
-    var toolbarWideTimeout = null;
-    toolbar.addEventListener('mouseenter', function() {
-        if (toolbarWideTimeout) {
-            clearTimeout(toolbarWideTimeout);
-            toolbarWideTimeout = null;
+    // Toolbar horizontal scroll navigation
+    var toolbarScrollLeftBtn = document.getElementById('toolbarScrollLeft');
+    var toolbarScrollRightBtn = document.getElementById('toolbarScrollRight');
+    var toolbarInner = document.getElementById('toolbarInner');
+
+    function updateToolbarScrollButtons() {
+        if (!toolbarInner) return;
+        var scrollLeft = toolbarInner.scrollLeft;
+        var maxScroll = toolbarInner.scrollWidth - toolbarInner.clientWidth;
+        if (maxScroll <= 0) {
+            // No overflow — hide both buttons
+            toolbarScrollLeftBtn.classList.add('hidden');
+            toolbarScrollRightBtn.classList.add('hidden');
+        } else {
+            toolbarScrollLeftBtn.classList.toggle('hidden', scrollLeft <= 0);
+            toolbarScrollRightBtn.classList.toggle('hidden', scrollLeft >= maxScroll - 1);
         }
-        toolbar.classList.add('toolbar--wide');
-    });
-    toolbar.addEventListener('mouseleave', function() {
-        toolbarWideTimeout = setTimeout(function() {
-            toolbar.classList.remove('toolbar--wide');
-            toolbarWideTimeout = null;
-        }, 300);
-    });
+    }
+
+    if (toolbarInner) {
+        toolbarInner.addEventListener('scroll', updateToolbarScrollButtons);
+        window.addEventListener('resize', updateToolbarScrollButtons);
+        // Initial check after icons are rendered
+        setTimeout(updateToolbarScrollButtons, 100);
+    }
+
+    if (toolbarScrollLeftBtn) {
+        toolbarScrollLeftBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            toolbarInner.scrollBy({ left: -200, behavior: 'smooth' });
+        });
+    }
+    if (toolbarScrollRightBtn) {
+        toolbarScrollRightBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            toolbarInner.scrollBy({ left: 200, behavior: 'smooth' });
+        });
+    }
 
     // Search & Replace elements
     const searchReplaceBox = document.getElementById('searchReplaceBox');

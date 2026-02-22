@@ -153,30 +153,60 @@ body {
 .word-count div { margin: 4px 0; }
 
 .editor-container { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-/* ===== Toolbar: Narrow/Wide Mode ===== */
+/* ===== Toolbar: Single row with scroll navigation ===== */
 .toolbar {
     display: flex;
     align-items: center;
-    padding: 4px 12px;
+    padding: 0;
     background: var(--toolbar-bg);
     border-bottom: 1px solid var(--border-color);
+    position: relative;
+    height: 40px;
+}
+/* Scrollable inner container */
+.toolbar-inner {
+    display: flex;
+    align-items: center;
     gap: 2px;
-    /* Narrow mode (default): single row, horizontal scroll */
-    flex-wrap: nowrap;
+    flex: 1;
     overflow-x: auto;
     overflow-y: hidden;
-    max-height: 40px;
-    transition: max-height 0.25s ease-out, padding 0.15s ease-out;
+    padding: 4px 12px;
     scrollbar-width: none; /* Firefox */
+    min-width: 0;
 }
-.toolbar::-webkit-scrollbar { display: none; } /* Chrome/Safari */
-/* Wide mode: wrap to multiple rows, fit editor width */
-.toolbar.toolbar--wide {
-    flex-wrap: wrap;
-    overflow-x: visible;
-    overflow-y: visible;
-    max-height: 500px;
-    padding: 6px 12px;
+.toolbar-inner::-webkit-scrollbar { display: none; } /* Chrome/Safari */
+/* Scroll navigation buttons */
+.toolbar-scroll-btn {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--toolbar-bg);
+    border: none;
+    cursor: pointer;
+    color: var(--text-color);
+    z-index: 10;
+    font-size: 14px;
+    font-weight: bold;
+    padding: 0;
+    opacity: 0.8;
+}
+.toolbar-scroll-btn:hover {
+    opacity: 1;
+    background: var(--selection-bg);
+}
+.toolbar-scroll-btn.hidden { display: none; }
+.toolbar-scroll-btn--left {
+    left: 0;
+    box-shadow: 4px 0 8px -2px rgba(0,0,0,0.1);
+}
+.toolbar-scroll-btn--right {
+    right: 0;
+    box-shadow: -4px 0 8px -2px rgba(0,0,0,0.1);
 }
 /* Toolbar groups */
 .toolbar-group {

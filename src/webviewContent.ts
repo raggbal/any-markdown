@@ -98,37 +98,41 @@ export function getWebviewContent(
         </aside>
         <main class="editor-container">
             <div class="toolbar" id="toolbar">
-                <button data-action="openOutline" class="menu-btn hidden" id="openSidebarBtn" title="${msg.openOutline}"></button>
-                <div class="toolbar-group" data-group="inline">
-                    <button data-action="bold" title="${msg.bold}"></button>
-                    <button data-action="italic" title="${msg.italic}"></button>
-                    <button data-action="strikethrough" title="${msg.strikethrough}"></button>
-                    <button data-action="code" title="${msg.inlineCode}"></button>
+                <button class="toolbar-scroll-btn toolbar-scroll-btn--left hidden" id="toolbarScrollLeft">&#x276E;</button>
+                <div class="toolbar-inner" id="toolbarInner">
+                    <button data-action="openOutline" class="menu-btn hidden" id="openSidebarBtn" title="${msg.openOutline}"></button>
+                    <div class="toolbar-group" data-group="inline">
+                        <button data-action="bold" title="${msg.bold}"></button>
+                        <button data-action="italic" title="${msg.italic}"></button>
+                        <button data-action="strikethrough" title="${msg.strikethrough}"></button>
+                        <button data-action="code" title="${msg.inlineCode}"></button>
+                    </div>
+                    <div class="toolbar-group" data-group="block">
+                        <button data-action="heading1" title="${msg.heading1}"></button>
+                        <button data-action="heading2" title="${msg.heading2}"></button>
+                        <button data-action="heading3" title="${msg.heading3}"></button>
+                        <button data-action="heading4" title="${msg.heading4}"></button>
+                        <button data-action="heading5" title="${msg.heading5}"></button>
+                        <button data-action="heading6" title="${msg.heading6}"></button>
+                        <button data-action="ul" title="${msg.unorderedList}"></button>
+                        <button data-action="ol" title="${msg.orderedList}"></button>
+                        <button data-action="task" title="${msg.taskList}"></button>
+                        <button data-action="quote" title="${msg.blockquote}"></button>
+                        <button data-action="codeblock" title="${msg.codeBlock}"></button>
+                        <button data-action="hr" title="${msg.horizontalRule}"></button>
+                    </div>
+                    <div class="toolbar-group" data-group="insert">
+                        <button data-action="link" title="${msg.insertLink}"></button>
+                        <button data-action="image" title="${msg.insertImage}"></button>
+                        <button data-action="imageDir" title="${msg.setImageDir}"></button>
+                        <button data-action="table" title="${msg.insertTable}"></button>
+                    </div>
+                    <div class="toolbar-group" data-group="utility">
+                        <button data-action="openInTextEditor" title="${msg.openInTextEditor}"></button>
+                        <button data-action="source" title="${msg.toggleSourceMode}"></button>
+                    </div>
                 </div>
-                <div class="toolbar-group" data-group="block">
-                    <button data-action="heading1" title="${msg.heading1}"></button>
-                    <button data-action="heading2" title="${msg.heading2}"></button>
-                    <button data-action="heading3" title="${msg.heading3}"></button>
-                    <button data-action="heading4" title="${msg.heading4}"></button>
-                    <button data-action="heading5" title="${msg.heading5}"></button>
-                    <button data-action="heading6" title="${msg.heading6}"></button>
-                    <button data-action="ul" title="${msg.unorderedList}"></button>
-                    <button data-action="ol" title="${msg.orderedList}"></button>
-                    <button data-action="task" title="${msg.taskList}"></button>
-                    <button data-action="quote" title="${msg.blockquote}"></button>
-                    <button data-action="codeblock" title="${msg.codeBlock}"></button>
-                    <button data-action="hr" title="${msg.horizontalRule}"></button>
-                </div>
-                <div class="toolbar-group" data-group="insert">
-                    <button data-action="link" title="${msg.insertLink}"></button>
-                    <button data-action="image" title="${msg.insertImage}"></button>
-                    <button data-action="imageDir" title="${msg.setImageDir}"></button>
-                    <button data-action="table" title="${msg.insertTable}"></button>
-                </div>
-                <div class="toolbar-group" data-group="utility">
-                    <button data-action="openInTextEditor" title="${msg.openInTextEditor}"></button>
-                    <button data-action="source" title="${msg.toggleSourceMode}"></button>
-                </div>
+                <button class="toolbar-scroll-btn toolbar-scroll-btn--right hidden" id="toolbarScrollRight">&#x276F;</button>
             </div>
             <div class="editor-wrapper" id="editorWrapper">
                 <div class="search-replace-box" id="searchReplaceBox" style="display: none;">
