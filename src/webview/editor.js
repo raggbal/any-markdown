@@ -154,6 +154,11 @@
 
     // Active editing detection — replaces simple focus-based guard
     let isActivelyEditing = false;
+    let isNavigatingIntoBlock = false; // Suppress focusout during arrow-key navigation into code blocks
+    const NAVIGATION_FLAG_RESET_DELAY = 200; // Must be > focusout handler delay (100ms)
+    function resetNavigationFlag() {
+        setTimeout(() => { isNavigatingIntoBlock = false; }, NAVIGATION_FLAG_RESET_DELAY);
+    }
     let editingIdleTimer = null;
     let queuedExternalContent = null; // Queued external change waiting for idle
     const EDITING_IDLE_TIMEOUT = 1500; // 1.5 seconds of inactivity = idle
@@ -530,32 +535,49 @@
             }
         } else {
             // Last line is empty (trailing line break)
-            // For navigation purposes, position at the previous content line's start
-            // (if available), not the empty trailing line
-            if (lineBreaks.length >= 2) {
-                // Use the second-to-last break to find the previous content line
-                var prevBreak = lineBreaks[lineBreaks.length - 2];
-                if (prevBreak.type === 'br') {
-                    var target = prevBreak.node.nextSibling;
-                    while (target && target !== lastBreak.node) {
-                        if (target.nodeType === 3 && target.textContent.length > 0 && target.textContent !== '\n') {
-                            range.setStart(target, 0);
-                            logger.log('setCursorToLastLineStart: positioned at previous content line (before trailing BR)');
-                            break;
-                        }
-                        target = target.nextSibling;
+            // For code blocks: position at the empty last line (after the last BR)
+            // For other elements (table cells etc.): go to previous content line
+            var isCodeElement = element.tagName === 'CODE' || element.closest('code');
+            if (isCodeElement) {
+                // Code block: position at the actual empty last line
+                if (lastBreak.type === 'br') {
+                    var afterBr = lastBreak.node.nextSibling;
+                    if (afterBr && afterBr.nodeType === 3) {
+                        range.setStart(afterBr, 0);
+                        logger.log('setCursorToLastLineStart: code block - positioned at empty text node after last BR');
+                    } else {
+                        var brParent = lastBreak.node.parentNode;
+                        var brIdx = Array.prototype.indexOf.call(brParent.childNodes, lastBreak.node);
+                        range.setStart(brParent, brIdx + 1);
+                        logger.log('setCursorToLastLineStart: code block - positioned after last BR using parent offset');
                     }
                 } else {
-                    // \n - position after the second-to-last \n
-                    range.setStart(prevBreak.node, prevBreak.offset + 1);
-                    logger.log('setCursorToLastLineStart: positioned after second-to-last \\n');
+                    range.setStart(lastBreak.node, lastBreak.offset + 1);
+                    logger.log('setCursorToLastLineStart: code block - positioned after last \\n (empty trailing line)');
                 }
             } else {
-                // Only one line break and it's trailing - the only content line is before this break
-                // Position at the start of the element (the single content line)
-                setCursorToStart(element);
-                logger.log('setCursorToLastLineStart: single trailing break, positioned at element start');
-                return;
+                // Non-code elements: go to previous content line (skip trailing BR)
+                if (lineBreaks.length >= 2) {
+                    var prevBreak = lineBreaks[lineBreaks.length - 2];
+                    if (prevBreak.type === 'br') {
+                        var target = prevBreak.node.nextSibling;
+                        while (target && target !== lastBreak.node) {
+                            if (target.nodeType === 3 && target.textContent.length > 0 && target.textContent !== '\n') {
+                                range.setStart(target, 0);
+                                logger.log('setCursorToLastLineStart: positioned at previous content line (before trailing BR)');
+                                break;
+                            }
+                            target = target.nextSibling;
+                        }
+                    } else {
+                        range.setStart(prevBreak.node, prevBreak.offset + 1);
+                        logger.log('setCursorToLastLineStart: positioned after second-to-last \\n');
+                    }
+                } else {
+                    setCursorToStart(element);
+                    logger.log('setCursorToLastLineStart: single trailing break, positioned at element start');
+                    return;
+                }
             }
         }
 
@@ -2093,6 +2115,8 @@
         code.addEventListener('focusout', (e) => {
             // Delay to check if focus moved to language selector
             setTimeout(() => {
+                // Suppress during arrow-key navigation into this block
+                if (isNavigatingIntoBlock) return;
                 const activeEl = document.activeElement;
                 if (!pre.contains(activeEl) && !document.querySelector('.lang-selector')) {
                     if (pre.getAttribute('data-mode') === 'edit') {
@@ -6854,17 +6878,21 @@
                                     const prevTag = prevElement.tagName.toLowerCase();
                                     if (prevTag === 'pre') {
                                         // Enter code block edit mode, cursor at last line start
+                                        isNavigatingIntoBlock = true;
                                         enterEditMode(prevElement);
                                         setTimeout(() => {
                                             const code = prevElement.querySelector('code');
                                             if (code) {
                                                 setCursorToLastLineStart(code);
                                             }
+                                            resetNavigationFlag();
                                         }, 0);
                                     } else if (prevTag === 'div' && isSpecialWrapper(prevElement)) {
                                         // Enter mermaid/math edit mode, cursor at last line start
+                                        isNavigatingIntoBlock = true;
                                         setTimeout(() => {
                                             enterSpecialWrapperEditMode(prevElement, 'lastLineStart');
+                                            resetNavigationFlag();
                                         }, 0);
                                     } else if (prevTag === 'blockquote') {
                                         // Use setTimeout to ensure cursor is set after browser finishes table focus cleanup
@@ -6970,17 +6998,21 @@
                                     const nextTag = nextElement.tagName.toLowerCase();
                                     if (nextTag === 'pre') {
                                         // Enter code block edit mode, cursor at first line start
+                                        isNavigatingIntoBlock = true;
                                         enterEditMode(nextElement);
                                         setTimeout(() => {
                                             const code = nextElement.querySelector('code');
                                             if (code) {
                                                 setCursorToStart(code);
                                             }
+                                            resetNavigationFlag();
                                         }, 0);
                                     } else if (nextTag === 'div' && isSpecialWrapper(nextElement)) {
                                         // Enter mermaid/math edit mode, cursor at first line start
+                                        isNavigatingIntoBlock = true;
                                         setTimeout(() => {
                                             enterSpecialWrapperEditMode(nextElement, 'start');
+                                            resetNavigationFlag();
                                         }, 0);
                                     } else {
                                         setCursorToStart(nextElement);
@@ -7249,16 +7281,20 @@
                             if (prev) {
                                 const prevTag = prev.tagName.toLowerCase();
                                 if (prevTag === 'pre') {
+                                    isNavigatingIntoBlock = true;
                                     enterEditMode(prev);
                                     setTimeout(() => {
                                         const code = prev.querySelector('code');
                                         if (code) {
                                             setCursorToLastLineStart(code);
                                         }
+                                        resetNavigationFlag();
                                     }, 0);
                                 } else if (prevTag === 'div' && isSpecialWrapper(prev)) {
+                                    isNavigatingIntoBlock = true;
                                     setTimeout(() => {
                                         enterSpecialWrapperEditMode(prev, 'lastLineStart');
+                                        resetNavigationFlag();
                                     }, 0);
                                 } else if (prev.tagName.toLowerCase() === 'blockquote') {
                                     setCursorToBlockLastLineStart(prev);
@@ -7288,16 +7324,20 @@
                                 const prevTag = prev.tagName.toLowerCase();
                                 // If previous element is a code block, enter edit mode
                                 if (prevTag === 'pre') {
+                                    isNavigatingIntoBlock = true;
                                     enterEditMode(prev);
                                     setTimeout(() => {
                                         const code = prev.querySelector('code');
                                         if (code) {
                                             setCursorToLastLineStart(code);
                                         }
+                                        resetNavigationFlag();
                                     }, 0);
                                 } else if (prevTag === 'div' && isSpecialWrapper(prev)) {
+                                    isNavigatingIntoBlock = true;
                                     setTimeout(() => {
                                         enterSpecialWrapperEditMode(prev, 'lastLineStart');
+                                        resetNavigationFlag();
                                     }, 0);
                                 } else if (prev.tagName.toLowerCase() === 'blockquote') {
                                     setCursorToBlockLastLineStart(prev);
@@ -7346,16 +7386,20 @@
                             if (next) {
                                 const nextTag = next.tagName.toLowerCase();
                                 if (nextTag === 'pre') {
+                                    isNavigatingIntoBlock = true;
                                     enterEditMode(next);
                                     setTimeout(() => {
                                         const code = next.querySelector('code');
                                         if (code) {
                                             setCursorToBlockStart(code);
                                         }
+                                        resetNavigationFlag();
                                     }, 0);
                                 } else if (nextTag === 'div' && isSpecialWrapper(next)) {
+                                    isNavigatingIntoBlock = true;
                                     setTimeout(() => {
                                         enterSpecialWrapperEditMode(next, 'start');
+                                        resetNavigationFlag();
                                     }, 0);
                                 } else if (nextTag === 'table') {
                                     const rows = next.querySelectorAll('tr');
@@ -7390,16 +7434,20 @@
                                 const nextTag = next.tagName.toLowerCase();
                                 // If next element is a code block, enter edit mode
                                 if (nextTag === 'pre') {
+                                    isNavigatingIntoBlock = true;
                                     enterEditMode(next);
                                     setTimeout(() => {
                                         const code = next.querySelector('code');
                                         if (code) {
                                             setCursorToBlockStart(code);
                                         }
+                                        resetNavigationFlag();
                                     }, 0);
                                 } else if (nextTag === 'div' && isSpecialWrapper(next)) {
+                                    isNavigatingIntoBlock = true;
                                     setTimeout(() => {
                                         enterSpecialWrapperEditMode(next, 'start');
+                                        resetNavigationFlag();
                                     }, 0);
                                 } else if (nextTag === 'table') {
                                     const rows = next.querySelectorAll('tr');
@@ -7508,12 +7556,14 @@
                             // #endregion
                             e.preventDefault();
                             if (tag === 'pre') {
+                                isNavigatingIntoBlock = true;
                                 enterEditMode(prev);
                                 setTimeout(() => {
                                     const code = prev.querySelector('code');
                                     if (code) {
                                         setCursorToLastLineStart(code);
                                     }
+                                    resetNavigationFlag();
                                 }, 0);
                             } else {
                                 setCursorToBlockLastLineStart(prev);
@@ -7522,8 +7572,10 @@
                         }
                         if (tag === 'div' && isSpecialWrapper(prev)) {
                             e.preventDefault();
+                            isNavigatingIntoBlock = true;
                             setTimeout(() => {
                                 enterSpecialWrapperEditMode(prev, 'lastLineStart');
+                                resetNavigationFlag();
                             }, 0);
                             return;
                         }
@@ -7556,7 +7608,11 @@
                             // #endregion
                             e.preventDefault();
                             if (tag === 'pre') {
+                                isNavigatingIntoBlock = true;
                                 enterEditMode(next);
+                                setTimeout(() => {
+                                    resetNavigationFlag();
+                                }, 0);
                             } else {
                                 setCursorToBlockStart(next);
                             }
@@ -7564,8 +7620,10 @@
                         }
                         if (tag === 'div' && isSpecialWrapper(next)) {
                             e.preventDefault();
+                            isNavigatingIntoBlock = true;
                             setTimeout(() => {
                                 enterSpecialWrapperEditMode(next, 'start');
+                                resetNavigationFlag();
                             }, 0);
                             return;
                         }
@@ -9004,21 +9062,24 @@
                             if (isCurrentEmpty) {
                                 currentLine.remove();
                                 // Enter edit mode and set cursor to end
+                                isNavigatingIntoBlock = true;
                                 enterEditMode(prevElement);
                                 setTimeout(() => {
                                     const code = prevElement.querySelector('code');
                                     if (code) {
                                         setCursorToEnd(code);
                                     }
+                                    resetNavigationFlag();
                                 }, 0);
                                 syncMarkdown();
                                 return;
                             }
-                            
+
                             // Merge paragraph content into code block's last line
                             const code = prevElement.querySelector('code');
                             if (code) {
                                 // Enter edit mode first
+                                isNavigatingIntoBlock = true;
                                 enterEditMode(prevElement);
                                 
                                 setTimeout(() => {
@@ -9042,6 +9103,7 @@
                                         codeEl.appendChild(document.createTextNode(currentContent));
                                         setCursorToEnd(codeEl);
                                     }
+                                    resetNavigationFlag();
                                     syncMarkdown();
                                 }, 0);
                             }
