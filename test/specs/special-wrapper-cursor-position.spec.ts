@@ -183,7 +183,7 @@ test.describe('Mermaid/Math block cursor position after editing', () => {
     test('ArrowUp into mermaid block after adding lines with Enter - realistic', async ({ page }) => {
         // Setup: mermaid block with paragraph below
         await page.evaluate(() => {
-            window.__testApi.setMarkdown('```mermaid\ngraph TD\n    A --> B\n```\n\nParagraph below\n');
+            window.__testApi.setMarkdown('```mermaid\ngraph TD\n    A --> B\n```\nParagraph below\n');
         });
         await page.waitForTimeout(500);
 

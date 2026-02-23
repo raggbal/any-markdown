@@ -7522,7 +7522,9 @@
                         }
                         if (tag === 'div' && isSpecialWrapper(prev)) {
                             e.preventDefault();
-                            enterSpecialWrapperEditMode(prev, 'lastLineStart');
+                            setTimeout(() => {
+                                enterSpecialWrapperEditMode(prev, 'lastLineStart');
+                            }, 0);
                             return;
                         }
                         if (tag === 'table') {
@@ -7562,7 +7564,9 @@
                         }
                         if (tag === 'div' && isSpecialWrapper(next)) {
                             e.preventDefault();
-                            enterSpecialWrapperEditMode(next, 'start');
+                            setTimeout(() => {
+                                enterSpecialWrapperEditMode(next, 'start');
+                            }, 0);
                             return;
                         }
                         if (tag === 'table') {
