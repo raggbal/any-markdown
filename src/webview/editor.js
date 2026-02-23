@@ -455,7 +455,7 @@
         // Helper: check if a sibling is real editable content (not UI elements like resize handles)
         function isEditableContent(node) {
             if (node.nodeType === 3) {
-                return node.textContent.length > 0 && node.textContent !== '\n' && node.textContent.trim() !== '';
+                return node.textContent.length > 0 && node.textContent !== '\n';
             }
             if (node.nodeType === 1) {
                 // Skip non-editable UI elements (e.g., table resize handles)
@@ -7101,7 +7101,12 @@
                 const targetNode = (tag === 'pre') ? (el.querySelector('code') || el) : el;
                 const brTags = targetNode.querySelectorAll('br');
                 const text = targetNode.textContent || '';
-                const newlineCount = (text.match(/\n/g) || []).length;
+                let newlineCount = (text.match(/\n/g) || []).length;
+                // Sentinel \n correction: browser's insertLineBreak adds a trailing \n
+                // that inflates the line count by 1. Same fix as getCurrentLineInBlock().
+                if (text.endsWith('\n')) {
+                    newlineCount = Math.max(0, newlineCount - 1);
+                }
                 const totalLines = brTags.length + newlineCount + 1;
                 setCursorToLineStart(el, totalLines - 1);
             }
@@ -7490,26 +7495,11 @@
                     return cursorRect.bottom > elemRect.bottom - cursorRect.height;
                 }
 
-                // Helper: check if element is an empty paragraph (used for skipping blank lines between blocks)
-                function isEmptyParagraph(el) {
-                    return el && el.tagName === 'P' && (el.innerHTML === '<br>' || el.textContent.trim() === '');
-                }
-
                 if (e.key === 'ArrowUp') {
                     // Only enter adjacent block if cursor is at the first line of current element
                     if (!isCursorAtFirstLine(currentElement)) return;
 
-                    // Skip empty paragraphs to find the real previous element
-                    // (Markdown generates empty <p> between blocks and paragraphs)
                     let prev = currentElement.previousElementSibling;
-                    if (prev && isEmptyParagraph(prev) && prev.previousElementSibling) {
-                        const realPrev = prev.previousElementSibling;
-                        const realTag = realPrev.tagName.toLowerCase();
-                        if (realTag === 'pre' || realTag === 'blockquote' || realTag === 'table' ||
-                            (realTag === 'div' && isSpecialWrapper(realPrev))) {
-                            prev = realPrev;
-                        }
-                    }
                     if (prev) {
                         const tag = prev.tagName.toLowerCase();
                         if (tag === 'pre' || tag === 'blockquote') {
@@ -7555,16 +7545,7 @@
                     // Only enter adjacent block if cursor is at the last line of current element
                     if (!isCursorAtLastLine(currentElement)) return;
 
-                    // Skip empty paragraphs to find the real next element
                     let next = currentElement.nextElementSibling;
-                    if (next && isEmptyParagraph(next) && next.nextElementSibling) {
-                        const realNext = next.nextElementSibling;
-                        const realTag = realNext.tagName.toLowerCase();
-                        if (realTag === 'pre' || realTag === 'blockquote' || realTag === 'table' ||
-                            (realTag === 'div' && isSpecialWrapper(realNext))) {
-                            next = realNext;
-                        }
-                    }
                     if (next) {
                         const tag = next.tagName.toLowerCase();
                         if (tag === 'pre' || tag === 'blockquote') {
