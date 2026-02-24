@@ -163,6 +163,83 @@
     function resetNavigationFlag() {
         setTimeout(() => { isNavigatingIntoBlock = false; }, NAVIGATION_FLAG_RESET_DELAY);
     }
+
+    // Unified navigation dispatch: navigate to an adjacent element
+    // direction: 'up' → last line start, 'down' → first line start
+    // useTimeout: true when called from table exit (browser resets selection async)
+    function navigateToAdjacentElement(target, direction, useTimeout) {
+        if (!target) return false;
+        var tag = target.tagName.toLowerCase();
+
+        if (tag === 'pre') {
+            isNavigatingIntoBlock = true;
+            enterEditMode(target);
+            setTimeout(function() {
+                var code = target.querySelector('code');
+                if (code) {
+                    if (direction === 'up') {
+                        setCursorToLastLineStartByDOM(code);
+                    } else {
+                        setCursorToFirstTextNode(code);
+                    }
+                }
+                resetNavigationFlag();
+            }, 0);
+            return true;
+        }
+        if (tag === 'div' && isSpecialWrapper(target)) {
+            isNavigatingIntoBlock = true;
+            setTimeout(function() {
+                enterSpecialWrapperEditMode(target, direction === 'up' ? 'lastLineStart' : 'start');
+                resetNavigationFlag();
+            }, 0);
+            return true;
+        }
+        if (tag === 'table') {
+            var rows = target.querySelectorAll('tr');
+            if (rows.length > 0) {
+                var row = direction === 'up' ? rows[rows.length - 1] : rows[0];
+                var cell = row.cells[0];
+                if (cell) {
+                    activeTable = target;
+                    activeTableCell = cell;
+                    if (direction === 'up') {
+                        setCursorToLastLineStartByDOM(cell);
+                    } else {
+                        setCursorToStart(cell);
+                    }
+                    showTableToolbar(target);
+                }
+            }
+            return true;
+        }
+        if (tag === 'blockquote') {
+            if (useTimeout) {
+                setTimeout(function() {
+                    if (direction === 'up') {
+                        setCursorToLastLineStartByDOM(target);
+                    } else {
+                        setCursorToFirstTextNode(target);
+                    }
+                }, 0);
+            } else {
+                if (direction === 'up') {
+                    setCursorToLastLineStartByDOM(target);
+                } else {
+                    setCursorToFirstTextNode(target);
+                }
+            }
+            return true;
+        }
+        // Normal elements (paragraph, heading, list, etc.)
+        if (direction === 'up') {
+            setCursorToLastLineStartByDOM(target);
+        } else {
+            setCursorToFirstTextNode(target);
+        }
+        return true;
+    }
+
     let editingIdleTimer = null;
     let queuedExternalContent = null; // Queued external change waiting for idle
     const EDITING_IDLE_TIMEOUT = 1500; // 1.5 seconds of inactivity = idle
@@ -317,30 +394,6 @@
     
     // Helper: Get current selection and range if available
     // Returns { sel, range } or null if no valid selection
-    function getSelectionRange() {
-        const sel = window.getSelection();
-        if (!sel || !sel.rangeCount) return null;
-        return { sel, range: sel.getRangeAt(0) };
-    }
-    
-    function saveSelection() {
-        const sel = window.getSelection();
-        if (sel && sel.rangeCount > 0) {
-            return sel.getRangeAt(0).cloneRange();
-        }
-        return null;
-    }
-
-    function restoreSelection(range) {
-        if (range) {
-            const sel = window.getSelection();
-            if (sel) {
-                sel.removeAllRanges();
-                sel.addRange(range);
-            }
-        }
-    }
-
     function setCursorToEnd(element) {
         const range = document.createRange();
         const sel = window.getSelection();
@@ -615,6 +668,148 @@
         logger.log('setCursorToLastLineStartByDOM: AFTER - anchorNode =', newSel.anchorNode, 'anchorOffset =', newSel.anchorOffset);
     }
 
+    // Set cursor to specific line in block
+    // Handles both <br> tags and \n characters as line separators
+    function setCursorToLineStart(el, targetLineIndex) {
+        var tag = el.tagName.toLowerCase();
+        var targetNode = (tag === 'pre') ? (el.querySelector('code') || el) : el;
+
+        logger.log('setCursorToLineStart:', { targetLineIndex: targetLineIndex });
+
+        if (targetLineIndex === 0) {
+            setCursorToFirstTextNode(el);
+            return;
+        }
+
+        var lineCount = 0;
+        var walker = document.createTreeWalker(targetNode, NodeFilter.SHOW_ALL, null, false);
+        var node;
+
+        while ((node = walker.nextNode())) {
+            if (node.nodeType === 1 && node.tagName === 'BR') {
+                lineCount++;
+                if (lineCount === targetLineIndex) {
+                    var range = document.createRange();
+                    var s = window.getSelection();
+                    var nextNode = node.nextSibling;
+                    if (nextNode && nextNode.nodeType === 3) {
+                        range.setStart(nextNode, 0);
+                    } else {
+                        range.setStartAfter(node);
+                    }
+                    range.collapse(true);
+                    s.removeAllRanges();
+                    s.addRange(range);
+                    scrollCursorIntoView();
+                    return;
+                }
+            } else if (node.nodeType === 3) {
+                var text = node.textContent;
+                for (var i = 0; i < text.length; i++) {
+                    if (text[i] === '\n') {
+                        lineCount++;
+                        if (lineCount === targetLineIndex) {
+                            var range = document.createRange();
+                            var s = window.getSelection();
+                            range.setStart(node, i + 1);
+                            range.collapse(true);
+                            s.removeAllRanges();
+                            s.addRange(range);
+                            scrollCursorIntoView();
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Fallback: if target not found, go to end
+        setCursorToEnd(targetNode);
+    }
+
+    // Get current line index in block
+    // Counts both <br> tags and \n characters as line separators
+    function getCurrentLineInBlock(el, sel) {
+        var tag = el.tagName.toLowerCase();
+        var targetNode = (tag === 'pre') ? (el.querySelector('code') || el) : el;
+
+        var brCount = targetNode.querySelectorAll('br').length;
+        var text = targetNode.textContent || '';
+        var newlineCount = (text.match(/\n/g) || []).length;
+        // Sentinel \n correction: browser's insertLineBreak adds a trailing \n
+        if (text.endsWith('\n')) {
+            newlineCount = Math.max(0, newlineCount - 1);
+        }
+        // Sentinel <br> correction
+        var sentinelOwner = el.closest('.mermaid-wrapper') || el.closest('.math-wrapper') || el;
+        if (codeBlocksWithSentinel.has(sentinelOwner)) {
+            brCount = Math.max(0, brCount - 1);
+        }
+        var totalLines = brCount + newlineCount + 1;
+
+        try {
+            var range = sel.getRangeAt(0);
+            var startContainer = range.startContainer;
+            var startOffset = range.startOffset;
+
+            var linesBefore = 0;
+
+            // Special case: cursor is directly in the container element (not in a text node)
+            if (startContainer === targetNode || startContainer.nodeType === 1) {
+                var children = Array.from(targetNode.childNodes);
+                var cursorChildIndex = startOffset;
+
+                if (startContainer !== targetNode) {
+                    for (var i = 0; i < children.length; i++) {
+                        if (children[i] === startContainer || children[i].contains(startContainer)) {
+                            cursorChildIndex = i;
+                            break;
+                        }
+                    }
+                }
+
+                for (var i = 0; i < cursorChildIndex && i < children.length; i++) {
+                    var child = children[i];
+                    if (child.nodeType === 1 && child.tagName === 'BR') {
+                        linesBefore++;
+                    } else if (child.nodeType === 3) {
+                        linesBefore += (child.textContent.match(/\n/g) || []).length;
+                    } else if (child.nodeType === 1) {
+                        linesBefore += child.querySelectorAll('br').length;
+                        linesBefore += (child.textContent.match(/\n/g) || []).length;
+                    }
+                }
+
+                return { currentLineIndex: linesBefore, totalLines: totalLines };
+            }
+
+            // Normal case: cursor is in a text node
+            var walker = document.createTreeWalker(targetNode, NodeFilter.SHOW_ALL, null, false);
+            var node;
+            var foundCursor = false;
+
+            while ((node = walker.nextNode()) && !foundCursor) {
+                if (node === startContainer) {
+                    foundCursor = true;
+                    if (node.nodeType === 3) {
+                        var textBefore = node.textContent.substring(0, startOffset);
+                        linesBefore += (textBefore.match(/\n/g) || []).length;
+                    }
+                    break;
+                }
+                if (node.nodeType === 1 && node.tagName === 'BR') {
+                    linesBefore++;
+                } else if (node.nodeType === 3) {
+                    linesBefore += (node.textContent.match(/\n/g) || []).length;
+                }
+            }
+
+            return { currentLineIndex: linesBefore, totalLines: totalLines };
+        } catch (ex) {
+            return { currentLineIndex: 0, totalLines: totalLines };
+        }
+    }
+
     // Set cursor to start of element (first line)
     // Same approach for both pre and blockquote - find first text node
     function setCursorToFirstTextNode(el) {
@@ -822,25 +1017,6 @@
             node = node.parentNode;
         }
         return node;
-    }
-
-    function getLineText(lineElement) {
-        if (!lineElement) return '';
-        return lineElement.textContent || '';
-    }
-
-    function getTextBeforeCursor(container, range) {
-        const preRange = document.createRange();
-        preRange.selectNodeContents(container);
-        preRange.setEnd(range.startContainer, range.startOffset);
-        return preRange.toString();
-    }
-
-    function getTextAfterCursor(container, range) {
-        const postRange = document.createRange();
-        postRange.selectNodeContents(container);
-        postRange.setStart(range.endContainer, range.endOffset);
-        return postRange.toString();
     }
 
     // ========== MARKDOWN TO HTML ==========
@@ -1260,14 +1436,32 @@
         }
     }
 
+    // Helper: strip sentinel \n from code element and rebuild its DOM.
+    // Used by enterDisplayMode and exitSpecialWrapperDisplayMode when
+    // transitioning from edit mode back to display mode.
+    function stripSentinelAndRebuildCode(code) {
+        var plainText = getCodePlainText(code);
+        if (plainText.endsWith('\n')) {
+            plainText = plainText.slice(0, -1);
+        }
+        if (!plainText || plainText === '') {
+            code.innerHTML = '<br>';
+            code.removeAttribute('data-trailing-br');
+        } else if (plainText.endsWith('\n')) {
+            code.innerHTML = escapeHtml(plainText).replace(/\n/g, '<br>') + '<br>';
+            code.setAttribute('data-trailing-br', 'true');
+        } else {
+            code.innerHTML = escapeHtml(plainText).replace(/\n/g, '<br>');
+            code.removeAttribute('data-trailing-br');
+        }
+    }
+
     // Helper: exit special wrapper to display mode and re-render
     function exitSpecialWrapperDisplayMode(wrapper) {
         var hasSentinel = codeBlocksWithSentinel.has(wrapper);
         wrapper.setAttribute('data-mode', 'display');
 
         if (hasSentinel) {
-            // Strip browser sentinel \n from edit DOM before rendering.
-            // Same logic as enterDisplayMode for regular code blocks.
             codeBlocksWithSentinel.delete(wrapper);
             var preSelector = wrapper.classList.contains('mermaid-wrapper')
                 ? 'pre[data-lang="mermaid"]' : 'pre[data-lang="math"]';
@@ -1275,20 +1469,7 @@
             if (pre) {
                 var code = pre.querySelector('code');
                 if (code) {
-                    var plainText = getCodePlainText(code);
-                    if (plainText.endsWith('\n')) {
-                        plainText = plainText.slice(0, -1);
-                    }
-                    if (!plainText || plainText === '') {
-                        code.innerHTML = '<br>';
-                        code.removeAttribute('data-trailing-br');
-                    } else if (plainText.endsWith('\n')) {
-                        code.innerHTML = escapeHtml(plainText).replace(/\n/g, '<br>') + '<br>';
-                        code.setAttribute('data-trailing-br', 'true');
-                    } else {
-                        code.innerHTML = escapeHtml(plainText).replace(/\n/g, '<br>');
-                        code.removeAttribute('data-trailing-br');
-                    }
+                    stripSentinelAndRebuildCode(code);
                 }
             }
         }
@@ -2270,120 +2451,56 @@
         code.setAttribute('contenteditable', 'false');
 
         if (hasSentinel) {
-            // Strip browser sentinel \n from the edit DOM before applying
-            // highlighting. insertLineBreak added a trailing \n for cursor
-            // positioning — this is NOT user content.
-            // We strip it so the display DOM faithfully represents the
-            // actual content. A single trailing <br> in display mode still
-            // visually shows trailing empty lines correctly.
             codeBlocksWithSentinel.delete(pre);
-            let plainText = getCodePlainText(code);
-            if (plainText.endsWith('\n')) {
-                plainText = plainText.slice(0, -1);
-            }
-            // Rebuild code DOM from stripped text before highlighting
-            if (!plainText || plainText === '') {
-                code.innerHTML = '<br>';
-                code.removeAttribute('data-trailing-br');
-            } else if (plainText.endsWith('\n')) {
-                code.innerHTML = escapeHtml(plainText).replace(/\n/g, '<br>') + '<br>';
-                code.setAttribute('data-trailing-br', 'true');
-            } else {
-                code.innerHTML = escapeHtml(plainText).replace(/\n/g, '<br>');
-                code.removeAttribute('data-trailing-br');
-            }
+            stripSentinelAndRebuildCode(code);
         }
 
         // Apply syntax highlighting (also manages data-trailing-br)
         applyHighlighting(pre);
     }
     
-    // Convert a regular code block to a mermaid block
-    function convertToMermaidBlock(pre) {
-        logger.log('convertToMermaidBlock');
-        
-        // Get the code content
-        const code = pre.querySelector('code');
-        if (!code) return;
-        
-        const codeContent = getCodePlainText(code);
-        
-        // Create mermaid wrapper
-        const wrapper = document.createElement('div');
-        wrapper.className = 'mermaid-wrapper';
-        wrapper.setAttribute('data-mode', 'display');
-        wrapper.setAttribute('contenteditable', 'false');
-        
-        // Create pre element for mermaid
-        const mermaidPre = document.createElement('pre');
-        mermaidPre.setAttribute('data-lang', 'mermaid');
-        mermaidPre.setAttribute('contenteditable', 'true');
-        
-        const mermaidCode = document.createElement('code');
-        // Convert content to HTML with <br> for newlines
-        if (!codeContent || codeContent === '' || codeContent === '\n') {
-            mermaidCode.innerHTML = '<br>';
-        } else if (codeContent.endsWith('\n')) {
-            mermaidCode.innerHTML = escapeHtml(codeContent).replace(/\n/g, '<br>') + '<br>';
-        } else {
-            mermaidCode.innerHTML = escapeHtml(codeContent).replace(/\n/g, '<br>');
-        }
-        mermaidPre.appendChild(mermaidCode);
-        
-        // Create diagram div
-        const diagramDiv = document.createElement('div');
-        diagramDiv.className = 'mermaid-diagram';
-        
-        wrapper.appendChild(mermaidPre);
-        wrapper.appendChild(diagramDiv);
-        
-        // Replace the original pre with the mermaid wrapper
-        pre.parentNode.replaceChild(wrapper, pre);
-        
-        // Setup and render the mermaid diagram
-        wrapper.dataset.mermaidSetup = 'true';
-        renderMermaidDiagram(wrapper);
-        
-        syncMarkdownSync();
-    }
-    
-    function convertToMathBlock(pre) {
-        logger.log('convertToMathBlock');
+    // Convert a regular code block to a mermaid or math special wrapper block.
+    // type: 'mermaid' | 'math'
+    function convertToSpecialBlock(pre, type) {
+        logger.log('convertToSpecialBlock:', type);
 
         const code = pre.querySelector('code');
         if (!code) return;
 
         const codeContent = getCodePlainText(code);
+        const wrapperClass = type + '-wrapper';
+        const displayClass = type === 'mermaid' ? 'mermaid-diagram' : 'math-display';
+        const renderFn = type === 'mermaid' ? renderMermaidDiagram : renderMathBlock;
 
         const wrapper = document.createElement('div');
-        wrapper.className = 'math-wrapper';
+        wrapper.className = wrapperClass;
         wrapper.setAttribute('data-mode', 'display');
         wrapper.setAttribute('contenteditable', 'false');
 
-        const mathPre = document.createElement('pre');
-        mathPre.setAttribute('data-lang', 'math');
-        mathPre.setAttribute('contenteditable', 'true');
+        const newPre = document.createElement('pre');
+        newPre.setAttribute('data-lang', type);
+        newPre.setAttribute('contenteditable', 'true');
 
-        const mathCode = document.createElement('code');
+        const newCode = document.createElement('code');
         if (!codeContent || codeContent === '' || codeContent === '\n') {
-            mathCode.innerHTML = '<br>';
+            newCode.innerHTML = '<br>';
         } else if (codeContent.endsWith('\n')) {
-            mathCode.innerHTML = escapeHtml(codeContent).replace(/\n/g, '<br>') + '<br>';
+            newCode.innerHTML = escapeHtml(codeContent).replace(/\n/g, '<br>') + '<br>';
         } else {
-            mathCode.innerHTML = escapeHtml(codeContent).replace(/\n/g, '<br>');
+            newCode.innerHTML = escapeHtml(codeContent).replace(/\n/g, '<br>');
         }
-        mathPre.appendChild(mathCode);
+        newPre.appendChild(newCode);
 
         const displayDiv = document.createElement('div');
-        displayDiv.className = 'math-display';
+        displayDiv.className = displayClass;
 
-        wrapper.appendChild(mathPre);
+        wrapper.appendChild(newPre);
         wrapper.appendChild(displayDiv);
 
         pre.parentNode.replaceChild(wrapper, pre);
 
-        wrapper.dataset.mathSetup = 'true';
-        renderMathBlock(wrapper);
+        wrapper.dataset[type + 'Setup'] = 'true';
+        renderFn(wrapper);
 
         syncMarkdownSync();
     }
@@ -2657,11 +2774,11 @@
                 
                 // Special handling for mermaid/math: convert to wrapper block
                 if (lang === 'mermaid') {
-                    convertToMermaidBlock(pre);
+                    convertToSpecialBlock(pre, 'mermaid');
                     return;
                 }
                 if (lang === 'math') {
-                    convertToMathBlock(pre);
+                    convertToSpecialBlock(pre, 'math');
                     return;
                 }
                 
@@ -4058,16 +4175,6 @@
         syncMarkdown();
     }
 
-    // Legacy replaceInlinePattern for compatibility (not used anymore)
-    function replaceInlinePattern(textNode, match, tagName, cursorOffset, hasSpaceAfter) {
-        replaceInlinePatternAnywhere(textNode, match, tagName, cursorOffset, hasSpaceAfter);
-    }
-
-    // Legacy function name for compatibility
-    function checkAndConvert() {
-        checkAllPatterns('space');
-    }
-
     // ========== INLINE ELEMENT ESCAPE ==========
     
     // Check if cursor is inside an inline element and user typed ending marker + space
@@ -4584,6 +4691,18 @@
         return fence + ' ' + content + ' ' + fence;
     }
     
+    // Strip display-only trailing <br> and/or browser sentinel \n from code content.
+    // Used by mdProcessNode for both regular code blocks and special wrappers.
+    function stripTrailingNewlines(content, code, sentinelOwner) {
+        if (code && code.getAttribute('data-trailing-br') === 'true') {
+            if (content.endsWith('\n')) content = content.slice(0, -1);
+        }
+        if (sentinelOwner && codeBlocksWithSentinel.has(sentinelOwner)) {
+            if (content.endsWith('\n')) content = content.slice(0, -1);
+        }
+        return content;
+    }
+
     function mdProcessNode(node, listPrefix = '') {
         if (node.nodeType === 3) {
             return node.textContent;
@@ -4633,18 +4752,7 @@
                             };
                             processCodeNode(code);
                         }
-                        // Strip display-only trailing <br> (same as regular code blocks)
-                        if (code && code.getAttribute('data-trailing-br') === 'true') {
-                            if (wrapperContent.endsWith('\n')) {
-                                wrapperContent = wrapperContent.slice(0, -1);
-                            }
-                        }
-                        // Strip sentinel \n only if insertLineBreak was used.
-                        if (codeBlocksWithSentinel.has(node)) {
-                            if (wrapperContent.endsWith('\n')) {
-                                wrapperContent = wrapperContent.slice(0, -1);
-                            }
-                        }
+                        wrapperContent = stripTrailingNewlines(wrapperContent, code, node);
                         // Always add \n for fence format.
                         wrapperContent += '\n';
                         // Determine fence length: if content contains triple backticks, use more backticks
@@ -4702,26 +4810,7 @@
                 if (isEmptyCodeBlock) {
                     codeContent = '\n';
                 } else {
-                    // Strip display-only trailing <br>.
-                    // markdownToHtmlFragment and applyHighlighting add an extra
-                    // <br> at the end of code blocks that have trailing empty
-                    // lines (because browsers don't render a lone trailing <br>
-                    // as a visible line). This extra <br> is marked with
-                    // data-trailing-br on the <code> element. Strip its \n here
-                    // so the round-trip stays correct.
-                    if (code && code.getAttribute('data-trailing-br') === 'true') {
-                        if (codeContent.endsWith('\n')) {
-                            codeContent = codeContent.slice(0, -1);
-                        }
-                    }
-                    // After insertLineBreak in edit mode, the browser adds a
-                    // sentinel \n for cursor positioning. This is NOT user
-                    // content. We detect this via codeBlocksWithSentinel.
-                    if (codeBlocksWithSentinel.has(node)) {
-                        if (codeContent.endsWith('\n')) {
-                            codeContent = codeContent.slice(0, -1);
-                        }
-                    }
+                    codeContent = stripTrailingNewlines(codeContent, code, node);
                     // Always add \n for fence format.
                     codeContent += '\n';
                 }
@@ -6703,13 +6792,13 @@
                         sel.addRange(newRange);
                     } else {
                         // Fallback: set cursor to end of li's text content
-                        setCursorToEndOfLi(liElement, sel);
+                        setCursorToEndOfLi(liElement);
                     }
                 } catch (err) {
                     logger.log('Failed to restore cursor after indent:', err);
                     // Fallback: set cursor to end of li
                     try {
-                        setCursorToEndOfLi(liElement, sel);
+                        setCursorToEndOfLi(liElement);
                     } catch (e2) {
                         // ignore
                     }
@@ -7032,87 +7121,7 @@
                                 // At first row, exit table upward
                                 const prevElement = table.previousElementSibling;
                                 if (prevElement) {
-                                    const prevTag = prevElement.tagName.toLowerCase();
-                                    if (prevTag === 'pre') {
-                                        // Enter code block edit mode, cursor at last line start
-                                        isNavigatingIntoBlock = true;
-                                        enterEditMode(prevElement);
-                                        setTimeout(() => {
-                                            const code = prevElement.querySelector('code');
-                                            if (code) {
-                                                setCursorToLastLineStartByDOM(code);
-                                            }
-                                            resetNavigationFlag();
-                                        }, 0);
-                                    } else if (prevTag === 'div' && isSpecialWrapper(prevElement)) {
-                                        // Enter mermaid/math edit mode, cursor at last line start
-                                        isNavigatingIntoBlock = true;
-                                        setTimeout(() => {
-                                            enterSpecialWrapperEditMode(prevElement, 'lastLineStart');
-                                            resetNavigationFlag();
-                                        }, 0);
-                                    } else if (prevTag === 'blockquote') {
-                                        // Use setTimeout to ensure cursor is set after browser finishes table focus cleanup
-                                        const bqEl = prevElement;
-                                        setTimeout(() => {
-                                            const bqSel = window.getSelection();
-                                            const bqBrTags = bqEl.querySelectorAll('br');
-                                            const bqText = bqEl.textContent || '';
-                                            const bqNewlineCount = (bqText.match(/\n/g) || []).length;
-                                            const bqTotalLines = bqBrTags.length + bqNewlineCount + 1;
-                                            if (bqTotalLines <= 1) {
-                                                setCursorToStart(bqEl);
-                                                return;
-                                            }
-                                            // Find the last line start by walking nodes
-                                            const bqLastLineIndex = bqTotalLines - 1;
-                                            let bqLineCount = 0;
-                                            const bqWalker = document.createTreeWalker(bqEl, NodeFilter.SHOW_ALL, null, false);
-                                            let bqNode;
-                                            let bqFound = false;
-                                            while ((bqNode = bqWalker.nextNode())) {
-                                                if (bqNode.nodeType === 1 && bqNode.tagName === 'BR') {
-                                                    bqLineCount++;
-                                                    if (bqLineCount === bqLastLineIndex) {
-                                                        const bqRange = document.createRange();
-                                                        const bqNextNode = bqNode.nextSibling;
-                                                        if (bqNextNode && bqNextNode.nodeType === 3) {
-                                                            bqRange.setStart(bqNextNode, 0);
-                                                        } else {
-                                                            bqRange.setStartAfter(bqNode);
-                                                        }
-                                                        bqRange.collapse(true);
-                                                        bqSel.removeAllRanges();
-                                                        bqSel.addRange(bqRange);
-                                                        bqFound = true;
-                                                        break;
-                                                    }
-                                                } else if (bqNode.nodeType === 3) {
-                                                    const bqNodeText = bqNode.textContent;
-                                                    for (let bi = 0; bi < bqNodeText.length; bi++) {
-                                                        if (bqNodeText[bi] === '\n') {
-                                                            bqLineCount++;
-                                                            if (bqLineCount === bqLastLineIndex) {
-                                                                const bqRange = document.createRange();
-                                                                bqRange.setStart(bqNode, bi + 1);
-                                                                bqRange.collapse(true);
-                                                                bqSel.removeAllRanges();
-                                                                bqSel.addRange(bqRange);
-                                                                bqFound = true;
-                                                                break;
-                                                            }
-                                                        }
-                                                    }
-                                                    if (bqFound) break;
-                                                }
-                                            }
-                                            if (!bqFound) {
-                                                setCursorToEnd(bqEl);
-                                            }
-                                        }, 0);
-                                    } else {
-                                        setCursorToLastLineStartByDOM(prevElement);
-                                    }
+                                    navigateToAdjacentElement(prevElement, 'up', true);
                                 } else {
                                     const p = document.createElement('p');
                                     p.innerHTML = '<br>';
@@ -7152,28 +7161,7 @@
                                 // At last row, exit table downward
                                 const nextElement = table.nextElementSibling;
                                 if (nextElement) {
-                                    const nextTag = nextElement.tagName.toLowerCase();
-                                    if (nextTag === 'pre') {
-                                        // Enter code block edit mode, cursor at first line start
-                                        isNavigatingIntoBlock = true;
-                                        enterEditMode(nextElement);
-                                        setTimeout(() => {
-                                            const code = nextElement.querySelector('code');
-                                            if (code) {
-                                                setCursorToStart(code);
-                                            }
-                                            resetNavigationFlag();
-                                        }, 0);
-                                    } else if (nextTag === 'div' && isSpecialWrapper(nextElement)) {
-                                        // Enter mermaid/math edit mode, cursor at first line start
-                                        isNavigatingIntoBlock = true;
-                                        setTimeout(() => {
-                                            enterSpecialWrapperEditMode(nextElement, 'start');
-                                            resetNavigationFlag();
-                                        }, 0);
-                                    } else {
-                                        setCursorToStart(nextElement);
-                                    }
+                                    navigateToAdjacentElement(nextElement, 'down', true);
                                 } else {
                                     // No next element, create a paragraph after table
                                     const p = document.createElement('p');
@@ -7214,213 +7202,7 @@
                 }
                 node = node.parentNode;
             }
-            
-            // Helper: set cursor to specific line in block
-            // Handles both <br> tags and \n characters as line separators
-            function setCursorToLineStart(el, targetLineIndex) {
-                const tag = el.tagName.toLowerCase();
-                const targetNode = (tag === 'pre') ? (el.querySelector('code') || el) : el;
-                
-                logger.log('setCursorToLineStart:', { targetLineIndex });
-                
-                if (targetLineIndex === 0) {
-                    // First line - go to start
-                    setCursorToFirstTextNode(el);
-                    return;
-                }
-                
-                // Walk through nodes and count line separators (<br> and \n)
-                let lineCount = 0;
-                const walker = document.createTreeWalker(targetNode, NodeFilter.SHOW_ALL, null, false);
-                let node;
-                
-                while ((node = walker.nextNode())) {
-                    if (node.nodeType === 1 && node.tagName === 'BR') {
-                        lineCount++;
-                        logger.log('Found BR, lineCount:', lineCount);
-                        if (lineCount === targetLineIndex) {
-                            // Set cursor right after this <br>
-                            const range = document.createRange();
-                            const s = window.getSelection();
-                            const nextNode = node.nextSibling;
-                            if (nextNode && nextNode.nodeType === 3) {
-                                range.setStart(nextNode, 0);
-                            } else {
-                                range.setStartAfter(node);
-                            }
-                            range.collapse(true);
-                            s.removeAllRanges();
-                            s.addRange(range);
-                            logger.log('Cursor set after BR');
-                            scrollCursorIntoView();
-                            return;
-                        }
-                    } else if (node.nodeType === 3) {
-                        // Check for \n in text content
-                        const text = node.textContent;
-                        for (let i = 0; i < text.length; i++) {
-                            if (text[i] === '\n') {
-                                lineCount++;
-                                logger.log('Found newline at', i, ', lineCount:', lineCount);
-                                if (lineCount === targetLineIndex) {
-                                    // Set cursor right after this \n
-                                    const range = document.createRange();
-                                    const s = window.getSelection();
-                                    range.setStart(node, i + 1);
-                                    range.collapse(true);
-                                    s.removeAllRanges();
-                                    s.addRange(range);
-                                    logger.log('Cursor set after newline');
-                                    scrollCursorIntoView();
-                                    return;
-                                }
-                            }
-                        }
-                    }
-                }
-                
-                // Fallback: if target not found, go to end
-                logger.log('Fallback to end');
-                setCursorToEnd(targetNode);
-            }
-            
-            // Helper: set cursor to start of last line in block
-            function setCursorToLastLineStartByCount(el) {
-                const tag = el.tagName.toLowerCase();
-                const targetNode = (tag === 'pre') ? (el.querySelector('code') || el) : el;
-                let brCount = targetNode.querySelectorAll('br').length;
-                const text = targetNode.textContent || '';
-                let newlineCount = (text.match(/\n/g) || []).length;
-                // Sentinel \n correction: browser's insertLineBreak adds a trailing \n
-                // that inflates the line count by 1. Same fix as getCurrentLineInBlock().
-                if (text.endsWith('\n')) {
-                    newlineCount = Math.max(0, newlineCount - 1);
-                }
-                // Sentinel <br> correction: same as getCurrentLineInBlock().
-                const sentinelOwner = el.closest('.mermaid-wrapper') || el.closest('.math-wrapper') || el;
-                if (codeBlocksWithSentinel.has(sentinelOwner)) {
-                    brCount = Math.max(0, brCount - 1);
-                }
-                const totalLines = brCount + newlineCount + 1;
-                setCursorToLineStart(el, totalLines - 1);
-            }
-            
-            // Helper: get current line index in block
-            // Counts both <br> tags and \n characters as line separators
-            function getCurrentLineInBlock(el) {
-                const tag = el.tagName.toLowerCase();
-                const targetNode = (tag === 'pre') ? (el.querySelector('code') || el) : el;
 
-                // Count total lines: <br> tags + \n in textContent + 1
-                let brCount = targetNode.querySelectorAll('br').length;
-                const text = targetNode.textContent || '';
-                let newlineCount = (text.match(/\n/g) || []).length;
-                // When insertLineBreak is used at the end of content, the browser adds
-                // a sentinel \n to make the new empty line visible/cursor-able.
-                // This sentinel inflates the line count by 1, causing an extra arrow key
-                // press to be needed when navigating out. Subtract 1 if text ends with \n.
-                if (text.endsWith('\n')) {
-                    newlineCount = Math.max(0, newlineCount - 1);
-                }
-                // The display-only sentinel <br> (tracked via codeBlocksWithSentinel)
-                // also inflates the BR count by 1. Subtract it so navigation treats
-                // the sentinel as invisible.
-                const sentinelOwner = el.closest('.mermaid-wrapper') || el.closest('.math-wrapper') || el;
-                if (codeBlocksWithSentinel.has(sentinelOwner)) {
-                    brCount = Math.max(0, brCount - 1);
-                }
-                const totalLines = brCount + newlineCount + 1;
-                
-                try {
-                    const range = sel.getRangeAt(0);
-                    const startContainer = range.startContainer;
-                    const startOffset = range.startOffset;
-                    
-                    logger.log('getCurrentLineInBlock:', {
-                        containerType: startContainer.nodeType,
-                        containerName: startContainer.nodeName,
-                        startOffset,
-                        isTargetNode: startContainer === targetNode
-                    });
-                    
-                    // Count line separators before cursor
-                    let linesBefore = 0;
-                    
-                    // Special case: cursor is directly in the container element (not in a text node)
-                    // This happens when setCursorToLineStart uses setStartAfter(br)
-                    if (startContainer === targetNode || startContainer.nodeType === 1) {
-                        // Get the actual cursor position by counting child nodes
-                        const children = Array.from(targetNode.childNodes);
-                        let cursorChildIndex = startOffset;
-                        
-                        // If startContainer is the targetNode, use startOffset directly
-                        // Otherwise, find the position of startContainer's child
-                        if (startContainer !== targetNode) {
-                            // Find which child of targetNode contains the cursor
-                            for (let i = 0; i < children.length; i++) {
-                                if (children[i] === startContainer || children[i].contains(startContainer)) {
-                                    cursorChildIndex = i;
-                                    break;
-                                }
-                            }
-                        }
-                        
-                        logger.log('Element container, cursorChildIndex:', cursorChildIndex);
-                        
-                        // Count BR tags before cursor position
-                        for (let i = 0; i < cursorChildIndex && i < children.length; i++) {
-                            const child = children[i];
-                            if (child.nodeType === 1 && child.tagName === 'BR') {
-                                linesBefore++;
-                            } else if (child.nodeType === 3) {
-                                linesBefore += (child.textContent.match(/\n/g) || []).length;
-                            } else if (child.nodeType === 1) {
-                                // For element nodes, count BR inside and \n in text
-                                linesBefore += child.querySelectorAll('br').length;
-                                linesBefore += (child.textContent.match(/\n/g) || []).length;
-                            }
-                        }
-                        
-                        logger.log('Calculated linesBefore:', linesBefore);
-                        return { currentLineIndex: linesBefore, totalLines };
-                    }
-                    
-                    // Normal case: cursor is in a text node
-                    const walker = document.createTreeWalker(targetNode, NodeFilter.SHOW_ALL, null, false);
-                    let node;
-                    let foundCursor = false;
-                    
-                    while ((node = walker.nextNode()) && !foundCursor) {
-                        if (node === startContainer) {
-                            foundCursor = true;
-                            // If cursor is in a text node, count \n before cursor position
-                            if (node.nodeType === 3) {
-                                const textBefore = node.textContent.substring(0, startOffset);
-                                linesBefore += (textBefore.match(/\n/g) || []).length;
-                            }
-                            break;
-                        }
-                        if (node.nodeType === 1 && node.tagName === 'BR') {
-                            linesBefore++;
-                        } else if (node.nodeType === 3) {
-                            // Count \n in text nodes before cursor
-                            linesBefore += (node.textContent.match(/\n/g) || []).length;
-                        }
-                    }
-                    
-                    return { currentLineIndex: linesBefore, totalLines };
-                } catch (ex) {
-                    return { currentLineIndex: 0, totalLines };
-                }
-            }
-            
-            // Helper: set cursor to specific line in block
-            function setCursorToBlockLine(el, lineIndex) {
-                setCursorToLineStart(el, lineIndex);
-                // Scroll cursor into view after setting position
-                scrollCursorIntoView();
-            }
-            
             // Inside a block (code or blockquote)
             if (blockNode) {
                 // If Shift is pressed, let browser handle selection
@@ -7431,7 +7213,7 @@
                 // Check if this block is inside a mermaid-wrapper or math-wrapper
                 const specialWrapperBlock = blockNode.closest('.mermaid-wrapper') || blockNode.closest('.math-wrapper');
 
-                const { currentLineIndex, totalLines } = getCurrentLineInBlock(blockNode);
+                const { currentLineIndex, totalLines } = getCurrentLineInBlock(blockNode, sel);
 
                 // #region agent log
                 logger.log('Arrow in block:', { key: e.key, currentLineIndex, totalLines, tag: blockNode.tagName, inSpecialWrapper: !!specialWrapperBlock });
@@ -7445,43 +7227,9 @@
                         if (specialWrapperBlock) {
                             // Exit special wrapper - set display mode and go to previous sibling of wrapper
                             exitSpecialWrapperDisplayMode(specialWrapperBlock);
-                            // No syncMarkdown() - exitSpecialWrapperDisplayMode already synced.
                             const prev = specialWrapperBlock.previousElementSibling;
                             if (prev) {
-                                const prevTag = prev.tagName.toLowerCase();
-                                if (prevTag === 'pre') {
-                                    isNavigatingIntoBlock = true;
-                                    enterEditMode(prev);
-                                    setTimeout(() => {
-                                        const code = prev.querySelector('code');
-                                        if (code) {
-                                            setCursorToLastLineStartByDOM(code);
-                                        }
-                                        resetNavigationFlag();
-                                    }, 0);
-                                } else if (prevTag === 'div' && isSpecialWrapper(prev)) {
-                                    isNavigatingIntoBlock = true;
-                                    setTimeout(() => {
-                                        enterSpecialWrapperEditMode(prev, 'lastLineStart');
-                                        resetNavigationFlag();
-                                    }, 0);
-                                } else if (prev.tagName.toLowerCase() === 'blockquote') {
-                                    setCursorToLastLineStartByCount(prev);
-                                } else if (prev.tagName.toLowerCase() === 'table') {
-                                    const rows = prev.querySelectorAll('tr');
-                                    if (rows.length > 0) {
-                                        const lastRow = rows[rows.length - 1];
-                                        const firstCell = lastRow.cells[0];
-                                        if (firstCell) {
-                                            activeTable = prev;
-                                            activeTableCell = firstCell;
-                                            setCursorToLastLineStartByDOM(firstCell);
-                                            showTableToolbar(prev);
-                                        }
-                                    }
-                                } else {
-                                    setCursorToLastLineStartByDOM(prev);
-                                }
+                                navigateToAdjacentElement(prev, 'up', false);
                             }
                         } else {
                             // If this is a code block in edit mode, switch to display mode
@@ -7490,41 +7238,7 @@
                             }
                             const prev = blockNode.previousElementSibling;
                             if (prev) {
-                                const prevTag = prev.tagName.toLowerCase();
-                                // If previous element is a code block, enter edit mode
-                                if (prevTag === 'pre') {
-                                    isNavigatingIntoBlock = true;
-                                    enterEditMode(prev);
-                                    setTimeout(() => {
-                                        const code = prev.querySelector('code');
-                                        if (code) {
-                                            setCursorToLastLineStartByDOM(code);
-                                        }
-                                        resetNavigationFlag();
-                                    }, 0);
-                                } else if (prevTag === 'div' && isSpecialWrapper(prev)) {
-                                    isNavigatingIntoBlock = true;
-                                    setTimeout(() => {
-                                        enterSpecialWrapperEditMode(prev, 'lastLineStart');
-                                        resetNavigationFlag();
-                                    }, 0);
-                                } else if (prev.tagName.toLowerCase() === 'blockquote') {
-                                    setCursorToLastLineStartByCount(prev);
-                                } else if (prev.tagName.toLowerCase() === 'table') {
-                                    const rows = prev.querySelectorAll('tr');
-                                    if (rows.length > 0) {
-                                        const lastRow = rows[rows.length - 1];
-                                        const firstCell = lastRow.cells[0];
-                                        if (firstCell) {
-                                            activeTable = prev;
-                                            activeTableCell = firstCell;
-                                            setCursorToLastLineStartByDOM(firstCell);
-                                            showTableToolbar(prev);
-                                        }
-                                    }
-                                } else {
-                                    setCursorToLastLineStartByDOM(prev);
-                                }
+                                navigateToAdjacentElement(prev, 'up', false);
                             } else {
                                 // No previous element, create a new paragraph
                                 const newP = document.createElement('p');
@@ -7536,7 +7250,7 @@
                     } else {
                         // Move to previous line
                         e.preventDefault();
-                        setCursorToBlockLine(blockNode, currentLineIndex - 1);
+                        setCursorToLineStart(blockNode, currentLineIndex - 1); scrollCursorIntoView();
                     }
                     return;
                 }
@@ -7550,41 +7264,9 @@
                         if (specialWrapperBlock) {
                             // Exit special wrapper - set display mode and go to next sibling of wrapper
                             exitSpecialWrapperDisplayMode(specialWrapperBlock);
-                            // No syncMarkdown() - exitSpecialWrapperDisplayMode already synced.
                             const next = specialWrapperBlock.nextElementSibling;
                             if (next) {
-                                const nextTag = next.tagName.toLowerCase();
-                                if (nextTag === 'pre') {
-                                    isNavigatingIntoBlock = true;
-                                    enterEditMode(next);
-                                    setTimeout(() => {
-                                        const code = next.querySelector('code');
-                                        if (code) {
-                                            setCursorToFirstTextNode(code);
-                                        }
-                                        resetNavigationFlag();
-                                    }, 0);
-                                } else if (nextTag === 'div' && isSpecialWrapper(next)) {
-                                    isNavigatingIntoBlock = true;
-                                    setTimeout(() => {
-                                        enterSpecialWrapperEditMode(next, 'start');
-                                        resetNavigationFlag();
-                                    }, 0);
-                                } else if (nextTag === 'table') {
-                                    const rows = next.querySelectorAll('tr');
-                                    if (rows.length > 0) {
-                                        const firstRow = rows[0];
-                                        const firstCell = firstRow.cells[0];
-                                        if (firstCell) {
-                                            activeTable = next;
-                                            activeTableCell = firstCell;
-                                            setCursorToStart(firstCell);
-                                            showTableToolbar(next);
-                                        }
-                                    }
-                                } else {
-                                    setCursorToFirstTextNode(next);
-                                }
+                                navigateToAdjacentElement(next, 'down', false);
                             } else {
                                 // No next element, create a new paragraph
                                 const newP = document.createElement('p');
@@ -7600,39 +7282,7 @@
                             const next = blockNode.nextElementSibling;
                             logger.log('Next element:', next ? next.tagName : 'null');
                             if (next) {
-                                const nextTag = next.tagName.toLowerCase();
-                                // If next element is a code block, enter edit mode
-                                if (nextTag === 'pre') {
-                                    isNavigatingIntoBlock = true;
-                                    enterEditMode(next);
-                                    setTimeout(() => {
-                                        const code = next.querySelector('code');
-                                        if (code) {
-                                            setCursorToFirstTextNode(code);
-                                        }
-                                        resetNavigationFlag();
-                                    }, 0);
-                                } else if (nextTag === 'div' && isSpecialWrapper(next)) {
-                                    isNavigatingIntoBlock = true;
-                                    setTimeout(() => {
-                                        enterSpecialWrapperEditMode(next, 'start');
-                                        resetNavigationFlag();
-                                    }, 0);
-                                } else if (nextTag === 'table') {
-                                    const rows = next.querySelectorAll('tr');
-                                    if (rows.length > 0) {
-                                        const firstRow = rows[0];
-                                        const firstCell = firstRow.cells[0];
-                                        if (firstCell) {
-                                            activeTable = next;
-                                            activeTableCell = firstCell;
-                                            setCursorToStart(firstCell);
-                                            showTableToolbar(next);
-                                        }
-                                    }
-                                } else {
-                                    setCursorToFirstTextNode(next);
-                                }
+                                navigateToAdjacentElement(next, 'down', false);
                             } else {
                                 // No next element, create a new paragraph
                                 logger.log('Creating new paragraph');
@@ -7645,7 +7295,7 @@
                     } else {
                         // Move to next line
                         e.preventDefault();
-                        setCursorToBlockLine(blockNode, currentLineIndex + 1);
+                        setCursorToLineStart(blockNode, currentLineIndex + 1); scrollCursorIntoView();
                     }
                     return;
                 }
@@ -7719,48 +7369,9 @@
                     let prev = currentElement.previousElementSibling;
                     if (prev) {
                         const tag = prev.tagName.toLowerCase();
-                        if (tag === 'pre' || tag === 'blockquote') {
-                            // #region agent log
-                            logger.log('Entering block from below:', tag);
-                            // #endregion
+                        if (tag === 'pre' || tag === 'blockquote' || (tag === 'div' && isSpecialWrapper(prev)) || tag === 'table') {
                             e.preventDefault();
-                            if (tag === 'pre') {
-                                isNavigatingIntoBlock = true;
-                                enterEditMode(prev);
-                                setTimeout(() => {
-                                    const code = prev.querySelector('code');
-                                    if (code) {
-                                        setCursorToLastLineStartByDOM(code);
-                                    }
-                                    resetNavigationFlag();
-                                }, 0);
-                            } else {
-                                setCursorToLastLineStartByCount(prev);
-                            }
-                            return;
-                        }
-                        if (tag === 'div' && isSpecialWrapper(prev)) {
-                            e.preventDefault();
-                            isNavigatingIntoBlock = true;
-                            setTimeout(() => {
-                                enterSpecialWrapperEditMode(prev, 'lastLineStart');
-                                resetNavigationFlag();
-                            }, 0);
-                            return;
-                        }
-                        if (tag === 'table') {
-                            e.preventDefault();
-                            const rows = prev.querySelectorAll('tr');
-                            if (rows.length > 0) {
-                                const lastRow = rows[rows.length - 1];
-                                const firstCell = lastRow.cells[0];
-                                if (firstCell) {
-                                    activeTable = prev;
-                                    activeTableCell = firstCell;
-                                    setCursorToLastLineStartByDOM(firstCell);
-                                    showTableToolbar(prev);
-                                }
-                            }
+                            navigateToAdjacentElement(prev, 'up', false);
                             return;
                         }
                     }
@@ -7771,44 +7382,9 @@
                     let next = currentElement.nextElementSibling;
                     if (next) {
                         const tag = next.tagName.toLowerCase();
-                        if (tag === 'pre' || tag === 'blockquote') {
-                            // #region agent log
-                            logger.log('Entering block from above:', tag);
-                            // #endregion
+                        if (tag === 'pre' || tag === 'blockquote' || (tag === 'div' && isSpecialWrapper(next)) || tag === 'table') {
                             e.preventDefault();
-                            if (tag === 'pre') {
-                                isNavigatingIntoBlock = true;
-                                enterEditMode(next);
-                                setTimeout(() => {
-                                    resetNavigationFlag();
-                                }, 0);
-                            } else {
-                                setCursorToFirstTextNode(next);
-                            }
-                            return;
-                        }
-                        if (tag === 'div' && isSpecialWrapper(next)) {
-                            e.preventDefault();
-                            isNavigatingIntoBlock = true;
-                            setTimeout(() => {
-                                enterSpecialWrapperEditMode(next, 'start');
-                                resetNavigationFlag();
-                            }, 0);
-                            return;
-                        }
-                        if (tag === 'table') {
-                            e.preventDefault();
-                            const rows = next.querySelectorAll('tr');
-                            if (rows.length > 0) {
-                                const firstRow = rows[0];
-                                const firstCell = firstRow.cells[0];
-                                if (firstCell) {
-                                    activeTable = next;
-                                    activeTableCell = firstCell;
-                                    setCursorToStart(firstCell);
-                                    showTableToolbar(next);
-                                }
-                            }
+                            navigateToAdjacentElement(next, 'down', false);
                             return;
                         }
                     }
@@ -8040,7 +7616,8 @@
         /**
          * Set cursor to end of element, handling br and nested lists
          */
-        function setCursorToEndOfLi(li, sel) {
+        function setCursorToEndOfLi(li) {
+            var sel = window.getSelection();
             // Find the last text position before any nested list
             let targetNode = null;
             let targetOffset = 0;
@@ -8196,7 +7773,7 @@
                         // Remove the paragraph first
                         paragraphElement.remove();
                         // Set cursor to end of deepest li
-                        setCursorToEndOfLi(deepestLi, sel);
+                        setCursorToEndOfLi(deepestLi);
                         logger.log('[handleEmptyParagraphInLi] cursor set to deepestLi');
                         return true;
                     }
@@ -8227,7 +7804,7 @@
                     if (visualPrev) {
                         paragraphElement.remove();
                         if (visualPrev.tagName?.toLowerCase() === 'li') {
-                            setCursorToEndOfLi(visualPrev, sel);
+                            setCursorToEndOfLi(visualPrev);
                         } else {
                             setCursorToEnd(visualPrev);
                         }
@@ -8256,7 +7833,7 @@
                     sel.removeAllRanges();
                     sel.addRange(range);
                 } else if (cursorTarget.tagName?.toLowerCase() === 'li') {
-                    setCursorToEndOfLi(cursorTarget, sel);
+                    setCursorToEndOfLi(cursorTarget);
                 } else {
                     setCursorToEnd(cursorTarget);
                 }
@@ -9022,7 +8599,7 @@
                         
                         // Set cursor to the end of the deepest last li (visually previous line)
                         if (deepestLastLi) {
-                            setCursorToEndOfLi(deepestLastLi, window.getSelection());
+                            setCursorToEndOfLi(deepestLastLi);
                         } else {
                             setCursorToEnd(prevElement.lastElementChild);
                         }
