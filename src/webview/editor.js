@@ -503,20 +503,28 @@
             }
         }
 
-        // If this element belongs to a block with a sentinel <br> (added for
-        // trailing empty line visibility), exclude the sentinel from lineBreaks
-        // so the cursor lands on the actual last content line, not after the sentinel.
-        var sentinelOwner = element.closest && (element.closest('.mermaid-wrapper') || element.closest('.math-wrapper'));
-        if (!sentinelOwner) {
-            // For regular code blocks, the sentinel owner is the <pre> parent
-            var preParent = element.closest ? element.closest('pre') : null;
-            sentinelOwner = preParent || element;
-        }
-        if (codeBlocksWithSentinel.has(sentinelOwner) && lineBreaks.length > 0) {
-            // The last BR in the list is the sentinel — remove it
-            var lastEntry = lineBreaks[lineBreaks.length - 1];
-            if (lastEntry.type === 'br') {
-                lineBreaks.pop();
+        // Detect sentinel <br> dynamically: if the last child of the element
+        // is a <br> that acts as a block-closer (preceded by another <br> or
+        // empty text), exclude it from lineBreaks so the cursor lands on the
+        // actual last content line.
+        if (lineBreaks.length > 0) {
+            var lastChild = element.lastChild;
+            if (lastChild && lastChild.nodeType === 1 && lastChild.tagName === 'BR') {
+                var prevSib = lastChild.previousSibling;
+                var isSentinelBr = false;
+                if (element.getAttribute && element.getAttribute('data-trailing-br') === 'true') {
+                    isSentinelBr = true;
+                } else if (prevSib && prevSib.nodeType === 1 && prevSib.tagName === 'BR') {
+                    isSentinelBr = true;
+                } else if (prevSib && prevSib.nodeType === 3 && prevSib.textContent === '') {
+                    isSentinelBr = true;
+                }
+                if (isSentinelBr) {
+                    var lastEntry = lineBreaks[lineBreaks.length - 1];
+                    if (lastEntry.type === 'br') {
+                        lineBreaks.pop();
+                    }
+                }
             }
         }
 
@@ -737,13 +745,35 @@
         var text = targetNode.textContent || '';
         var newlineCount = (text.match(/\n/g) || []).length;
         // Sentinel \n correction: browser's insertLineBreak adds a trailing \n
+        // at the end of content to make the new empty line cursor-able.
         if (text.endsWith('\n')) {
             newlineCount = Math.max(0, newlineCount - 1);
         }
-        // Sentinel <br> correction
-        var sentinelOwner = el.closest('.mermaid-wrapper') || el.closest('.math-wrapper') || el;
-        if (codeBlocksWithSentinel.has(sentinelOwner)) {
-            brCount = Math.max(0, brCount - 1);
+        // Sentinel <br> correction: display-mode trailing BR (data-trailing-br)
+        // or edit-mode trailing BR added by enterEditMode for visual empty line.
+        // Detect dynamically by checking if last child is a BR that acts as
+        // block-closer (i.e., no text content follows it).
+        if (brCount > 0) {
+            var lastChild = targetNode.lastChild;
+            if (lastChild && lastChild.nodeType === 1 && lastChild.tagName === 'BR') {
+                // Last child is <br>. Check if it's a sentinel:
+                // - data-trailing-br explicitly marks it
+                // - or the previous sibling is also <br> or empty text (block-closer pattern)
+                var prev = lastChild.previousSibling;
+                var isSentinel = (targetNode.getAttribute && targetNode.getAttribute('data-trailing-br') === 'true');
+                if (!isSentinel && prev) {
+                    if (prev.nodeType === 1 && prev.tagName === 'BR') {
+                        // BR → BR at end: the last BR is block-closer sentinel
+                        isSentinel = true;
+                    } else if (prev.nodeType === 3 && prev.textContent === '') {
+                        // empty text → BR at end: also sentinel
+                        isSentinel = true;
+                    }
+                }
+                if (isSentinel) {
+                    brCount = Math.max(0, brCount - 1);
+                }
+            }
         }
         var totalLines = brCount + newlineCount + 1;
 
@@ -6141,9 +6171,15 @@
                         // Fallback: just insert line break
                         document.execCommand('insertLineBreak');
                     }
-                    // Track that this code block has a browser sentinel \n.
-                    const sentinelTarget = preElement.closest('.mermaid-wrapper') || preElement.closest('.math-wrapper') || preElement;
-                    codeBlocksWithSentinel.add(sentinelTarget);
+                    // Track sentinel only when insertLineBreak was at the END of content.
+                    // The browser adds a sentinel \n only at the end; mid-content Enter
+                    // does not produce a sentinel, so registering it would miscount lines.
+                    const codeForSentinel = preElement.querySelector('code') || preElement;
+                    const textAfterInsert = codeForSentinel.textContent || '';
+                    if (textAfterInsert.endsWith('\n')) {
+                        const sentinelTarget = preElement.closest('.mermaid-wrapper') || preElement.closest('.math-wrapper') || preElement;
+                        codeBlocksWithSentinel.add(sentinelTarget);
+                    }
                     syncMarkdown();
                     logger.log('Inserted newline in code block with indent preservation');
                 }
