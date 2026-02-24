@@ -155,6 +155,10 @@
     // Active editing detection — replaces simple focus-based guard
     let isActivelyEditing = false;
     let isNavigatingIntoBlock = false; // Suppress focusout during arrow-key navigation into code blocks
+    // Track code blocks that had insertLineBreak during edit mode.
+    // These have a browser sentinel \n at the end that must be stripped
+    // by htmlToMarkdown (in edit mode) or by enterDisplayMode (on mode transition).
+    const codeBlocksWithSentinel = new WeakSet();
     const NAVIGATION_FLAG_RESET_DELAY = 200; // Must be > focusout handler delay (100ms)
     function resetNavigationFlag() {
         setTimeout(() => { isNavigatingIntoBlock = false; }, NAVIGATION_FLAG_RESET_DELAY);
@@ -443,6 +447,23 @@
                         lineBreaks.push({ type: 'newline', node: child, offset: j, index: i });
                     }
                 }
+            }
+        }
+
+        // If this element belongs to a block with a sentinel <br> (added for
+        // trailing empty line visibility), exclude the sentinel from lineBreaks
+        // so the cursor lands on the actual last content line, not after the sentinel.
+        var sentinelOwner = element.closest && (element.closest('.mermaid-wrapper') || element.closest('.math-wrapper'));
+        if (!sentinelOwner) {
+            // For regular code blocks, the sentinel owner is the <pre> parent
+            var preParent = element.closest ? element.closest('pre') : null;
+            sentinelOwner = preParent || element;
+        }
+        if (codeBlocksWithSentinel.has(sentinelOwner) && lineBreaks.length > 0) {
+            // The last BR in the list is the sentinel — remove it
+            var lastEntry = lineBreaks[lineBreaks.length - 1];
+            if (lastEntry.type === 'br') {
+                lineBreaks.pop();
             }
         }
 
@@ -1219,6 +1240,14 @@
         if (pre) {
             var code = pre.querySelector('code');
             if (code) {
+                // The display-only trailing <br> (data-trailing-br) doubles as
+                // the edit-mode visibility <br> for trailing empty lines.
+                // Keep it in the DOM but switch tracking from data-trailing-br
+                // to codeBlocksWithSentinel so Markdown conversion strips it.
+                if (code.getAttribute('data-trailing-br') === 'true') {
+                    code.removeAttribute('data-trailing-br');
+                    codeBlocksWithSentinel.add(wrapper);
+                }
                 code.focus();
                 if (cursorPosition === 'end') {
                     setCursorToEnd(code);
@@ -1233,7 +1262,37 @@
 
     // Helper: exit special wrapper to display mode and re-render
     function exitSpecialWrapperDisplayMode(wrapper) {
+        var hasSentinel = codeBlocksWithSentinel.has(wrapper);
         wrapper.setAttribute('data-mode', 'display');
+
+        if (hasSentinel) {
+            // Strip browser sentinel \n from edit DOM before rendering.
+            // Same logic as enterDisplayMode for regular code blocks.
+            codeBlocksWithSentinel.delete(wrapper);
+            var preSelector = wrapper.classList.contains('mermaid-wrapper')
+                ? 'pre[data-lang="mermaid"]' : 'pre[data-lang="math"]';
+            var pre = wrapper.querySelector(preSelector);
+            if (pre) {
+                var code = pre.querySelector('code');
+                if (code) {
+                    var plainText = getCodePlainText(code);
+                    if (plainText.endsWith('\n')) {
+                        plainText = plainText.slice(0, -1);
+                    }
+                    if (!plainText || plainText === '') {
+                        code.innerHTML = '<br>';
+                        code.removeAttribute('data-trailing-br');
+                    } else if (plainText.endsWith('\n')) {
+                        code.innerHTML = escapeHtml(plainText).replace(/\n/g, '<br>') + '<br>';
+                        code.setAttribute('data-trailing-br', 'true');
+                    } else {
+                        code.innerHTML = escapeHtml(plainText).replace(/\n/g, '<br>');
+                        code.removeAttribute('data-trailing-br');
+                    }
+                }
+            }
+        }
+
         if (wrapper.classList.contains('mermaid-wrapper')) {
             renderMermaidDiagram(wrapper);
         } else if (wrapper.classList.contains('math-wrapper')) {
@@ -1476,36 +1535,42 @@
                     const afterFence = fenceMatch[2] || '';
                     if (fenceCharacter === codeFenceChar && fenceLen >= codeFenceLength && afterFence.trim() === '') {
                         // Valid closing fence
-                        // Remove ALL trailing newlines from code content.
-                        // The line processing loop adds '\n' after each line, and trailing
-                        // empty lines also contribute '\n'. Per requirement 9A-21, non-empty
-                        // code blocks should not have trailing <br> elements.
+                        // The line processing loop appends '\n' to every line, so the
+                        // raw codeContent always has one extra trailing '\n'.
+                        // Strip exactly one trailing '\n' (the loop artifact).
                         const trimmedContent = codeContent.replace(/\n$/, '');
-                        // Convert newlines to <br> for proper display in contenteditable
-                        // For empty code blocks, add a <br> for minimum height
-                        // For non-empty content, add trailing <br> to preserve trailing newlines
+                        // In contenteditable, a trailing <br> at the very end of a
+                        // block is treated as a "block closer" and NOT rendered as a
+                        // visible empty line. When the content has trailing empty
+                        // line(s), we add an extra <br> for browser display AND mark
+                        // the code element with data-trailing-br so that
+                        // getCodePlainText / mdProcessNode can strip it back out.
                         let codeHtml;
+                        let hasTrailingBr = false;
                         if (!trimmedContent || trimmedContent === '') {
+                            // Empty code block: single <br> for minimum height / cursor
                             codeHtml = '<br>';
+                        } else if (trimmedContent.endsWith('\n')) {
+                            // Content has trailing empty line(s) — extra <br> needed
+                            codeHtml = escapeHtml(trimmedContent).replace(/\n/g, '<br>') + '<br>';
+                            hasTrailingBr = true;
                         } else {
-                            // No trailing <br> for non-empty code blocks (requirement 9A-21)
+                            // No trailing empty line: no extra <br> (requirement 9A-21)
                             codeHtml = escapeHtml(trimmedContent).replace(/\n/g, '<br>');
                         }
+                        const trailingAttr = hasTrailingBr ? ' data-trailing-br="true"' : '';
                         if (codeLang === 'mermaid') {
-                            // Mermaid: wrap in container with both code and diagram placeholder
-                            // Use data-mode attribute for consistency with regular code blocks
                             html += '<div class="mermaid-wrapper" data-mode="display" contenteditable="false">' +
-                                '<pre data-lang="mermaid" contenteditable="true"><code>' + codeHtml + '</code></pre>' +
+                                '<pre data-lang="mermaid" contenteditable="true"><code' + trailingAttr + '>' + codeHtml + '</code></pre>' +
                                 '<div class="mermaid-diagram"></div>' +
                                 '</div>';
                         } else if (codeLang === 'math') {
-                            // Math: wrap in container with both code and rendered math display
                             html += '<div class="math-wrapper" data-mode="display" contenteditable="false">' +
-                                '<pre data-lang="math" contenteditable="true"><code>' + codeHtml + '</code></pre>' +
+                                '<pre data-lang="math" contenteditable="true"><code' + trailingAttr + '>' + codeHtml + '</code></pre>' +
                                 '<div class="math-display"></div>' +
                                 '</div>';
                         } else {
-                            html += '<pre data-lang="' + escapeHtml(codeLang) + '" data-mode="display"><code contenteditable="false">' + codeHtml + '</code></pre>';
+                            html += '<pre data-lang="' + escapeHtml(codeLang) + '" data-mode="display"><code contenteditable="false"' + trailingAttr + '>' + codeHtml + '</code></pre>';
                         }
                         inCodeBlock = false;
                         codeContent = '';
@@ -2131,15 +2196,23 @@
     function enterEditMode(pre) {
         const code = pre.querySelector('code');
         if (!code) return;
-        
+
         logger.log('enterEditMode');
-        
-        // Get plain text content, converting <br> to newlines
-        const plainText = getCodePlainText(code);
-        
-        // Set edit mode
+
+        // Get plain text content, converting <br> to newlines.
+        let plainText = getCodePlainText(code);
+        // Strip the display-only trailing <br> that was added for browser
+        // visibility. This <br> is NOT user content.
+        if (code.getAttribute('data-trailing-br') === 'true') {
+            if (plainText.endsWith('\n')) {
+                plainText = plainText.slice(0, -1);
+            }
+        }
+
+        // Set edit mode — clear the trailing-br marker since edit DOM doesn't use it
         pre.setAttribute('data-mode', 'edit');
         code.setAttribute('contenteditable', 'true');
+        code.removeAttribute('data-trailing-br');
         
         // Replace content with plain text (remove highlight spans)
         // Convert to text nodes with <br> for newlines
@@ -2156,6 +2229,14 @@
                     code.appendChild(document.createElement('br'));
                 }
             });
+            // If content has a trailing empty line, the last <br> above acts as
+            // the contenteditable "block closer" and is NOT rendered as a visible
+            // empty line.  Add one more <br> so the empty line is actually visible,
+            // and mark the block as having a sentinel so Markdown conversion strips it.
+            if (plainText.endsWith('\n')) {
+                code.appendChild(document.createElement('br'));
+                codeBlocksWithSentinel.add(pre);
+            }
         }
         
         // Focus and place cursor at start
@@ -2179,18 +2260,42 @@
     function enterDisplayMode(pre) {
         const code = pre.querySelector('code');
         if (!code) return;
-        
+
         logger.log('enterDisplayMode');
-        
+
+        const hasSentinel = codeBlocksWithSentinel.has(pre);
+
         // Set display mode
         pre.setAttribute('data-mode', 'display');
         code.setAttribute('contenteditable', 'false');
-        
-        // Apply syntax highlighting
+
+        if (hasSentinel) {
+            // Strip browser sentinel \n from the edit DOM before applying
+            // highlighting. insertLineBreak added a trailing \n for cursor
+            // positioning — this is NOT user content.
+            // We strip it so the display DOM faithfully represents the
+            // actual content. A single trailing <br> in display mode still
+            // visually shows trailing empty lines correctly.
+            codeBlocksWithSentinel.delete(pre);
+            let plainText = getCodePlainText(code);
+            if (plainText.endsWith('\n')) {
+                plainText = plainText.slice(0, -1);
+            }
+            // Rebuild code DOM from stripped text before highlighting
+            if (!plainText || plainText === '') {
+                code.innerHTML = '<br>';
+                code.removeAttribute('data-trailing-br');
+            } else if (plainText.endsWith('\n')) {
+                code.innerHTML = escapeHtml(plainText).replace(/\n/g, '<br>') + '<br>';
+                code.setAttribute('data-trailing-br', 'true');
+            } else {
+                code.innerHTML = escapeHtml(plainText).replace(/\n/g, '<br>');
+                code.removeAttribute('data-trailing-br');
+            }
+        }
+
+        // Apply syntax highlighting (also manages data-trailing-br)
         applyHighlighting(pre);
-        
-        // Sync markdown
-        syncMarkdownSync();
     }
     
     // Convert a regular code block to a mermaid block
@@ -2218,6 +2323,8 @@
         // Convert content to HTML with <br> for newlines
         if (!codeContent || codeContent === '' || codeContent === '\n') {
             mermaidCode.innerHTML = '<br>';
+        } else if (codeContent.endsWith('\n')) {
+            mermaidCode.innerHTML = escapeHtml(codeContent).replace(/\n/g, '<br>') + '<br>';
         } else {
             mermaidCode.innerHTML = escapeHtml(codeContent).replace(/\n/g, '<br>');
         }
@@ -2260,6 +2367,8 @@
         const mathCode = document.createElement('code');
         if (!codeContent || codeContent === '' || codeContent === '\n') {
             mathCode.innerHTML = '<br>';
+        } else if (codeContent.endsWith('\n')) {
+            mathCode.innerHTML = escapeHtml(codeContent).replace(/\n/g, '<br>') + '<br>';
         } else {
             mathCode.innerHTML = escapeHtml(codeContent).replace(/\n/g, '<br>');
         }
@@ -2287,21 +2396,38 @@
         let lang = pre.getAttribute('data-lang') || '';
         lang = LANGUAGE_ALIASES[lang.toLowerCase()] || lang.toLowerCase();
         
-        // Get plain text content, converting <br> to newlines
-        const text = getCodePlainText(code);
-        
+        // Get plain text content, converting <br> to newlines.
+        // If there's already a display-only trailing <br> from a previous
+        // call, strip it before processing so we don't accumulate extras.
+        let text = getCodePlainText(code);
+        if (code.getAttribute('data-trailing-br') === 'true' && text.endsWith('\n')) {
+            text = text.slice(0, -1);
+        }
+
         // Handle empty code block - add a <br> for minimum height
         if (!text || text === '' || text === '\n') {
             code.innerHTML = '<br>';
+            code.removeAttribute('data-trailing-br');
             return;
         }
-        
+
+        // Trailing empty line needs an extra <br> for browser visibility.
+        // Also set/clear data-trailing-br attribute so mdProcessNode can
+        // strip it during round-trip.
+        const hasTrailingEmptyLine = text.endsWith('\n');
+        const trailingBr = hasTrailingEmptyLine ? '<br>' : '';
+        if (hasTrailingEmptyLine) {
+            code.setAttribute('data-trailing-br', 'true');
+        } else {
+            code.removeAttribute('data-trailing-br');
+        }
+
         // Get highlight patterns for this language
         const patterns = getHighlightPatterns(lang);
-        
+
         if (!patterns || patterns.length === 0) {
             // No patterns - just escape HTML and preserve newlines
-            code.innerHTML = escapeHtml(text).replace(/\n/g, '<br>');
+            code.innerHTML = escapeHtml(text).replace(/\n/g, '<br>') + trailingBr;
             return;
         }
         
@@ -2358,8 +2484,8 @@
             result += html.substring(lastEnd);
         }
         
-        // Convert newlines to <br>
-        code.innerHTML = result.replace(/\n/g, '<br>');
+        // Convert newlines to <br>, with extra <br> for trailing empty line
+        code.innerHTML = result.replace(/\n/g, '<br>') + trailingBr;
     }
     
     // Get highlight patterns for a language
@@ -3267,7 +3393,7 @@
         editor.querySelectorAll('.mermaid-wrapper[data-mode="edit"], .math-wrapper[data-mode="edit"]').forEach(wrapper => {
             if (wrapper !== clickedSpecialWrapper) {
                 exitSpecialWrapperDisplayMode(wrapper);
-                syncMarkdown();
+                // No syncMarkdown() here - exitSpecialWrapperDisplayMode already synced.
             }
         });
     });
@@ -4507,9 +4633,20 @@
                             };
                             processCodeNode(code);
                         }
-                        if (!wrapperContent.endsWith('\n')) {
-                            wrapperContent += '\n';
+                        // Strip display-only trailing <br> (same as regular code blocks)
+                        if (code && code.getAttribute('data-trailing-br') === 'true') {
+                            if (wrapperContent.endsWith('\n')) {
+                                wrapperContent = wrapperContent.slice(0, -1);
+                            }
                         }
+                        // Strip sentinel \n only if insertLineBreak was used.
+                        if (codeBlocksWithSentinel.has(node)) {
+                            if (wrapperContent.endsWith('\n')) {
+                                wrapperContent = wrapperContent.slice(0, -1);
+                            }
+                        }
+                        // Always add \n for fence format.
+                        wrapperContent += '\n';
                         // Determine fence length: if content contains triple backticks, use more backticks
                         const wrapperFence = getCodeFence(wrapperContent);
                         return wrapperFence + wrapperLang + '\n' + wrapperContent + wrapperFence + '\n';
@@ -4565,10 +4702,27 @@
                 if (isEmptyCodeBlock) {
                     codeContent = '\n';
                 } else {
-                    // Always add a newline for the closing fence.
-                    // This preserves trailing empty lines: a trailing <br> in HTML
-                    // represents a real empty line, and its \n should NOT be reused
-                    // as the closing fence newline.
+                    // Strip display-only trailing <br>.
+                    // markdownToHtmlFragment and applyHighlighting add an extra
+                    // <br> at the end of code blocks that have trailing empty
+                    // lines (because browsers don't render a lone trailing <br>
+                    // as a visible line). This extra <br> is marked with
+                    // data-trailing-br on the <code> element. Strip its \n here
+                    // so the round-trip stays correct.
+                    if (code && code.getAttribute('data-trailing-br') === 'true') {
+                        if (codeContent.endsWith('\n')) {
+                            codeContent = codeContent.slice(0, -1);
+                        }
+                    }
+                    // After insertLineBreak in edit mode, the browser adds a
+                    // sentinel \n for cursor positioning. This is NOT user
+                    // content. We detect this via codeBlocksWithSentinel.
+                    if (codeBlocksWithSentinel.has(node)) {
+                        if (codeContent.endsWith('\n')) {
+                            codeContent = codeContent.slice(0, -1);
+                        }
+                    }
+                    // Always add \n for fence format.
                     codeContent += '\n';
                 }
                 // Determine fence length: if content contains triple backticks, use more backticks
@@ -5898,6 +6052,9 @@
                         // Fallback: just insert line break
                         document.execCommand('insertLineBreak');
                     }
+                    // Track that this code block has a browser sentinel \n.
+                    const sentinelTarget = preElement.closest('.mermaid-wrapper') || preElement.closest('.math-wrapper') || preElement;
+                    codeBlocksWithSentinel.add(sentinelTarget);
                     syncMarkdown();
                     logger.log('Inserted newline in code block with indent preservation');
                 }
@@ -7131,7 +7288,7 @@
             function setCursorToBlockLastLineStart(el) {
                 const tag = el.tagName.toLowerCase();
                 const targetNode = (tag === 'pre') ? (el.querySelector('code') || el) : el;
-                const brTags = targetNode.querySelectorAll('br');
+                let brCount = targetNode.querySelectorAll('br').length;
                 const text = targetNode.textContent || '';
                 let newlineCount = (text.match(/\n/g) || []).length;
                 // Sentinel \n correction: browser's insertLineBreak adds a trailing \n
@@ -7139,7 +7296,12 @@
                 if (text.endsWith('\n')) {
                     newlineCount = Math.max(0, newlineCount - 1);
                 }
-                const totalLines = brTags.length + newlineCount + 1;
+                // Sentinel <br> correction: same as getCurrentLineInBlock().
+                const sentinelOwner = el.closest('.mermaid-wrapper') || el.closest('.math-wrapper') || el;
+                if (codeBlocksWithSentinel.has(sentinelOwner)) {
+                    brCount = Math.max(0, brCount - 1);
+                }
+                const totalLines = brCount + newlineCount + 1;
                 setCursorToLineStart(el, totalLines - 1);
             }
             
@@ -7148,9 +7310,9 @@
             function getCurrentLineInBlock(el) {
                 const tag = el.tagName.toLowerCase();
                 const targetNode = (tag === 'pre') ? (el.querySelector('code') || el) : el;
-                
+
                 // Count total lines: <br> tags + \n in textContent + 1
-                const brTags = targetNode.querySelectorAll('br');
+                let brCount = targetNode.querySelectorAll('br').length;
                 const text = targetNode.textContent || '';
                 let newlineCount = (text.match(/\n/g) || []).length;
                 // When insertLineBreak is used at the end of content, the browser adds
@@ -7160,7 +7322,14 @@
                 if (text.endsWith('\n')) {
                     newlineCount = Math.max(0, newlineCount - 1);
                 }
-                const totalLines = brTags.length + newlineCount + 1;
+                // The display-only sentinel <br> (tracked via codeBlocksWithSentinel)
+                // also inflates the BR count by 1. Subtract it so navigation treats
+                // the sentinel as invisible.
+                const sentinelOwner = el.closest('.mermaid-wrapper') || el.closest('.math-wrapper') || el;
+                if (codeBlocksWithSentinel.has(sentinelOwner)) {
+                    brCount = Math.max(0, brCount - 1);
+                }
+                const totalLines = brCount + newlineCount + 1;
                 
                 try {
                     const range = sel.getRangeAt(0);
@@ -7276,7 +7445,7 @@
                         if (specialWrapperBlock) {
                             // Exit special wrapper - set display mode and go to previous sibling of wrapper
                             exitSpecialWrapperDisplayMode(specialWrapperBlock);
-                            syncMarkdown();
+                            // No syncMarkdown() - exitSpecialWrapperDisplayMode already synced.
                             const prev = specialWrapperBlock.previousElementSibling;
                             if (prev) {
                                 const prevTag = prev.tagName.toLowerCase();
@@ -7381,7 +7550,7 @@
                         if (specialWrapperBlock) {
                             // Exit special wrapper - set display mode and go to next sibling of wrapper
                             exitSpecialWrapperDisplayMode(specialWrapperBlock);
-                            syncMarkdown();
+                            // No syncMarkdown() - exitSpecialWrapperDisplayMode already synced.
                             const next = specialWrapperBlock.nextElementSibling;
                             if (next) {
                                 const nextTag = next.tagName.toLowerCase();
