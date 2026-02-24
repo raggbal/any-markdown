@@ -424,13 +424,13 @@
 
     // Set cursor to the start of the last line in an element (for table cell navigation)
     // This should place cursor at the START of the last line, not the end
-    function setCursorToLastLineStart(element) {
+    function setCursorToLastLineStartByDOM(element) {
         const sel = window.getSelection();
         const range = document.createRange();
 
         // Debug: show full DOM structure
-        logger.log('setCursorToLastLineStart: element.innerHTML =', element.innerHTML);
-        logger.log('setCursorToLastLineStart: childNodes =', Array.from(element.childNodes).map(n => n.nodeType === 3 ? 'TEXT:"' + n.textContent + '"' : n.nodeName));
+        logger.log('setCursorToLastLineStartByDOM: element.innerHTML =', element.innerHTML);
+        logger.log('setCursorToLastLineStartByDOM: childNodes =', Array.from(element.childNodes).map(n => n.nodeType === 3 ? 'TEXT:"' + n.textContent + '"' : n.nodeName));
 
         // Unified approach: collect ALL line break positions (both <br> and \n in text nodes)
         // Each entry: { type: 'br'|'newline', node, offset (for text nodes) }
@@ -467,7 +467,7 @@
             }
         }
 
-        logger.log('setCursorToLastLineStart: lineBreaks count =', lineBreaks.length);
+        logger.log('setCursorToLastLineStartByDOM: lineBreaks count =', lineBreaks.length);
 
         if (lineBreaks.length === 0) {
             // No line breaks at all, single line - go to start
@@ -530,7 +530,7 @@
                 while (target) {
                     if (target.nodeType === 3 && target.textContent.length > 0 && target.textContent !== '\n') {
                         range.setStart(target, 0);
-                        logger.log('setCursorToLastLineStart: positioned at text after last BR');
+                        logger.log('setCursorToLastLineStartByDOM: positioned at text after last BR');
                         break;
                     }
                     target = target.nextSibling;
@@ -540,14 +540,14 @@
                 var afterText = lastBreak.node.textContent.substring(lastBreak.offset + 1);
                 if (afterText.length > 0 && afterText !== '\n') {
                     range.setStart(lastBreak.node, lastBreak.offset + 1);
-                    logger.log('setCursorToLastLineStart: positioned after last \\n at offset', lastBreak.offset + 1);
+                    logger.log('setCursorToLastLineStartByDOM: positioned after last \\n at offset', lastBreak.offset + 1);
                 } else {
                     // Find next sibling with content
                     var target = lastBreak.node.nextSibling;
                     while (target) {
                         if (target.nodeType === 3 && target.textContent.length > 0 && target.textContent !== '\n') {
                             range.setStart(target, 0);
-                            logger.log('setCursorToLastLineStart: positioned at next text node after \\n');
+                            logger.log('setCursorToLastLineStartByDOM: positioned at next text node after \\n');
                             break;
                         }
                         target = target.nextSibling;
@@ -565,16 +565,16 @@
                     var afterBr = lastBreak.node.nextSibling;
                     if (afterBr && afterBr.nodeType === 3) {
                         range.setStart(afterBr, 0);
-                        logger.log('setCursorToLastLineStart: code block - positioned at empty text node after last BR');
+                        logger.log('setCursorToLastLineStartByDOM: code block - positioned at empty text node after last BR');
                     } else {
                         var brParent = lastBreak.node.parentNode;
                         var brIdx = Array.prototype.indexOf.call(brParent.childNodes, lastBreak.node);
                         range.setStart(brParent, brIdx + 1);
-                        logger.log('setCursorToLastLineStart: code block - positioned after last BR using parent offset');
+                        logger.log('setCursorToLastLineStartByDOM: code block - positioned after last BR using parent offset');
                     }
                 } else {
                     range.setStart(lastBreak.node, lastBreak.offset + 1);
-                    logger.log('setCursorToLastLineStart: code block - positioned after last \\n (empty trailing line)');
+                    logger.log('setCursorToLastLineStartByDOM: code block - positioned after last \\n (empty trailing line)');
                 }
             } else {
                 // Non-code elements: go to previous content line (skip trailing BR)
@@ -585,18 +585,18 @@
                         while (target && target !== lastBreak.node) {
                             if (target.nodeType === 3 && target.textContent.length > 0 && target.textContent !== '\n') {
                                 range.setStart(target, 0);
-                                logger.log('setCursorToLastLineStart: positioned at previous content line (before trailing BR)');
+                                logger.log('setCursorToLastLineStartByDOM: positioned at previous content line (before trailing BR)');
                                 break;
                             }
                             target = target.nextSibling;
                         }
                     } else {
                         range.setStart(prevBreak.node, prevBreak.offset + 1);
-                        logger.log('setCursorToLastLineStart: positioned after second-to-last \\n');
+                        logger.log('setCursorToLastLineStartByDOM: positioned after second-to-last \\n');
                     }
                 } else {
                     setCursorToStart(element);
-                    logger.log('setCursorToLastLineStart: single trailing break, positioned at element start');
+                    logger.log('setCursorToLastLineStartByDOM: single trailing break, positioned at element start');
                     return;
                 }
             }
@@ -612,12 +612,12 @@
 
         // Verify cursor position
         var newSel = window.getSelection();
-        logger.log('setCursorToLastLineStart: AFTER - anchorNode =', newSel.anchorNode, 'anchorOffset =', newSel.anchorOffset);
+        logger.log('setCursorToLastLineStartByDOM: AFTER - anchorNode =', newSel.anchorNode, 'anchorOffset =', newSel.anchorOffset);
     }
 
     // Set cursor to start of element (first line)
     // Same approach for both pre and blockquote - find first text node
-    function setCursorToBlockStart(el) {
+    function setCursorToFirstTextNode(el) {
         const range = document.createRange();
         const s = window.getSelection();
         const tag = el.tagName.toLowerCase();
@@ -1252,9 +1252,9 @@
                 if (cursorPosition === 'end') {
                     setCursorToEnd(code);
                 } else if (cursorPosition === 'start') {
-                    setCursorToBlockStart(code);
+                    setCursorToFirstTextNode(code);
                 } else if (cursorPosition === 'lastLineStart') {
-                    setCursorToLastLineStart(code);
+                    setCursorToLastLineStartByDOM(code);
                 }
             }
         }
@@ -7025,7 +7025,7 @@
                                 const targetCell = prevRow.cells[Math.min(cellIndex, prevRow.cells.length - 1)];
                                 if (targetCell) {
                                     activeTableCell = targetCell;
-                                    setCursorToLastLineStart(targetCell);
+                                    setCursorToLastLineStartByDOM(targetCell);
                                     targetCell.scrollIntoView({ block: 'nearest' });
                                 }
                             } else {
@@ -7040,7 +7040,7 @@
                                         setTimeout(() => {
                                             const code = prevElement.querySelector('code');
                                             if (code) {
-                                                setCursorToLastLineStart(code);
+                                                setCursorToLastLineStartByDOM(code);
                                             }
                                             resetNavigationFlag();
                                         }, 0);
@@ -7111,7 +7111,7 @@
                                             }
                                         }, 0);
                                     } else {
-                                        setCursorToLastLineStart(prevElement);
+                                        setCursorToLastLineStartByDOM(prevElement);
                                     }
                                 } else {
                                     const p = document.createElement('p');
@@ -7225,7 +7225,7 @@
                 
                 if (targetLineIndex === 0) {
                     // First line - go to start
-                    setCursorToBlockStart(el);
+                    setCursorToFirstTextNode(el);
                     return;
                 }
                 
@@ -7285,7 +7285,7 @@
             }
             
             // Helper: set cursor to start of last line in block
-            function setCursorToBlockLastLineStart(el) {
+            function setCursorToLastLineStartByCount(el) {
                 const tag = el.tagName.toLowerCase();
                 const targetNode = (tag === 'pre') ? (el.querySelector('code') || el) : el;
                 let brCount = targetNode.querySelectorAll('br').length;
@@ -7455,7 +7455,7 @@
                                     setTimeout(() => {
                                         const code = prev.querySelector('code');
                                         if (code) {
-                                            setCursorToLastLineStart(code);
+                                            setCursorToLastLineStartByDOM(code);
                                         }
                                         resetNavigationFlag();
                                     }, 0);
@@ -7466,7 +7466,7 @@
                                         resetNavigationFlag();
                                     }, 0);
                                 } else if (prev.tagName.toLowerCase() === 'blockquote') {
-                                    setCursorToBlockLastLineStart(prev);
+                                    setCursorToLastLineStartByCount(prev);
                                 } else if (prev.tagName.toLowerCase() === 'table') {
                                     const rows = prev.querySelectorAll('tr');
                                     if (rows.length > 0) {
@@ -7475,12 +7475,12 @@
                                         if (firstCell) {
                                             activeTable = prev;
                                             activeTableCell = firstCell;
-                                            setCursorToLastLineStart(firstCell);
+                                            setCursorToLastLineStartByDOM(firstCell);
                                             showTableToolbar(prev);
                                         }
                                     }
                                 } else {
-                                    setCursorToLastLineStart(prev);
+                                    setCursorToLastLineStartByDOM(prev);
                                 }
                             }
                         } else {
@@ -7498,7 +7498,7 @@
                                     setTimeout(() => {
                                         const code = prev.querySelector('code');
                                         if (code) {
-                                            setCursorToLastLineStart(code);
+                                            setCursorToLastLineStartByDOM(code);
                                         }
                                         resetNavigationFlag();
                                     }, 0);
@@ -7509,7 +7509,7 @@
                                         resetNavigationFlag();
                                     }, 0);
                                 } else if (prev.tagName.toLowerCase() === 'blockquote') {
-                                    setCursorToBlockLastLineStart(prev);
+                                    setCursorToLastLineStartByCount(prev);
                                 } else if (prev.tagName.toLowerCase() === 'table') {
                                     const rows = prev.querySelectorAll('tr');
                                     if (rows.length > 0) {
@@ -7518,12 +7518,12 @@
                                         if (firstCell) {
                                             activeTable = prev;
                                             activeTableCell = firstCell;
-                                            setCursorToLastLineStart(firstCell);
+                                            setCursorToLastLineStartByDOM(firstCell);
                                             showTableToolbar(prev);
                                         }
                                     }
                                 } else {
-                                    setCursorToLastLineStart(prev);
+                                    setCursorToLastLineStartByDOM(prev);
                                 }
                             } else {
                                 // No previous element, create a new paragraph
@@ -7560,7 +7560,7 @@
                                     setTimeout(() => {
                                         const code = next.querySelector('code');
                                         if (code) {
-                                            setCursorToBlockStart(code);
+                                            setCursorToFirstTextNode(code);
                                         }
                                         resetNavigationFlag();
                                     }, 0);
@@ -7583,7 +7583,7 @@
                                         }
                                     }
                                 } else {
-                                    setCursorToBlockStart(next);
+                                    setCursorToFirstTextNode(next);
                                 }
                             } else {
                                 // No next element, create a new paragraph
@@ -7608,7 +7608,7 @@
                                     setTimeout(() => {
                                         const code = next.querySelector('code');
                                         if (code) {
-                                            setCursorToBlockStart(code);
+                                            setCursorToFirstTextNode(code);
                                         }
                                         resetNavigationFlag();
                                     }, 0);
@@ -7631,7 +7631,7 @@
                                         }
                                     }
                                 } else {
-                                    setCursorToBlockStart(next);
+                                    setCursorToFirstTextNode(next);
                                 }
                             } else {
                                 // No next element, create a new paragraph
@@ -7639,7 +7639,7 @@
                                 const newP = document.createElement('p');
                                 newP.innerHTML = '<br>';
                                 blockNode.parentNode.insertBefore(newP, blockNode.nextSibling);
-                                setCursorToBlockStart(newP);
+                                setCursorToFirstTextNode(newP);
                             }
                         }
                     } else {
@@ -7730,12 +7730,12 @@
                                 setTimeout(() => {
                                     const code = prev.querySelector('code');
                                     if (code) {
-                                        setCursorToLastLineStart(code);
+                                        setCursorToLastLineStartByDOM(code);
                                     }
                                     resetNavigationFlag();
                                 }, 0);
                             } else {
-                                setCursorToBlockLastLineStart(prev);
+                                setCursorToLastLineStartByCount(prev);
                             }
                             return;
                         }
@@ -7757,7 +7757,7 @@
                                 if (firstCell) {
                                     activeTable = prev;
                                     activeTableCell = firstCell;
-                                    setCursorToLastLineStart(firstCell);
+                                    setCursorToLastLineStartByDOM(firstCell);
                                     showTableToolbar(prev);
                                 }
                             }
@@ -7783,7 +7783,7 @@
                                     resetNavigationFlag();
                                 }, 0);
                             } else {
-                                setCursorToBlockStart(next);
+                                setCursorToFirstTextNode(next);
                             }
                             return;
                         }
@@ -12843,7 +12843,7 @@
         window.__testApi.setColumnAlignment = setColumnAlignment;
         window.__testApi.insertTableColumnRight = insertTableColumnRight;
         window.__testApi.syncMarkdown = syncMarkdown;
-        window.__testApi.setCursorToLastLineStart = setCursorToLastLineStart;
+        window.__testApi.setCursorToLastLineStartByDOM = setCursorToLastLineStartByDOM;
         
         // Also expose directly on window for backward compatibility with existing tests
         window.initializeTableColumnWidths = initializeTableColumnWidths;

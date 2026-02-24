@@ -15,8 +15,8 @@ test.describe('Mermaid/Math block cursor position after editing', () => {
         await page.waitForFunction(() => window.__testApi?.ready === true, { timeout: 5000 });
     });
 
-    test('setCursorToLastLineStart handles \\n text nodes correctly', async ({ page }) => {
-        // Directly test setCursorToLastLineStart with \n text nodes (not <br>)
+    test('setCursorToLastLineStartByDOM handles \\n text nodes correctly', async ({ page }) => {
+        // Directly test setCursorToLastLineStartByDOM with \n text nodes (not <br>)
         const result = await page.evaluate(() => {
             const editor = document.getElementById('editor');
 
@@ -37,8 +37,8 @@ test.describe('Mermaid/Math block cursor position after editing', () => {
             pre.appendChild(code);
             editor.appendChild(pre);
 
-            // Call setCursorToLastLineStart via test API
-            window.__testApi.setCursorToLastLineStart(code);
+            // Call setCursorToLastLineStartByDOM via test API
+            window.__testApi.setCursorToLastLineStartByDOM(code);
 
             // Check cursor position
             const sel = window.getSelection();
@@ -72,13 +72,13 @@ test.describe('Mermaid/Math block cursor position after editing', () => {
                 )
             };
         });
-        console.log('setCursorToLastLineStart with \\n result:', JSON.stringify(result));
+        console.log('setCursorToLastLineStartByDOM with \\n result:', JSON.stringify(result));
 
         // Cursor should be at the start of the last (empty) line
         expect(result.isAtLineStart).toBe(true);
     });
 
-    test('setCursorToLastLineStart handles \\n text nodes with content on last line', async ({ page }) => {
+    test('setCursorToLastLineStartByDOM handles \\n text nodes with content on last line', async ({ page }) => {
         // Test with \n text nodes where the last line has content
         const result = await page.evaluate(() => {
             const editor = document.getElementById('editor');
@@ -98,7 +98,7 @@ test.describe('Mermaid/Math block cursor position after editing', () => {
             pre.appendChild(code);
             editor.appendChild(pre);
 
-            window.__testApi.setCursorToLastLineStart(code);
+            window.__testApi.setCursorToLastLineStartByDOM(code);
 
             const sel = window.getSelection();
             if (!sel || !sel.rangeCount) return { error: 'no selection' };
@@ -123,13 +123,13 @@ test.describe('Mermaid/Math block cursor position after editing', () => {
                 anchorOffset: range.startOffset
             };
         });
-        console.log('setCursorToLastLineStart with \\n (content on last line) result:', JSON.stringify(result));
+        console.log('setCursorToLastLineStartByDOM with \\n (content on last line) result:', JSON.stringify(result));
 
         // Cursor should be at start of "line3" (position 0 in the last line)
         expect(result.isAtLineStart).toBe(true);
     });
 
-    test('setCursorToLastLineStart handles mixed <br> and \\n correctly', async ({ page }) => {
+    test('setCursorToLastLineStartByDOM handles mixed <br> and \\n correctly', async ({ page }) => {
         // Test with mixed <br> and \n (which can happen during editing)
         const result = await page.evaluate(() => {
             const editor = document.getElementById('editor');
@@ -150,7 +150,7 @@ test.describe('Mermaid/Math block cursor position after editing', () => {
             pre.appendChild(code);
             editor.appendChild(pre);
 
-            window.__testApi.setCursorToLastLineStart(code);
+            window.__testApi.setCursorToLastLineStartByDOM(code);
 
             const sel = window.getSelection();
             if (!sel || !sel.rangeCount) return { error: 'no selection' };
@@ -175,7 +175,7 @@ test.describe('Mermaid/Math block cursor position after editing', () => {
                 anchorOffset: range.startOffset
             };
         });
-        console.log('setCursorToLastLineStart with mixed result:', JSON.stringify(result));
+        console.log('setCursorToLastLineStartByDOM with mixed result:', JSON.stringify(result));
 
         expect(result.isAtLineStart).toBe(true);
     });

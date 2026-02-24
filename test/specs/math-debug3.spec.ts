@@ -46,7 +46,7 @@ test('Debug math block', async ({ page }) => {
     });
     console.log('T3 trailing empty:', JSON.stringify(t3));
 
-    // Test 4: setCursorToLastLineStart on single-line (no BR, no \n)
+    // Test 4: setCursorToLastLineStartByDOM on single-line (no BR, no \n)
     await page.evaluate(() => {
         window.__testApi.setMarkdown('Above\n\n```math\nE = mc^2\n```\n\nBelow\n');
     });
@@ -59,7 +59,7 @@ test('Debug math block', async ({ page }) => {
         c.focus();
         
         const before = Array.from(c.childNodes).map(n=>n.nodeType===3?'T:"'+n.textContent+'"':n.nodeName);
-        window.__testApi.setCursorToLastLineStart(c);
+        window.__testApi.setCursorToLastLineStartByDOM(c);
         const after = Array.from(c.childNodes).map(n=>n.nodeType===3?'T:"'+n.textContent+'"':n.nodeName);
         
         const sel = window.getSelection();
@@ -70,9 +70,9 @@ test('Debug math block', async ({ page }) => {
             cursorOffset: r?.startOffset
         };
     });
-    console.log('T4 setCursorToLastLineStart single-line:', JSON.stringify(t4));
+    console.log('T4 setCursorToLastLineStartByDOM single-line:', JSON.stringify(t4));
 
-    // Test 5: setCursorToLastLineStart on multi-line (has BR)
+    // Test 5: setCursorToLastLineStartByDOM on multi-line (has BR)
     await page.evaluate(() => {
         window.__testApi.setMarkdown('Above\n\n```math\nE = mc^2\nx^2 = 1\n```\n\nBelow\n');
     });
@@ -85,7 +85,7 @@ test('Debug math block', async ({ page }) => {
         c.focus();
         
         const before = Array.from(c.childNodes).map(n=>n.nodeType===3?'T:"'+n.textContent+'"':n.nodeName);
-        window.__testApi.setCursorToLastLineStart(c);
+        window.__testApi.setCursorToLastLineStartByDOM(c);
         const after = Array.from(c.childNodes).map(n=>n.nodeType===3?'T:"'+n.textContent+'"':n.nodeName);
         
         const sel = window.getSelection();
@@ -96,7 +96,7 @@ test('Debug math block', async ({ page }) => {
             cursorOffset: r?.startOffset
         };
     });
-    console.log('T5 setCursorToLastLineStart multi-line:', JSON.stringify(t5));
+    console.log('T5 setCursorToLastLineStartByDOM multi-line:', JSON.stringify(t5));
 
     // Test 6: with trailing BR (from trailing empty line)
     await page.evaluate(() => {
@@ -111,7 +111,7 @@ test('Debug math block', async ({ page }) => {
         c.focus();
         
         const before = Array.from(c.childNodes).map(n=>n.nodeType===3?'T:"'+n.textContent+'"':n.nodeName);
-        window.__testApi.setCursorToLastLineStart(c);
+        window.__testApi.setCursorToLastLineStartByDOM(c);
         const after = Array.from(c.childNodes).map(n=>n.nodeType===3?'T:"'+n.textContent+'"':n.nodeName);
         
         const sel = window.getSelection();
@@ -122,7 +122,7 @@ test('Debug math block', async ({ page }) => {
             cursorOffset: r?.startOffset
         };
     });
-    console.log('T6 setCursorToLastLineStart with trailing BR:', JSON.stringify(t6));
+    console.log('T6 setCursorToLastLineStartByDOM with trailing BR:', JSON.stringify(t6));
 
     expect(true).toBe(true);
 });
