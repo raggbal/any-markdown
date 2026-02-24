@@ -164,6 +164,28 @@
         setTimeout(() => { isNavigatingIntoBlock = false; }, NAVIGATION_FLAG_RESET_DELAY);
     }
 
+    // Find the deepest last <li> in a list (ul/ol), recursing into nested lists
+    function getDeepestLastLi(listElement) {
+        var items = listElement.children;
+        var lastLi = null;
+        for (var i = items.length - 1; i >= 0; i--) {
+            if (items[i].tagName === 'LI') {
+                lastLi = items[i];
+                break;
+            }
+        }
+        if (!lastLi) return null;
+        // If last <li> has a nested list as last structural child, recurse into it
+        for (var j = lastLi.children.length - 1; j >= 0; j--) {
+            var child = lastLi.children[j];
+            if (child.tagName === 'UL' || child.tagName === 'OL') {
+                var deeper = getDeepestLastLi(child);
+                if (deeper) return deeper;
+            }
+        }
+        return lastLi;
+    }
+
     // Unified navigation dispatch: navigate to an adjacent element
     // direction: 'up' → last line start, 'down' → first line start
     // useTimeout: true when called from table exit (browser resets selection async)
@@ -231,7 +253,21 @@
             }
             return true;
         }
-        // Normal elements (paragraph, heading, list, etc.)
+        // List elements: find the deepest last/first <li> to position cursor correctly
+        if (tag === 'ul' || tag === 'ol') {
+            if (direction === 'up') {
+                var lastLi = getDeepestLastLi(target);
+                if (lastLi) {
+                    setCursorToLastLineStartByDOM(lastLi);
+                } else {
+                    setCursorToStart(target);
+                }
+            } else {
+                setCursorToFirstTextNode(target);
+            }
+            return true;
+        }
+        // Normal elements (paragraph, heading, etc.)
         if (direction === 'up') {
             setCursorToLastLineStartByDOM(target);
         } else {
