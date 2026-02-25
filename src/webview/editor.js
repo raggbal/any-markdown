@@ -8025,7 +8025,10 @@
                     }
                     nodesToMove.push(child);
                 }
-                
+
+                // Save first moved node for cursor positioning when prev li was empty
+                const firstMovedNode = nodesToMove.length > 0 ? nodesToMove[0] : null;
+
                 for (const node of nodesToMove) {
                     if (insertBefore) {
                         visualPrev.insertBefore(node, insertBefore);
@@ -8070,6 +8073,7 @@
                 
                 // Set cursor
                 if (cursorNode) {
+                    // Previous li had text - place cursor at end of that text (= boundary)
                     try {
                         const range = document.createRange();
                         range.setStart(cursorNode, cursorOffset);
@@ -8078,6 +8082,21 @@
                         sel.addRange(range);
                     } catch (e) {
                         setCursorToEnd(visualPrev);
+                    }
+                } else if (firstMovedNode) {
+                    // Previous li was empty - place cursor at start of moved content
+                    try {
+                        const range = document.createRange();
+                        if (firstMovedNode.nodeType === 3) {
+                            range.setStart(firstMovedNode, 0);
+                        } else {
+                            range.setStartBefore(firstMovedNode);
+                        }
+                        range.collapse(true);
+                        sel.removeAllRanges();
+                        sel.addRange(range);
+                    } catch (e) {
+                        setCursorToStart(visualPrev);
                     }
                 } else {
                     setCursorToEnd(visualPrev);
