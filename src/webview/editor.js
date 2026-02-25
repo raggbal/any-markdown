@@ -6932,6 +6932,13 @@
                     indentListItem(liElement);
                 }
 
+                // If liElement was converted to a paragraph and removed from DOM
+                // (e.g. Shift+Tab on top-level item), convertListItemToParagraph
+                // already set the cursor and called syncMarkdown – nothing left to do.
+                if (!liElement.isConnected) {
+                    return;
+                }
+
                 // Restore cursor position using the saved text offset
                 try {
                     let currentOffset = 0;
