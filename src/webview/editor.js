@@ -1904,7 +1904,7 @@
                     listStack.push({ type: parsed.listType, indent: indentLevel });
                 } else {
                     const currentLevel = listStack.length - 1;
-                    
+
                     if (indentLevel > currentLevel) {
                         // Nest deeper - create nested list inside current li
                         html += '<' + parsed.listType + '><li>' + parsed.html;
@@ -1914,12 +1914,29 @@
                         while (listStack.length > indentLevel + 1) {
                             html += '</li></' + listStack.pop().type + '>';
                         }
-                        if (listStack.length > 0) {
+                        // Check if list type changed at the target level
+                        if (listStack.length > 0 && listStack[listStack.length - 1].type !== parsed.listType) {
+                            // Close current list and start new one of different type
+                            while (listStack.length > 0) {
+                                html += '</li></' + listStack.pop().type + '>';
+                            }
+                            html += '<' + parsed.listType + '><li>' + parsed.html;
+                            listStack.push({ type: parsed.listType, indent: indentLevel });
+                        } else if (listStack.length > 0) {
                             html += '</li><li>' + parsed.html;
                         }
                     } else {
-                        // Same level - just add another item
-                        html += '</li><li>' + parsed.html;
+                        // Same level - check if list type changed
+                        if (listStack[listStack.length - 1].type !== parsed.listType) {
+                            // Close current list and start new one of different type
+                            while (listStack.length > 0) {
+                                html += '</li></' + listStack.pop().type + '>';
+                            }
+                            html += '<' + parsed.listType + '><li>' + parsed.html;
+                            listStack.push({ type: parsed.listType, indent: indentLevel });
+                        } else {
+                            html += '</li><li>' + parsed.html;
+                        }
                     }
                 }
             } else {
@@ -9848,9 +9865,34 @@
             prevSiblingTag: li.previousElementSibling?.tagName
         });
         // #endregion
-        
-        const prevSibling = li.previousElementSibling;
+
+        let prevSibling = li.previousElementSibling;
         if (!prevSibling || prevSibling.tagName.toLowerCase() !== 'li') {
+            // No previous sibling within the same list.
+            // Check if the parent list has a previous sibling list element
+            // (cross-list-boundary indent: e.g., <ul><li>a</li></ul><ol><li>b</li></ol>)
+            const parentList = li.parentNode;
+            const prevList = parentList ? parentList.previousElementSibling : null;
+            if (prevList && (prevList.tagName.toLowerCase() === 'ul' || prevList.tagName.toLowerCase() === 'ol')) {
+                // Get the last li of the previous list
+                const lastLiOfPrev = prevList.lastElementChild;
+                if (lastLiOfPrev && lastLiOfPrev.tagName.toLowerCase() === 'li') {
+                    // Move this li (and remaining siblings) into a nested list under lastLiOfPrev
+                    const currentListTag = parentList.tagName.toLowerCase();
+                    let nestedList = lastLiOfPrev.querySelector(':scope > ul, :scope > ol');
+                    if (!nestedList) {
+                        nestedList = document.createElement(currentListTag);
+                        lastLiOfPrev.appendChild(nestedList);
+                    }
+                    nestedList.appendChild(li);
+                    // If the parent list is now empty, remove it
+                    if (parentList.children.length === 0) {
+                        parentList.remove();
+                    }
+                    logger.log('indentListItem: Cross-list indent done');
+                    return;
+                }
+            }
             // #region agent log
             logger.log('indentListItem: No valid previous sibling, cannot indent');
             // #endregion
