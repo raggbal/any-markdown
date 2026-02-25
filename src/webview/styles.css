@@ -757,6 +757,8 @@ body {
     margin: 0 4px;
 }
 .editor input[type="checkbox"] { margin-right: 8px; }
+.editor li:has(> input[type="checkbox"]) { list-style: none; }
+.editor > ul > li:has(> input[type="checkbox"]) { margin-left: -2em; }
 
 .editor:empty:before {
     content: 'Start typing... (Try: # heading, - list, > quote, --- hr)';

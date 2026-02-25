@@ -3581,6 +3581,8 @@
         });
     });
 
+
+
     editor.addEventListener('focusout', function(e) {
         // Delay hiding to allow button clicks
         setTimeout(() => {
@@ -5720,11 +5722,14 @@
                         
                         e.preventDefault();
                         
-                        // Get content of current li (excluding nested list)
+                        // Get content of current li (excluding nested list and checkbox)
                         const currentContent = [];
                         for (const child of Array.from(liElement.childNodes)) {
                             if (child.nodeType === 1 && (child.tagName.toLowerCase() === 'ul' || child.tagName.toLowerCase() === 'ol')) {
                                 continue; // Skip nested lists
+                            }
+                            if (child.nodeType === 1 && child.tagName === 'INPUT' && child.type === 'checkbox') {
+                                continue; // Skip checkbox
                             }
                             currentContent.push(child);
                         }
@@ -6814,7 +6819,7 @@
                     // Tab: indent
                     indentListItem(liElement);
                 }
-                
+
                 // Restore cursor position using the saved text offset
                 try {
                     let currentOffset = 0;
@@ -7943,11 +7948,15 @@
             if (!visualPrev) {
                 // No previous element - convert to paragraph
                 const p = document.createElement('p');
-                // Move li content to paragraph
+                // Move li content to paragraph (skip checkbox)
                 while (liElement.firstChild) {
                     const child = liElement.firstChild;
                     if (child.tagName?.toLowerCase() === 'ul' || child.tagName?.toLowerCase() === 'ol') {
                         break; // Don't move nested lists
+                    }
+                    if (child.nodeType === 1 && child.tagName === 'INPUT' && child.type === 'checkbox') {
+                        child.remove();
+                        continue;
                     }
                     p.appendChild(child);
                 }
@@ -8014,11 +8023,14 @@
                     }
                 }
                 
-                // Move content from current li to prev li
+                // Move content from current li to prev li (skip checkbox)
                 const nodesToMove = [];
                 for (const child of liElement.childNodes) {
                     if (child.tagName?.toLowerCase() === 'ul' || child.tagName?.toLowerCase() === 'ol') {
                         break;
+                    }
+                    if (child.nodeType === 1 && child.tagName === 'INPUT' && child.type === 'checkbox') {
+                        continue;
                     }
                     nodesToMove.push(child);
                 }
