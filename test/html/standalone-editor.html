@@ -3859,8 +3859,8 @@
             liNode = liNode.parentNode;
         }
         
-        // Convert list item to task list: [ ] + space at the beginning of a list item
-        // This handles the case where user types "- " first (creates ul), then "[ ] " to convert to task
+        // List type inter-conversion within existing list items
+        // Supports: bullet ↔ ordered ↔ task (any direction)
         if (liNode && liNode.tagName && liNode.tagName.toUpperCase() === 'LI' && trigger === 'space') {
             // Get only direct text content of the li (excluding nested lists)
             let liDirectText = '';
@@ -3875,39 +3875,84 @@
                     }
                 }
             }
-            
-            const taskInListMatch = liDirectText.match(/^\[([ xX])\] (.*)$/);
-            if (taskInListMatch) {
-                const existingText = taskInListMatch[2] || '';
-                const checkbox = document.createElement('input');
-                checkbox.type = 'checkbox';
-                checkbox.checked = taskInListMatch[1].toLowerCase() === 'x';
-                
-                // Preserve nested lists
-                const nestedLists = [];
-                for (const child of liNode.childNodes) {
-                    if (child.nodeType === 1) {
-                        const tag = child.tagName.toLowerCase();
-                        if (tag === 'ul' || tag === 'ol') {
-                            nestedLists.push(child.cloneNode(true));
-                        }
+
+            // Check if current item has a direct child checkbox
+            var hasCheckbox = false;
+            for (const child of liNode.childNodes) {
+                if (child.nodeType === 1 && child.tagName === 'INPUT' && child.type === 'checkbox') {
+                    hasCheckbox = true;
+                    break;
+                }
+            }
+            const parentList = liNode.parentNode;
+            const parentTag = parentList ? parentList.tagName.toLowerCase() : '';
+
+            // Helper: collect nested lists for preservation
+            const collectNestedLists = () => {
+                const lists = [];
+                for (const child of Array.from(liNode.childNodes)) {
+                    if (child.nodeType === 1 && (child.tagName.toLowerCase() === 'ul' || child.tagName.toLowerCase() === 'ol')) {
+                        lists.push(child.cloneNode(true));
                     }
                 }
-                
+                return lists;
+            };
+
+            // Helper: restore nested lists after rebuilding li content
+            const restoreNestedLists = (lists) => {
+                for (const nested of lists) {
+                    liNode.appendChild(nested);
+                }
+            };
+
+            // Helper: set cursor at start of li text (after checkbox if present)
+            const setCursorToLiTextStart = () => {
+                const r = document.createRange();
+                const s = window.getSelection();
+                // Find first text node (skipping checkbox)
+                for (const child of liNode.childNodes) {
+                    if (child.nodeType === 3 && child.textContent.length > 0) {
+                        r.setStart(child, 0);
+                        r.collapse(true);
+                        s.removeAllRanges();
+                        s.addRange(r);
+                        return;
+                    }
+                    if (child.nodeType === 1 && child.tagName === 'INPUT') {
+                        continue; // Skip checkbox
+                    }
+                }
+                // Fallback
+                setCursorToEnd(liNode);
+            };
+
+            // 1. Task list conversion: [ ] or [x] at beginning
+            const taskInListMatch = liDirectText.match(/^\[([ xX])\] (.*)$/);
+            if (taskInListMatch) {
+                if (hasCheckbox) return false; // Already a task item
+
+                const existingText = taskInListMatch[2] || '';
+                const checked = taskInListMatch[1].toLowerCase() === 'x';
+                const nestedLists = collectNestedLists();
+
                 liNode.innerHTML = '';
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.checked = checked;
                 liNode.appendChild(checkbox);
                 let textNode = null;
                 if (existingText) {
                     textNode = document.createTextNode(existingText);
                     liNode.appendChild(textNode);
                 }
+                restoreNestedLists(nestedLists);
 
-                // Re-append nested lists
-                for (const nested of nestedLists) {
-                    liNode.appendChild(nested);
+                // Change parent to ul if needed (e.g. from ol)
+                if (parentTag !== 'ul') {
+                    changeParentListType(liNode, 'ul');
                 }
 
-                // Set cursor at the beginning of the text (after checkbox)
+                // Set cursor after checkbox
                 const range = document.createRange();
                 const sel = window.getSelection();
                 if (existingText && textNode) {
@@ -3918,7 +3963,57 @@
                 range.collapse(true);
                 sel.removeAllRanges();
                 sel.addRange(range);
-                
+
+                syncMarkdown();
+                return true;
+            }
+
+            // 2. Bullet list conversion: - or * or + at beginning
+            const bulletMatch = liDirectText.match(/^[-*+] (.*)$/);
+            if (bulletMatch) {
+                // Skip if already a regular bullet (ul without checkbox)
+                if (parentTag === 'ul' && !hasCheckbox) return false;
+
+                const existingText = bulletMatch[1] || '';
+                const nestedLists = collectNestedLists();
+
+                liNode.innerHTML = '';
+                if (existingText) {
+                    liNode.appendChild(document.createTextNode(existingText));
+                } else {
+                    liNode.innerHTML = '<br>';
+                }
+                restoreNestedLists(nestedLists);
+
+                // Change parent to ul if needed (from ol), or just remove checkbox (already ul for task)
+                if (parentTag !== 'ul') {
+                    changeParentListType(liNode, 'ul');
+                }
+
+                setCursorToLiTextStart();
+                syncMarkdown();
+                return true;
+            }
+
+            // 3. Ordered list conversion: N. at beginning
+            const orderedMatch = liDirectText.match(/^(\d+)\. (.*)$/);
+            if (orderedMatch) {
+                if (parentTag === 'ol') return false; // Already ordered
+
+                const existingText = orderedMatch[2] || '';
+                const nestedLists = collectNestedLists();
+
+                liNode.innerHTML = '';
+                if (existingText) {
+                    liNode.appendChild(document.createTextNode(existingText));
+                } else {
+                    liNode.innerHTML = '<br>';
+                }
+                restoreNestedLists(nestedLists);
+
+                changeParentListType(liNode, 'ol');
+
+                setCursorToLiTextStart();
                 syncMarkdown();
                 return true;
             }
@@ -9810,6 +9905,104 @@
         // Debounced sync - only updates markdown after user stops typing
         debouncedSync();
     });
+
+    // ========== LIST TYPE CHANGE ==========
+
+    // Change the parent list type of a given li element.
+    // If the li is the only child, just swap the tag.
+    // If there are siblings, split into up to 3 lists: before (original), target (new), after (original).
+    // Then merge adjacent compatible lists.
+    function changeParentListType(li, targetTag) {
+        var parentList = li.parentNode;
+        if (!parentList) return;
+        var currentTag = parentList.tagName.toLowerCase();
+        if (currentTag === targetTag) return; // Already correct type
+
+        var siblings = Array.from(parentList.children);
+        var liIndex = siblings.indexOf(li);
+
+        if (siblings.length === 1) {
+            // Only child — replace parent tag in-place
+            var newList = document.createElement(targetTag);
+            // Copy attributes if any
+            for (var i = 0; i < parentList.attributes.length; i++) {
+                var attr = parentList.attributes[i];
+                newList.setAttribute(attr.name, attr.value);
+            }
+            newList.appendChild(li);
+            parentList.replaceWith(newList);
+        } else {
+            // Multiple siblings — split into before/target/after
+            var parentOfList = parentList.parentNode;
+            var insertRef = parentList.nextSibling;
+
+            // Build "after" list (items after li)
+            var afterItems = siblings.slice(liIndex + 1);
+            var afterList = null;
+            if (afterItems.length > 0) {
+                afterList = document.createElement(currentTag);
+                for (var j = 0; j < afterItems.length; j++) {
+                    afterList.appendChild(afterItems[j]);
+                }
+            }
+
+            // Build "target" list (just the converted li)
+            var targetList = document.createElement(targetTag);
+            targetList.appendChild(li);
+
+            // parentList now only contains "before" items (items before li)
+            // If parentList is now empty, remove it
+            if (parentList.children.length === 0) {
+                parentOfList.insertBefore(targetList, insertRef);
+                if (afterList) parentOfList.insertBefore(afterList, targetList.nextSibling);
+                parentList.remove();
+            } else {
+                // Insert target and after lists after the (now shortened) parentList
+                parentOfList.insertBefore(targetList, insertRef);
+                if (afterList) parentOfList.insertBefore(afterList, targetList.nextSibling);
+            }
+
+            // Merge adjacent compatible lists
+            mergeAdjacentLists(targetList);
+        }
+    }
+
+    // Check if two list elements are compatible for merging
+    // Regular ul and task ul are NOT compatible
+    function areListsCompatible(a, b) {
+        if (!a || !b) return false;
+        if (a.tagName !== b.tagName) return false;
+        // Both must be same type (ul or ol)
+        if (a.tagName.toLowerCase() === 'ul') {
+            // Check if one is task list and other is not
+            var aHasCheckbox = a.querySelector(':scope > li > input[type="checkbox"]') !== null;
+            var bHasCheckbox = b.querySelector(':scope > li > input[type="checkbox"]') !== null;
+            // Only merge if both are task or both are non-task
+            return aHasCheckbox === bHasCheckbox;
+        }
+        return true; // ol lists are always compatible with other ol
+    }
+
+    // Merge targetList with its adjacent compatible siblings
+    function mergeAdjacentLists(targetList) {
+        // Merge with next sibling
+        var next = targetList.nextElementSibling;
+        if (next && areListsCompatible(targetList, next)) {
+            while (next.firstChild) {
+                targetList.appendChild(next.firstChild);
+            }
+            next.remove();
+        }
+
+        // Merge with previous sibling
+        var prev = targetList.previousElementSibling;
+        if (prev && areListsCompatible(prev, targetList)) {
+            while (targetList.firstChild) {
+                prev.appendChild(targetList.firstChild);
+            }
+            targetList.remove();
+        }
+    }
 
     // ========== LIST INDENTATION ==========
 
