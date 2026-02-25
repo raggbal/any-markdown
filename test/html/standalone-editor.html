@@ -7571,8 +7571,19 @@
                         cursorRect = tempSpan.getBoundingClientRect();
                         tempSpan.parentNode.removeChild(tempSpan);
                     }
-                    // If still zero height, assume first line
-                    if (cursorRect.height === 0) return true;
+                    // If still zero height, need extra check for lists
+                    if (cursorRect.height === 0) {
+                        // For ul/ol, check if cursor is actually in the first <li> (document order)
+                        if (element.tagName === 'UL' || element.tagName === 'OL') {
+                            var firstLi = element.querySelector('li');
+                            if (firstLi) {
+                                var cn = sel.anchorNode;
+                                while (cn && (cn.nodeType !== 1 || cn.tagName !== 'LI')) cn = cn.parentElement;
+                                return cn === firstLi;
+                            }
+                        }
+                        return true;
+                    }
                     // Get element's first line rect
                     const elemRect = element.getBoundingClientRect();
                     // Cursor is at first line if its top is close to element's top
@@ -7594,38 +7605,44 @@
                         cursorRect = tempSpan.getBoundingClientRect();
                         tempSpan.parentNode.removeChild(tempSpan);
                     }
-                    // If still zero height, assume last line
-                    if (cursorRect.height === 0) return true;
+                    // If still zero height, need extra check for lists
+                    if (cursorRect.height === 0) {
+                        // For ul/ol, check if cursor is actually in the last <li> (document order)
+                        if (element.tagName === 'UL' || element.tagName === 'OL') {
+                            var allLis = element.querySelectorAll('li');
+                            var lastLi = allLis.length > 0 ? allLis[allLis.length - 1] : null;
+                            if (lastLi) {
+                                var cn = sel.anchorNode;
+                                while (cn && (cn.nodeType !== 1 || cn.tagName !== 'LI')) cn = cn.parentElement;
+                                return cn === lastLi;
+                            }
+                        }
+                        return true;
+                    }
                     const elemRect = element.getBoundingClientRect();
                     // Cursor is at last line if its bottom is close to element's bottom
                     return cursorRect.bottom > elemRect.bottom - cursorRect.height;
                 }
 
                 if (e.key === 'ArrowUp') {
-                    // Only enter adjacent block if cursor is at the first line of current element
+                    // Navigate to previous element if cursor is at the first line
                     if (!isCursorAtFirstLine(currentElement)) return;
 
                     let prev = currentElement.previousElementSibling;
                     if (prev) {
-                        const tag = prev.tagName.toLowerCase();
-                        if (tag === 'pre' || tag === 'blockquote' || (tag === 'div' && isSpecialWrapper(prev)) || tag === 'table') {
-                            e.preventDefault();
-                            navigateToAdjacentElement(prev, 'up', false);
-                            return;
-                        }
+                        e.preventDefault();
+                        navigateToAdjacentElement(prev, 'up', false);
+                        return;
                     }
                 } else if (e.key === 'ArrowDown') {
-                    // Only enter adjacent block if cursor is at the last line of current element
+                    // Navigate to next element if cursor is at the last line
                     if (!isCursorAtLastLine(currentElement)) return;
 
                     let next = currentElement.nextElementSibling;
                     if (next) {
-                        const tag = next.tagName.toLowerCase();
-                        if (tag === 'pre' || tag === 'blockquote' || (tag === 'div' && isSpecialWrapper(next)) || tag === 'table') {
-                            e.preventDefault();
-                            navigateToAdjacentElement(next, 'down', false);
-                            return;
-                        }
+                        e.preventDefault();
+                        navigateToAdjacentElement(next, 'down', false);
+                        return;
                     }
                 }
             }
