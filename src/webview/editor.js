@@ -1108,7 +1108,7 @@
             const checked = taskMatch[2].toLowerCase() === 'x' ? 'checked' : '';
             const taskContent = parseInline(taskMatch[3]);
             // Use <br> for empty task items to make them visible and editable
-            return { tag: 'li', listType: 'ul', html: '<input type="checkbox" ' + checked + '>' + (taskContent || '<br>'), consumed: true, indent: indent };
+            return { tag: 'li', listType: 'ul', html: '<input type="checkbox"' + (checked ? ' checked' : '') + '>' + (taskContent || '<br>'), consumed: true, indent: indent };
         }
 
         // Unordered list (with indentation support)
@@ -3727,26 +3727,24 @@
                 
                 liNode.innerHTML = '';
                 liNode.appendChild(checkbox);
-                const spaceNode = document.createTextNode(' ');
-                liNode.appendChild(spaceNode);
-                let textNode = spaceNode;
+                let textNode = null;
                 if (existingText) {
                     textNode = document.createTextNode(existingText);
                     liNode.appendChild(textNode);
                 }
-                
+
                 // Re-append nested lists
                 for (const nested of nestedLists) {
                     liNode.appendChild(nested);
                 }
-                
-                // Set cursor at the beginning of the text (after checkbox and space)
+
+                // Set cursor at the beginning of the text (after checkbox)
                 const range = document.createRange();
                 const sel = window.getSelection();
-                if (existingText) {
+                if (existingText && textNode) {
                     range.setStart(textNode, 0);
                 } else {
-                    range.setStartAfter(spaceNode);
+                    range.setStartAfter(checkbox);
                 }
                 range.collapse(true);
                 sel.removeAllRanges();
@@ -3802,7 +3800,6 @@
             checkbox.type = 'checkbox';
             checkbox.checked = taskMatch[1].toLowerCase() === 'x';
             li.appendChild(checkbox);
-            li.appendChild(document.createTextNode(' '));
             if (existingText) {
                 li.appendChild(document.createTextNode(existingText));
             }
@@ -6455,9 +6452,8 @@
                         const newCb = document.createElement('input');
                         newCb.type = 'checkbox';
                         newLi.appendChild(newCb);
-                        newLi.appendChild(document.createTextNode(' '));
                     }
-                    
+
                     // Append the extracted content to new item
                     if (afterContent.textContent.trim() !== '') {
                         newLi.appendChild(afterContent);
@@ -6483,21 +6479,22 @@
                     
                     // Set cursor to start of new item (after checkbox if present)
                     if (checkbox && newLi.querySelector('input[type="checkbox"]')) {
-                        // Position cursor after the checkbox and space
-                        const textNode = newLi.childNodes[newLi.childNodes.length > 1 ? 1 : 0];
-                        if (textNode) {
-                            const newRange = document.createRange();
-                            if (textNode.nodeType === 3) {
-                                newRange.setStart(textNode, textNode.textContent.startsWith(' ') ? 1 : 0);
+                        // Position cursor after the checkbox
+                        const cb = newLi.querySelector('input[type="checkbox"]');
+                        const nextNode = cb.nextSibling;
+                        const newRange = document.createRange();
+                        if (nextNode) {
+                            if (nextNode.nodeType === 3) {
+                                newRange.setStart(nextNode, 0);
                             } else {
-                                newRange.setStartBefore(textNode);
+                                newRange.setStartBefore(nextNode);
                             }
-                            newRange.collapse(true);
-                            sel.removeAllRanges();
-                            sel.addRange(newRange);
                         } else {
-                            setCursorToEnd(newLi);
+                            newRange.setStartAfter(cb);
                         }
+                        newRange.collapse(true);
+                        sel.removeAllRanges();
+                        sel.addRange(newRange);
                     } else {
                         // Position cursor at start of new item content (before nested lists)
                         const firstChild = newLi.firstChild;
@@ -10611,7 +10608,7 @@
                 const checkbox = document.createElement('input');
                 checkbox.type = 'checkbox';
                 li.appendChild(checkbox);
-                li.appendChild(document.createTextNode(' ' + text));
+                li.appendChild(document.createTextNode(text));
                 nextSibling.insertBefore(li, nextSibling.firstChild);
                 node.remove();
                 setCursorToEnd(li);
@@ -10630,7 +10627,7 @@
                 const checkbox = document.createElement('input');
                 checkbox.type = 'checkbox';
                 li.appendChild(checkbox);
-                li.appendChild(document.createTextNode(' ' + text));
+                li.appendChild(document.createTextNode(text));
                 prevSibling.appendChild(li);
                 node.remove();
                 setCursorToEnd(li);
@@ -10645,7 +10642,7 @@
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
         li.appendChild(checkbox);
-        li.appendChild(document.createTextNode(' ' + text));
+        li.appendChild(document.createTextNode(text));
         ul.appendChild(li);
         node.replaceWith(ul);
         setCursorToEnd(li);
