@@ -10011,7 +10011,7 @@
                     }
                 }
 
-                // Convert empty code block back to paragraph
+                // Convert empty code block back to paragraph, or block backspace at start of non-empty code block
                 if (tag === 'pre') {
                     const codeElement = currentLine.querySelector('code');
                     const codeContent = codeElement ? codeElement.textContent : currentLine.textContent;
@@ -10028,6 +10028,18 @@
                         setCursorToEnd(p);
                         syncMarkdown();
                         return;
+                    }
+                    // Non-empty code block: check if cursor is at the very beginning
+                    // If so, prevent backspace from merging with previous element
+                    if (codeElement) {
+                        const contentRange = document.createRange();
+                        contentRange.selectNodeContents(codeElement);
+                        contentRange.setEnd(range.startContainer, range.startOffset);
+                        const textBeforeCursor = contentRange.toString();
+                        if (textBeforeCursor.length === 0) {
+                            e.preventDefault();
+                            return;
+                        }
                     }
                 }
 
@@ -10074,12 +10086,54 @@
                     logger.log('Backspace in blockquote:', { textBeforeCursor, length: textBeforeCursor.length });
                     
                     if (textBeforeCursor.length === 0) {
-                        // Truly at the beginning - convert to paragraph
+                        // Truly at the beginning - convert to paragraph(s)
                         e.preventDefault();
-                        const p = document.createElement('p');
-                        p.innerHTML = currentLine.innerHTML || '<br>';
-                        currentLine.replaceWith(p);
-                        setCursorToStart(p);
+
+                        // Split blockquote content by <br> and \n into individual paragraphs
+                        // Blockquote content may use \n text nodes (from markdownToHtmlFragment)
+                        // or <br> elements (from insertLineBreak on Enter)
+                        const childNodes = Array.from(currentLine.childNodes);
+                        const lines = [];
+                        let currentFragment = document.createDocumentFragment();
+
+                        for (const node of childNodes) {
+                            if (node.nodeName === 'BR' && !node.hasAttribute?.('data-trailing-br')) {
+                                lines.push(currentFragment);
+                                currentFragment = document.createDocumentFragment();
+                            } else if (node.nodeType === 3 && node.textContent.includes('\n')) {
+                                // Text node containing \n - split it
+                                const parts = node.textContent.split('\n');
+                                for (let i = 0; i < parts.length; i++) {
+                                    if (i > 0) {
+                                        lines.push(currentFragment);
+                                        currentFragment = document.createDocumentFragment();
+                                    }
+                                    if (parts[i] !== '') {
+                                        currentFragment.appendChild(document.createTextNode(parts[i]));
+                                    }
+                                }
+                            } else {
+                                currentFragment.appendChild(node.cloneNode(true));
+                            }
+                        }
+                        lines.push(currentFragment);
+
+                        // Create <p> elements for each line
+                        const paragraphs = [];
+                        for (const fragment of lines) {
+                            const p = document.createElement('p');
+                            if (fragment.childNodes.length === 0 || (fragment.childNodes.length === 1 && fragment.firstChild.nodeType === 3 && fragment.firstChild.textContent === '')) {
+                                p.innerHTML = '<br>';
+                            } else {
+                                p.appendChild(fragment);
+                            }
+                            paragraphs.push(p);
+                        }
+
+                        // Replace blockquote with paragraphs
+                        const firstP = paragraphs[0];
+                        currentLine.replaceWith(...paragraphs);
+                        setCursorToStart(firstP);
                         syncMarkdown();
                     }
                     // Otherwise, let default backspace behavior handle it (delete previous char/br)
