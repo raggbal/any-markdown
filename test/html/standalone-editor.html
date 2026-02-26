@@ -7481,8 +7481,34 @@
                     const sel2 = window.getSelection();
                     if (!sel2 || !sel2.rangeCount) { return; }
                     const range2 = sel2.getRangeAt(0);
-                    const curNode = range2.startContainer;
-                    const curOffset = range2.startOffset;
+                    let curNode = range2.startContainer;
+                    let curOffset = range2.startOffset;
+
+                    // When cursor is at an element node (e.g. <code> after <br>),
+                    // resolve to the actual text node for the current line.
+                    if (curNode.nodeType === 1) {
+                        const children = curNode.childNodes;
+                        if (curOffset < children.length) {
+                            const child = children[curOffset];
+                            if (child.nodeType === 3) {
+                                // Cursor is right before a text node
+                                curNode = child;
+                                curOffset = 0;
+                            } else if (child.nodeName === 'BR' && curOffset + 1 < children.length && children[curOffset + 1].nodeType === 3) {
+                                // Cursor is at a <br>, next sibling is text
+                                curNode = children[curOffset + 1];
+                                curOffset = 0;
+                            }
+                        }
+                        // If offset points past all children, try the last text node
+                        if (curNode.nodeType === 1 && curOffset > 0 && curOffset <= children.length) {
+                            const prev = children[curOffset - 1];
+                            if (prev && prev.nodeType === 3) {
+                                curNode = prev;
+                                curOffset = prev.textContent.length;
+                            }
+                        }
+                    }
 
                     // Find the text node containing the current line start
                     // The cursor is in a text node: find the line start within it
