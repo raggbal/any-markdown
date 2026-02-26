@@ -81,4 +81,6 @@ export const webviewMessages = {
   sourceMode: '原始碼模式',
   relativePath: '相對路徑',
   externalChangeToast: '檔案已被外部修改。編輯中不會反映變更。請點擊編輯器外部以重新載入。',
+  undo: '復原 (Ctrl+Z)',
+  redo: '重做 (Ctrl+Shift+Z)',
 };

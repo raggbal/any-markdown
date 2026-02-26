@@ -81,4 +81,6 @@ export const webviewMessages = {
   sourceMode: '源代码模式',
   relativePath: '相对路径',
   externalChangeToast: '文件已被外部修改。编辑中不会反映更改。请点击编辑器外部以重新加载。',
+  undo: '撤销 (Ctrl+Z)',
+  redo: '重做 (Ctrl+Shift+Z)',
 };

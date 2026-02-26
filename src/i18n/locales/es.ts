@@ -81,4 +81,6 @@ export const webviewMessages = {
   sourceMode: 'Modo fuente',
   relativePath: 'Ruta relativa',
   externalChangeToast: 'Archivo modificado externamente. Los cambios no se reflejan mientras edita. Haga clic fuera del editor para recargar.',
+  undo: 'Deshacer (Ctrl+Z)',
+  redo: 'Rehacer (Ctrl+Shift+Z)',
 };

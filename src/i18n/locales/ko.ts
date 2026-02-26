@@ -81,4 +81,6 @@ export const webviewMessages = {
   sourceMode: '소스 모드',
   relativePath: '상대 경로',
   externalChangeToast: '파일이 외부에서 수정되었습니다. 편집 중에는 반영되지 않습니다. 편집기 외부를 클릭하면 반영됩니다.',
+  undo: '실행 취소 (Ctrl+Z)',
+  redo: '다시 실행 (Ctrl+Shift+Z)',
 };

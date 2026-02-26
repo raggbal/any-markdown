@@ -81,4 +81,6 @@ export const webviewMessages = {
   sourceMode: 'Source Mode',
   relativePath: 'Relative Path',
   externalChangeToast: 'File modified externally. Changes won\'t appear while editing. Click outside the editor to reload.',
+  undo: 'Undo (Ctrl+Z)',
+  redo: 'Redo (Ctrl+Shift+Z)',
 };

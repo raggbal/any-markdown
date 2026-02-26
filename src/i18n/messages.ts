@@ -82,6 +82,8 @@ export interface WebviewMessages {
   sourceMode: string;
   relativePath: string;
   externalChangeToast: string;
+  undo: string;
+  redo: string;
 }
 
 // Supported locales

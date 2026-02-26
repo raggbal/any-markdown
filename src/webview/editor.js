@@ -21,6 +21,9 @@
 
     // Lucide Icons (inline SVG) - unified icon set for all toolbars
     const LUCIDE_ICONS = {
+        // Undo/Redo
+        'undo': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>',
+        'redo': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/></svg>',
         // Group A: Inline formatting
         'bold': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12h9a4 4 0 0 1 0 8H7a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h7a4 4 0 0 1 0 8"/></svg>',
         'italic': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" x2="10" y1="4" y2="4"/><line x1="14" x2="5" y1="20" y2="20"/><line x1="15" x2="9" y1="4" y2="20"/></svg>',
@@ -381,6 +384,99 @@
     logger.log('[Any MD] Starting init(), markdown length:', markdown.length, 'editor element:', !!editor);
     init();
     logger.log('[Any MD] init() completed, editor.innerHTML length:', editor.innerHTML.length);
+
+    // ========== UNDO / REDO MANAGER ==========
+    var undoManager = (function() {
+        var MAX_STACK = 200;
+        var undoStack = [];
+        var redoStack = [];
+        var typingTimer = null;
+        var TYPING_DEBOUNCE = 500;
+        var _isUndoRedo = false;
+
+        function capture() {
+            return { markdown: markdown, cursor: saveCursorState() };
+        }
+
+        function saveSnapshot() {
+            if (_isUndoRedo) return;
+            var state = capture();
+            if (undoStack.length > 0 && undoStack[undoStack.length - 1].markdown === state.markdown) return;
+            undoStack.push(state);
+            if (undoStack.length > MAX_STACK) undoStack.shift();
+            redoStack.length = 0;
+            updateButtons();
+        }
+
+        function saveSnapshotDebounced() {
+            if (_isUndoRedo) return;
+            if (typingTimer) return;
+            saveSnapshot();
+            typingTimer = setTimeout(function() { typingTimer = null; }, TYPING_DEBOUNCE);
+        }
+
+        function undo() {
+            if (!undoStack.length) return;
+            _isUndoRedo = true;
+            try {
+                clearTimeout(syncTimeout);
+                pendingSync = false;
+                redoStack.push(capture());
+                var state = undoStack.pop();
+                markdown = state.markdown;
+                renderFromMarkdown();
+                if (state.cursor) restoreCursorState(state.cursor);
+                hasUserEdited = true;
+                notifyChangeImmediate();
+            } finally {
+                _isUndoRedo = false;
+            }
+            updateButtons();
+        }
+
+        function redo() {
+            if (!redoStack.length) return;
+            _isUndoRedo = true;
+            try {
+                clearTimeout(syncTimeout);
+                pendingSync = false;
+                undoStack.push(capture());
+                var state = redoStack.pop();
+                markdown = state.markdown;
+                renderFromMarkdown();
+                if (state.cursor) restoreCursorState(state.cursor);
+                hasUserEdited = true;
+                notifyChangeImmediate();
+            } finally {
+                _isUndoRedo = false;
+            }
+            updateButtons();
+        }
+
+        function updateButtons() {
+            var u = document.querySelector('[data-action="undo"]');
+            var r = document.querySelector('[data-action="redo"]');
+            if (u) { u.disabled = !undoStack.length; u.style.opacity = undoStack.length ? '1' : '0.3'; }
+            if (r) { r.disabled = !redoStack.length; r.style.opacity = redoStack.length ? '1' : '0.3'; }
+        }
+
+        function clear() {
+            undoStack.length = 0;
+            redoStack.length = 0;
+            updateButtons();
+        }
+
+        return {
+            saveSnapshot: saveSnapshot,
+            saveSnapshotDebounced: saveSnapshotDebounced,
+            undo: undo,
+            redo: redo,
+            updateButtons: updateButtons,
+            clear: clear,
+            get isUndoRedo() { return _isUndoRedo; }
+        };
+    })();
+    undoManager.updateButtons();
 
     // Debounced sync for performance - uses requestIdleCallback to avoid blocking UI
     function debouncedSync() {
@@ -1922,10 +2018,10 @@
                         }
                         // Check if list type changed at the target level
                         if (listStack.length > 0 && listStack[listStack.length - 1].type !== parsed.listType) {
-                            // Close current list and start new one of different type
-                            while (listStack.length > 0) {
-                                html += '</li></' + listStack.pop().type + '>';
-                            }
+                            // Close ONLY the current level's list and start new sibling list
+                            // of different type under the same parent li.
+                            // (Do NOT close all lists - that would collapse nested type changes to top level)
+                            html += '</li></' + listStack.pop().type + '>';
                             html += '<' + parsed.listType + '><li>' + parsed.html;
                             listStack.push({ type: parsed.listType, indent: indentLevel });
                         } else if (listStack.length > 0) {
@@ -1934,10 +2030,10 @@
                     } else {
                         // Same level - check if list type changed
                         if (listStack[listStack.length - 1].type !== parsed.listType) {
-                            // Close current list and start new one of different type
-                            while (listStack.length > 0) {
-                                html += '</li></' + listStack.pop().type + '>';
-                            }
+                            // Close ONLY the current level's list and start new sibling list
+                            // of different type under the same parent li.
+                            // (Do NOT close all lists - that would collapse nested type changes to top level)
+                            html += '</li></' + listStack.pop().type + '>';
                             html += '<' + parsed.listType + '><li>' + parsed.html;
                             listStack.push({ type: parsed.listType, indent: indentLevel });
                         } else {
@@ -5628,6 +5724,11 @@
             e.preventDefault();
             // Do NOT call stopPropagation - let the event reach the editor's keydown handler
         }
+        // Disable browser native undo/redo in live preview mode
+        var isMod = e.ctrlKey || e.metaKey;
+        if (isMod && !isSourceMode && (e.key === 'z' || e.key === 'Z' || e.key === 'y')) {
+            e.preventDefault();
+        }
     }, true); // true = capture phase
 
     // Key input handler
@@ -5644,6 +5745,7 @@
         // Case: Cursor at beginning of non-empty li that is the first child of a nested list
         // Action: Merge with parent li's content
         if (e.key === 'Backspace') {
+            undoManager.saveSnapshot();
             logger.log('Backspace key pressed');
             const sel = window.getSelection();
             if (!sel || !sel.rangeCount) return;
@@ -6174,6 +6276,7 @@
 
         // Enter key - check patterns and handle special cases
         if (e.key === 'Enter') {
+            undoManager.saveSnapshot();
             logger.log('Enter key detected:', {
                 shiftKey: e.shiftKey,
                 isComposing: e.isComposing,
@@ -6829,6 +6932,7 @@
         // Space key - check for inline escape first, then all conversions
         // Skip all conversions if inside a code block
         if (e.key === ' ') {
+            undoManager.saveSnapshot();
             // Check if inside code block or inline code - if so, skip all conversions
             const sel = window.getSelection();
             if (sel && sel.rangeCount) {
@@ -6851,6 +6955,7 @@
 
         // Tab key - table cell navigation or list indent
         if (e.key === 'Tab') {
+            undoManager.saveSnapshot();
             // #region agent log
             logger.log('Tab key pressed', {shiftKey: e.shiftKey});
             // #endregion
@@ -7929,9 +8034,12 @@
          * Find the deepest last li in a nested structure
          */
         function findDeepestLastLi(li) {
-            const nestedList = li.querySelector(':scope > ul, :scope > ol');
-            if (nestedList && nestedList.lastElementChild) {
-                return findDeepestLastLi(nestedList.lastElementChild);
+            // Find the LAST child list (not first) - an li may have multiple
+            // sibling lists of different types (ul, task-ul, ol) as direct children
+            const nestedLists = li.querySelectorAll(':scope > ul, :scope > ol');
+            const lastNestedList = nestedLists.length > 0 ? nestedLists[nestedLists.length - 1] : null;
+            if (lastNestedList && lastNestedList.lastElementChild) {
+                return findDeepestLastLi(lastNestedList.lastElementChild);
             }
             return li;
         }
@@ -8829,9 +8937,10 @@
                             // Find the deepest last li in the prev list (visually the line above)
                             let deepestLastLi = prevList.lastElementChild;
                             while (deepestLastLi) {
-                                const nestedList = deepestLastLi.querySelector(':scope > ul, :scope > ol');
-                                if (nestedList && nestedList.lastElementChild) {
-                                    deepestLastLi = nestedList.lastElementChild;
+                                const nestedLists = deepestLastLi.querySelectorAll(':scope > ul, :scope > ol');
+                                const lastNestedList = nestedLists.length > 0 ? nestedLists[nestedLists.length - 1] : null;
+                                if (lastNestedList && lastNestedList.lastElementChild) {
+                                    deepestLastLi = lastNestedList.lastElementChild;
                                 } else {
                                     break;
                                 }
@@ -8931,9 +9040,10 @@
                         
                         // Find the deepest last li BEFORE merging (this is the "visually previous line")
                         const findDeepestLastLi = (li) => {
-                            const nestedList = li.querySelector(':scope > ul, :scope > ol');
-                            if (nestedList && nestedList.lastElementChild) {
-                                return findDeepestLastLi(nestedList.lastElementChild);
+                            const nestedLists = li.querySelectorAll(':scope > ul, :scope > ol');
+                            const lastNestedList = nestedLists.length > 0 ? nestedLists[nestedLists.length - 1] : null;
+                            if (lastNestedList && lastNestedList.lastElementChild) {
+                                return findDeepestLastLi(lastNestedList.lastElementChild);
                             }
                             return li;
                         };
@@ -8971,9 +9081,10 @@
                             if (lastLi) {
                                 // Find the deepest last li in the list (including nested lists)
                                 const findDeepestLastLi = (li) => {
-                                    const nestedList = li.querySelector(':scope > ul, :scope > ol');
-                                    if (nestedList && nestedList.lastElementChild) {
-                                        return findDeepestLastLi(nestedList.lastElementChild);
+                                    const nestedLists = li.querySelectorAll(':scope > ul, :scope > ol');
+                                    const lastNestedList = nestedLists.length > 0 ? nestedLists[nestedLists.length - 1] : null;
+                                    if (lastNestedList && lastNestedList.lastElementChild) {
+                                        return findDeepestLastLi(lastNestedList.lastElementChild);
                                     }
                                     return li;
                                 };
@@ -9658,10 +9769,12 @@
                         // Find the deepest last li in prevLi's nested lists
                         // This handles the case where prevLi has nested lists and we should merge into the deepest last item
                         let targetLi = prevLi;
-                        let nestedList = prevLi.querySelector(':scope > ul, :scope > ol');
-                        while (nestedList && nestedList.lastElementChild) {
-                            targetLi = nestedList.lastElementChild;
-                            nestedList = targetLi.querySelector(':scope > ul, :scope > ol');
+                        let prevNestedLists = prevLi.querySelectorAll(':scope > ul, :scope > ol');
+                        let lastNestedList = prevNestedLists.length > 0 ? prevNestedLists[prevNestedLists.length - 1] : null;
+                        while (lastNestedList && lastNestedList.lastElementChild) {
+                            targetLi = lastNestedList.lastElementChild;
+                            prevNestedLists = targetLi.querySelectorAll(':scope > ul, :scope > ol');
+                            lastNestedList = prevNestedLists.length > 0 ? prevNestedLists[prevNestedLists.length - 1] : null;
                         }
                         
                         // Find position to insert in target item (before any nested lists)
@@ -9872,6 +9985,7 @@
         if (isSourceMode) return;
         markActivelyEditing();
         markAsEdited(); // User has made an edit
+        undoManager.saveSnapshotDebounced();
 
         // Normalize <div> to <p>: Chromium's contenteditable sometimes creates <div>
         // despite defaultParagraphSeparator('p'), especially after tables or other block elements.
@@ -10102,13 +10216,31 @@
 
         const grandparentList = grandparentLi.parentNode;
 
-        // Move all following siblings to stay in the nested list
+        // Move all following siblings (within same list) to stay in the nested list
         const followingSiblings = [];
         let sibling = li.nextElementSibling;
         while (sibling) {
             followingSiblings.push(sibling);
             sibling = sibling.nextElementSibling;
         }
+
+        // Collect trailing sibling lists after parentList in grandparentLi
+        // These are ul/ol elements that come AFTER the current list under the same parent li.
+        // In mixed-type lists, items in these lists are visually "below" the current item,
+        // so they must be moved under the outdented item to preserve line order.
+        var trailingSiblingLists = [];
+        var nextOfParent = parentList.nextElementSibling;
+        while (nextOfParent) {
+            var nextTag = nextOfParent.tagName ? nextOfParent.tagName.toLowerCase() : '';
+            if (nextTag === 'ul' || nextTag === 'ol') {
+                trailingSiblingLists.push(nextOfParent);
+            }
+            nextOfParent = nextOfParent.nextElementSibling;
+        }
+        logger.log('outdentListItem: collected', {
+            followingSiblings: followingSiblings.length,
+            trailingSiblingLists: trailingSiblingLists.length
+        });
 
         // Insert li after grandparent li
         grandparentList.insertBefore(li, grandparentLi.nextElementSibling);
@@ -10123,6 +10255,11 @@
             followingSiblings.forEach(s => newNestedList.appendChild(s));
         }
 
+        // Move trailing sibling lists under the moved item to preserve line order
+        for (var i = 0; i < trailingSiblingLists.length; i++) {
+            li.appendChild(trailingSiblingLists[i]);
+        }
+
         // Remove empty parent list
         if (parentList.children.length === 0) {
             parentList.remove();
@@ -10134,42 +10271,60 @@
     function convertListItemToParagraph(li) {
         logger.log('convertListItemToParagraph called', { liText: li.textContent });
         const parentList = li.parentNode;
-        
+
         // Get text content (excluding checkbox if any)
+        // Also collect nested lists (ul/ol) to preserve them
         let content = '';
+        var nestedLists = [];
         for (const child of li.childNodes) {
             if (child.nodeType === 3) {
                 content += child.textContent;
-            } else if (child.nodeType === 1 && child.tagName.toLowerCase() !== 'input' && child.tagName.toLowerCase() !== 'ul' && child.tagName.toLowerCase() !== 'ol') {
-                content += child.outerHTML;
+            } else if (child.nodeType === 1) {
+                var childTag = child.tagName.toLowerCase();
+                if (childTag === 'ul' || childTag === 'ol') {
+                    nestedLists.push(child);
+                } else if (childTag !== 'input') {
+                    content += child.outerHTML;
+                }
             }
         }
-        logger.log('convertListItemToParagraph: content extracted', { content });
-        
+        logger.log('convertListItemToParagraph: content extracted', { content, nestedListCount: nestedLists.length });
+
         // Create paragraph
         const p = document.createElement('p');
         p.innerHTML = content.trim() || '<br>';
-        
+
         // Insert paragraph after the list
         if (parentList.nextSibling) {
             parentList.parentNode.insertBefore(p, parentList.nextSibling);
         } else {
             parentList.parentNode.appendChild(p);
         }
-        logger.log('convertListItemToParagraph: paragraph inserted');
-        
+
+        // Insert nested lists after the paragraph as independent top-level lists
+        var insertAfter = p;
+        for (var i = 0; i < nestedLists.length; i++) {
+            if (insertAfter.nextSibling) {
+                insertAfter.parentNode.insertBefore(nestedLists[i], insertAfter.nextSibling);
+            } else {
+                insertAfter.parentNode.appendChild(nestedLists[i]);
+            }
+            insertAfter = nestedLists[i];
+        }
+        logger.log('convertListItemToParagraph: paragraph and nested lists inserted');
+
         // Remove the li from the list
         li.remove();
-        
+
         // If list is now empty, remove it
         if (parentList.children.length === 0) {
             parentList.remove();
         }
         logger.log('convertListItemToParagraph: li removed, setting cursor');
-        
+
         // Set cursor to the new paragraph
         setCursorToEnd(p);
-        
+
         syncMarkdown();
         logger.log('convertListItemToParagraph: done');
     }
@@ -10218,7 +10373,18 @@
             savedToolbarRange = null;
         }
 
+        // Save snapshot before structural toolbar actions (not for undo/redo/source/openOutline)
+        if (action !== 'undo' && action !== 'redo' && action !== 'source' && action !== 'openOutline') {
+            undoManager.saveSnapshot();
+        }
+
         switch (action) {
+            case 'undo':
+                undoManager.undo();
+                break;
+            case 'redo':
+                undoManager.redo();
+                break;
             case 'bold':
                 applyInlineFormat('strong');
                 syncMarkdown();
@@ -10591,6 +10757,28 @@
             }
         }
         
+        // Undo (Ctrl+Z / Cmd+Z)
+        if (isMod && !e.shiftKey && e.key === 'z') {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!isSourceMode) undoManager.undo();
+            return;
+        }
+
+        // Redo (Ctrl+Shift+Z / Cmd+Shift+Z / Ctrl+Y)
+        if (isMod && ((e.shiftKey && e.key.toLowerCase() === 'z') || (!e.shiftKey && e.key === 'y'))) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!isSourceMode) undoManager.redo();
+            return;
+        }
+
+        // Save snapshot before structural shortcuts (not for save/find/select-all/undo/redo/copy/cut/paste)
+        if (isMod && !isSourceMode && e.key !== 's' && e.key !== 'f' && e.key !== 'h' && e.key !== 'l' && e.key !== 'a'
+            && e.key !== 'z' && e.key !== 'Z' && e.key !== 'y' && e.key !== 'v' && e.key !== 'c' && e.key !== 'x') {
+            undoManager.saveSnapshot();
+        }
+
         // Save
         if (isMod && e.key === 's') {
             e.preventDefault();
@@ -11396,6 +11584,7 @@
             updateOutline();
             updateWordCount();
             updateStatus();
+            undoManager.clear();
         } else if (message.type === 'setImageDir') {
             // Update currentImageDir and currentForceRelativePath from extension
             currentImageDir = message.dirPath;
@@ -12108,7 +12297,8 @@
     // Paste handler - insert Markdown into source, then re-render
     editor.addEventListener('paste', function(e) {
         if (isSourceMode) return;
-        
+
+        undoManager.saveSnapshot();
         markAsEdited();
         
         logger.log('Paste event triggered');

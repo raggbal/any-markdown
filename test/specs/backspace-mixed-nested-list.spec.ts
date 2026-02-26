@@ -493,4 +493,113 @@ test.describe('ネストされた異種リスト間のBackspace統合', () => {
         expect(html).toContain('b');
         expect(html).toContain('a');
     });
+
+    // === 複数の兄弟リスト（3つ以上）が並んでいる場合のテスト ===
+
+    test('3つの兄弟リスト: ul+task+ol の後に |f でBackspace → eに統合（最後のolの最後の項目）', async ({ page }) => {
+        // 報告されたバグの再現テスト
+        // - a
+        //   - b
+        //     - c
+        //     - [ ] d
+        //     1. e
+        //   - |f
+        //     - [ ] g
+        // DOM: b の中に <ul>(c,d), <ol>(e) が兄弟として並ぶ
+        // f で Backspace → e に統合されるべき（最後の兄弟リストの最後の項目）
+        await page.evaluate(() => {
+            const editor = document.getElementById('editor')!;
+            editor.innerHTML = '<ul><li>a<ul><li>b<ul><li>c</li><li><input type="checkbox">d</li></ul><ol><li>e</li></ol></li><li>f<ul><li><input type="checkbox">g</li></ul></li></ul></li></ul>';
+        });
+
+        // f の先頭にカーソルを設定
+        await page.evaluate(() => {
+            const outerUl = document.querySelector('#editor > ul > li > ul')!;
+            const fLi = outerUl.children[1] as HTMLElement; // 2番目のli = f
+            const textNode = fLi.firstChild!; // テキスト "f"
+            const range = document.createRange();
+            range.setStart(textNode, 0);
+            range.collapse(true);
+            window.getSelection()!.removeAllRanges();
+            window.getSelection()!.addRange(range);
+        });
+
+        await page.keyboard.press('Backspace');
+        await page.waitForTimeout(100);
+
+        const html = await editor.getHtml();
+        // e と f が統合されているべき（d ではなく e）
+        expect(html).toContain('ef');
+        // d は保持（checkbox付き）
+        expect(html).toContain('d');
+        // c, b, a は保持
+        expect(html).toContain('c');
+        expect(html).toContain('b');
+        expect(html).toContain('a');
+    });
+
+    test('3つの兄弟リスト: ul+ol+task の後に |g でBackspace → 最後のtaskリストの最後の項目に統合', async ({ page }) => {
+        // b の中に <ul>(c), <ol>(d), <ul-task>(e) が兄弟として並ぶ
+        // f で Backspace → e（最後の兄弟リストの最後の項目）に統合
+        await page.evaluate(() => {
+            const editor = document.getElementById('editor')!;
+            editor.innerHTML = '<ul><li>a<ul><li>b<ul><li>c</li></ul><ol><li>d</li></ol><ul><li><input type="checkbox">e</li></ul></li><li>f</li></ul></li></ul>';
+        });
+
+        // f の先頭にカーソルを設定
+        await page.evaluate(() => {
+            const outerUl = document.querySelector('#editor > ul > li > ul')!;
+            const fLi = outerUl.children[1] as HTMLElement; // 2番目のli = f
+            const textNode = fLi.firstChild!;
+            const range = document.createRange();
+            range.setStart(textNode, 0);
+            range.collapse(true);
+            window.getSelection()!.removeAllRanges();
+            window.getSelection()!.addRange(range);
+        });
+
+        await page.keyboard.press('Backspace');
+        await page.waitForTimeout(100);
+
+        const html = await editor.getHtml();
+        // e と f が統合されている（c や d ではなく e）
+        expect(html).toContain('ef');
+        // d は保持
+        expect(html).toContain('d');
+        // c, b, a は保持
+        expect(html).toContain('c');
+        expect(html).toContain('b');
+        expect(html).toContain('a');
+    });
+
+    test('2つの同種リスト (ul+ul): findDeepestLastLi は最後の ul の最後の li を選ぶ', async ({ page }) => {
+        // b の中に 2つの <ul> が兄弟として並ぶ場合
+        // b → <ul>(c) → <ul>(d)
+        // f で Backspace → d に統合
+        await page.evaluate(() => {
+            const editor = document.getElementById('editor')!;
+            editor.innerHTML = '<ul><li>a<ul><li>b<ul><li>c</li></ul><ul><li>d</li></ul></li><li>f</li></ul></li></ul>';
+        });
+
+        await page.evaluate(() => {
+            const outerUl = document.querySelector('#editor > ul > li > ul')!;
+            const fLi = outerUl.children[1] as HTMLElement;
+            const textNode = fLi.firstChild!;
+            const range = document.createRange();
+            range.setStart(textNode, 0);
+            range.collapse(true);
+            window.getSelection()!.removeAllRanges();
+            window.getSelection()!.addRange(range);
+        });
+
+        await page.keyboard.press('Backspace');
+        await page.waitForTimeout(100);
+
+        const html = await editor.getHtml();
+        // d と f が統合（c ではなく d）
+        expect(html).toContain('df');
+        expect(html).toContain('c');
+        expect(html).toContain('b');
+        expect(html).toContain('a');
+    });
 });

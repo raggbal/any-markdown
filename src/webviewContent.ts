@@ -101,6 +101,10 @@ export function getWebviewContent(
                 <button class="toolbar-scroll-btn toolbar-scroll-btn--left hidden" id="toolbarScrollLeft">&#x276E;</button>
                 <div class="toolbar-inner" id="toolbarInner">
                     <button data-action="openOutline" class="menu-btn hidden" id="openSidebarBtn" title="${msg.openOutline}"></button>
+                    <div class="toolbar-group" data-group="history">
+                        <button data-action="undo" title="${msg.undo}"></button>
+                        <button data-action="redo" title="${msg.redo}"></button>
+                    </div>
                     <div class="toolbar-group" data-group="inline">
                         <button data-action="bold" title="${msg.bold}"></button>
                         <button data-action="italic" title="${msg.italic}"></button>

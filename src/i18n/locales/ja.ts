@@ -81,4 +81,6 @@ export const webviewMessages = {
   sourceMode: 'ソースモード',
   relativePath: '相対パス',
   externalChangeToast: 'ファイルが外部で変更されました。編集中は反映されません。エディタ外をクリックしてフォーカスを外すと反映されます。',
+  undo: '元に戻す (Ctrl+Z)',
+  redo: 'やり直す (Ctrl+Shift+Z)',
 };
