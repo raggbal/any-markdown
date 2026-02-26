@@ -511,6 +511,19 @@
         });
     }
 
+    // Check if editor is effectively empty and toggle placeholder class
+    function updatePlaceholder() {
+        var children = editor.children;
+        var isEmpty = children.length === 0 ||
+            (children.length === 1 && children[0].tagName === 'P' &&
+             (children[0].innerHTML === '<br>' || children[0].textContent === ''));
+        if (isEmpty) {
+            editor.classList.add('is-empty');
+        } else {
+            editor.classList.remove('is-empty');
+        }
+    }
+
     function init() {
         // Force browser to use <p> instead of <div> when pressing Enter in contenteditable
         try {
@@ -526,6 +539,7 @@
         try { updateOutline(); } catch (e) { console.error('[Any MD] updateOutline() failed:', e); }
         try { updateWordCount(); } catch (e) { console.error('[Any MD] updateWordCount() failed:', e); }
         try { updateStatus(); } catch (e) { console.error('[Any MD] updateStatus() failed:', e); }
+        updatePlaceholder();
     }
 
     // ========== CURSOR UTILITIES ==========
@@ -1388,6 +1402,7 @@
         logger.log('[Any MD] renderFromMarkdown: html length:', html.length, 'first 100 chars:', html.substring(0, 100));
         editor.innerHTML = html || '<p><br></p>';
         setupInteractiveElements();
+        updatePlaceholder();
     }
 
     // ========== CURSOR-PRESERVING DOM UPDATE ==========
@@ -1709,8 +1724,9 @@
 
         // 4. Restore cursor
         restoreCursorState(cursorState);
+        updatePlaceholder();
     }
-    
+
     // Convert markdown to HTML fragment (reusable for both full render and partial paste)
     function markdownToHtmlFragment(markdownText) {
         // Normalize line endings: \r\n → \n, lone \r → \n
@@ -10442,6 +10458,7 @@
 
         // Debounced sync - only updates markdown after user stops typing
         debouncedSync();
+        updatePlaceholder();
     });
 
     // ========== LIST TYPE CHANGE ==========

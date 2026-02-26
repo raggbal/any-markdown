@@ -279,6 +279,7 @@ body {
     outline: none;
     white-space: pre-wrap;
     word-wrap: break-word;
+    position: relative;
 }
 .editor.drag-over {
     background: var(--selection-bg);
@@ -830,9 +831,11 @@ body {
     margin-right: 0.3em;
 }
 
-.editor:empty:before {
+.editor.is-empty:before {
     content: 'Start typing... (Try: # heading, - list, > quote, --- hr)';
     color: var(--text-color);
     opacity: 0.4;
+    position: absolute;
+    pointer-events: none;
 }
 ::selection { background: var(--selection-bg); }
