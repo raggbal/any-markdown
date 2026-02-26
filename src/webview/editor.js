@@ -7275,9 +7275,13 @@
                         }
                         
                         // Get or create nested list in previous sibling
+                        // Use querySelectorAll to get the LAST nested list (Section 16: querySelector returns only the first match)
                         const parentList = firstLi.parentNode;
-                        let nestedList = prevSibling.querySelector('ul, ol');
-                        if (!nestedList) {
+                        const nestedLists = prevSibling.querySelectorAll(':scope > ul, :scope > ol');
+                        let nestedList;
+                        if (nestedLists.length > 0) {
+                            nestedList = nestedLists[nestedLists.length - 1];
+                        } else {
                             nestedList = document.createElement(parentList.tagName.toLowerCase());
                             prevSibling.appendChild(nestedList);
                         }
@@ -10508,9 +10512,13 @@
                 const lastLiOfPrev = prevList.lastElementChild;
                 if (lastLiOfPrev && lastLiOfPrev.tagName.toLowerCase() === 'li') {
                     // Move this li (and remaining siblings) into a nested list under lastLiOfPrev
+                    // Use querySelectorAll to get the LAST nested list (Section 16)
                     const currentListTag = parentList.tagName.toLowerCase();
-                    let nestedList = lastLiOfPrev.querySelector(':scope > ul, :scope > ol');
-                    if (!nestedList) {
+                    const crossNestedLists = lastLiOfPrev.querySelectorAll(':scope > ul, :scope > ol');
+                    let nestedList;
+                    if (crossNestedLists.length > 0) {
+                        nestedList = crossNestedLists[crossNestedLists.length - 1];
+                    } else {
                         nestedList = document.createElement(currentListTag);
                         lastLiOfPrev.appendChild(nestedList);
                     }
@@ -10534,8 +10542,12 @@
         // #endregion
 
         // Check if previous sibling already has a nested list
-        let nestedList = prevSibling.querySelector('ul, ol');
-        if (!nestedList) {
+        // Use querySelectorAll to get the LAST nested list (Section 16: querySelector returns only the first match)
+        const nestedLists = prevSibling.querySelectorAll(':scope > ul, :scope > ol');
+        let nestedList;
+        if (nestedLists.length > 0) {
+            nestedList = nestedLists[nestedLists.length - 1];
+        } else {
             // Create a new nested list of the same type as parent
             const parentList = li.parentNode;
             nestedList = document.createElement(parentList.tagName.toLowerCase());
