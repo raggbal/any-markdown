@@ -316,7 +316,24 @@ const imageDirectoryManager = new ImageDirectoryManager();
 export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvider {
     private static readonly viewType = 'any-markdown.editor';
 
+    // Track the currently active webview panel for undo/redo command forwarding
+    private activeWebviewPanel: vscode.WebviewPanel | undefined;
+
     constructor(private readonly context: vscode.ExtensionContext) {}
+
+    /**
+     * Send undo command to the active webview
+     */
+    public sendUndo(): void {
+        this.activeWebviewPanel?.webview.postMessage({ type: 'performUndo' });
+    }
+
+    /**
+     * Send redo command to the active webview
+     */
+    public sendRedo(): void {
+        this.activeWebviewPanel?.webview.postMessage({ type: 'performRedo' });
+    }
 
     public async resolveCustomTextEditor(
         document: vscode.TextDocument,
@@ -750,7 +767,22 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
             }
         });
 
+        // Track active webview panel for undo/redo command forwarding
+        if (webviewPanel.active) {
+            this.activeWebviewPanel = webviewPanel;
+        }
+        webviewPanel.onDidChangeViewState(() => {
+            if (webviewPanel.active) {
+                this.activeWebviewPanel = webviewPanel;
+            } else if (this.activeWebviewPanel === webviewPanel) {
+                this.activeWebviewPanel = undefined;
+            }
+        });
+
         webviewPanel.onDidDispose(() => {
+            if (this.activeWebviewPanel === webviewPanel) {
+                this.activeWebviewPanel = undefined;
+            }
             changeDocumentSubscription.dispose();
             changeConfigSubscription.dispose();
             fileChangeSubscription.dispose();

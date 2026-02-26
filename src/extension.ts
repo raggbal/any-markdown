@@ -92,6 +92,18 @@ export function activate(context: vscode.ExtensionContext) {
         })
     );
 
+    // Undo/Redo commands - forwarded to webview to bypass VSCode's native undo
+    context.subscriptions.push(
+        vscode.commands.registerCommand('any-markdown.undo', () => {
+            provider.sendUndo();
+        })
+    );
+    context.subscriptions.push(
+        vscode.commands.registerCommand('any-markdown.redo', () => {
+            provider.sendRedo();
+        })
+    );
+
     // Open markdown file in standard text editor
     context.subscriptions.push(
         vscode.commands.registerCommand('any-markdown.openAsText', async (uri?: vscode.Uri) => {

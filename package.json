@@ -2,7 +2,7 @@
   "name": "any-markdown",
   "displayName": "Any Markdown Editor",
   "description": "A WYSIWYG markdown editor for VS Code with seamless live preview",
-  "version": "0.195.325",
+  "version": "0.195.328",
   "publisher": "imaken",
   "icon": "media/icon.png",
   "license": "MIT",
@@ -68,6 +68,16 @@
       {
         "command": "any-markdown.compareAsText",
         "title": "Compare as Text",
+        "category": "Any MD"
+      },
+      {
+        "command": "any-markdown.undo",
+        "title": "Undo",
+        "category": "Any MD"
+      },
+      {
+        "command": "any-markdown.redo",
+        "title": "Redo",
         "category": "Any MD"
       }
     ],
@@ -171,7 +181,26 @@
         }
       ]
     },
-    "keybindings": []
+    "keybindings": [
+      {
+        "command": "any-markdown.undo",
+        "key": "ctrl+z",
+        "mac": "cmd+z",
+        "when": "activeCustomEditorId == 'any-markdown.editor'"
+      },
+      {
+        "command": "any-markdown.redo",
+        "key": "ctrl+shift+z",
+        "mac": "cmd+shift+z",
+        "when": "activeCustomEditorId == 'any-markdown.editor'"
+      },
+      {
+        "command": "any-markdown.redo",
+        "key": "ctrl+y",
+        "mac": "cmd+y",
+        "when": "activeCustomEditorId == 'any-markdown.editor'"
+      }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",

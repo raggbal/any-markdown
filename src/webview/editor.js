@@ -7800,6 +7800,11 @@
                     // Navigate to previous element if cursor is at the first line
                     if (!isCursorAtFirstLine(currentElement)) return;
 
+                    // If Shift is pressed, let browser handle selection
+                    if (e.shiftKey) {
+                        return;
+                    }
+
                     let prev = currentElement.previousElementSibling;
                     if (prev) {
                         e.preventDefault();
@@ -7809,6 +7814,11 @@
                 } else if (e.key === 'ArrowDown') {
                     // Navigate to next element if cursor is at the last line
                     if (!isCursorAtLastLine(currentElement)) return;
+
+                    // If Shift is pressed, let browser handle selection
+                    if (e.shiftKey) {
+                        return;
+                    }
 
                     let next = currentElement.nextElementSibling;
                     if (next) {
@@ -10773,9 +10783,10 @@
             return;
         }
 
-        // Save snapshot before structural shortcuts (not for save/find/select-all/undo/redo/copy/cut/paste)
+        // Save snapshot before structural shortcuts (not for save/find/select-all/undo/redo/copy/cut/paste/modifier-only)
         if (isMod && !isSourceMode && e.key !== 's' && e.key !== 'f' && e.key !== 'h' && e.key !== 'l' && e.key !== 'a'
-            && e.key !== 'z' && e.key !== 'Z' && e.key !== 'y' && e.key !== 'v' && e.key !== 'c' && e.key !== 'x') {
+            && e.key !== 'z' && e.key !== 'Z' && e.key !== 'y' && e.key !== 'v' && e.key !== 'c' && e.key !== 'x'
+            && e.key !== 'Meta' && e.key !== 'Control' && e.key !== 'Shift' && e.key !== 'Alt') {
             undoManager.saveSnapshot();
         }
 
@@ -11555,6 +11566,14 @@
     // Handle messages from VS Code
     window.addEventListener('message', function(event) {
         const message = event.data;
+        if (message.type === 'performUndo') {
+            if (!isSourceMode) undoManager.undo();
+            return;
+        }
+        if (message.type === 'performRedo') {
+            if (!isSourceMode) undoManager.redo();
+            return;
+        }
         if (message.type === 'update') {
             logger.log('[Any MD] update message received, content length:', message.content?.length);
 
