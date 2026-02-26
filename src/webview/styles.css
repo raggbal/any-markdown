@@ -79,6 +79,22 @@
     --selection-bg: #d0d0d0;
 }
 
+[data-theme="perplexity"] {
+    --bg-color: #FBFAF4;
+    --text-color: #13343B;
+    --heading-color: #0B363C;
+    --link-color: #1FB8CD;
+    --code-bg: #EAEEEF;
+    --code-text: #0B363C;
+    --border-color: #D8D8D0;
+    --blockquote-color: #2E565E;
+    --blockquote-border: #C8C8C0;
+    --sidebar-bg: #F2F1EB;
+    --toolbar-bg: #F2F1EB;
+    --selection-bg: #E0EFF1;
+    --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+}
+
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { height: 100%; overflow: hidden; }
 body {
@@ -427,6 +443,23 @@ body {
 .editor h3 { font-size: 1.25em; }
 .editor p, .editor div.paragraph { margin: 0.5em 0; min-height: 1.6em; }
 .editor a { color: var(--link-color); text-decoration: none; }
+
+/* Perplexity theme overrides */
+[data-theme="perplexity"] body { line-height: 1.75; font-weight: 400; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+[data-theme="perplexity"] .editor h1, [data-theme="perplexity"] .editor h2 { border-bottom: none; padding-bottom: 0; }
+[data-theme="perplexity"] .editor h1, [data-theme="perplexity"] .editor h2, [data-theme="perplexity"] .editor h3,
+[data-theme="perplexity"] .editor h4, [data-theme="perplexity"] .editor h5, [data-theme="perplexity"] .editor h6 {
+    font-weight: 500; letter-spacing: -0.01em; line-height: 1.3;
+}
+[data-theme="perplexity"] .editor a { text-decoration: underline; text-decoration-color: rgba(31, 184, 205, 0.4); text-underline-offset: 2px; }
+[data-theme="perplexity"] .editor a:hover { text-decoration-color: #1FB8CD; }
+[data-theme="perplexity"] .editor code { border-radius: 6px; }
+[data-theme="perplexity"] .editor pre { border-radius: 10px; border: 1px solid #D8D8D0; }
+[data-theme="perplexity"] .editor blockquote { border-left-width: 3px; font-style: normal; }
+[data-theme="perplexity"] .editor hr { border-top-color: #D8D8D0; border-top-width: 1px; }
+[data-theme="perplexity"] .editor img { border-radius: 8px; }
+[data-theme="perplexity"] .editor table th { background: #EAEEEF; }
+[data-theme="perplexity"] .editor table td, [data-theme="perplexity"] .editor table th { border-color: #D8D8D0; }
 .editor strong, .editor b { font-weight: 600; }
 .editor em, .editor i { font-style: italic; }
 .editor del, .editor s { text-decoration: line-through; }
@@ -588,6 +621,10 @@ body {
     background: #3d1f1f;
     color: #f97583;
 }
+[data-theme="perplexity"] .editor .mermaid-diagram .mermaid-error {
+    background: #FFF0F0;
+    color: #BF505C;
+}
 
 /* KaTeX math block styles */
 .editor .math-wrapper {
@@ -631,6 +668,10 @@ body {
     background: #3d1f1f;
     color: #f97583;
 }
+[data-theme="perplexity"] .editor .math-display .math-error {
+    background: #FFF0F0;
+    color: #BF505C;
+}
 
 /* Syntax highlighting colors */
 .hljs-keyword { color: #d73a49; }
@@ -659,6 +700,19 @@ body {
 [data-theme="dark"] .hljs-name { color: #7ee787; }
 [data-theme="dark"] .hljs-selector { color: #d2a8ff; }
 [data-theme="dark"] .hljs-property { color: #79c0ff; }
+[data-theme="perplexity"] .hljs-keyword { color: #1A6872; }
+[data-theme="perplexity"] .hljs-string { color: #707C36; }
+[data-theme="perplexity"] .hljs-number { color: #A84B2F; }
+[data-theme="perplexity"] .hljs-comment { color: #92DCE2; }
+[data-theme="perplexity"] .hljs-function { color: #1FB8CD; }
+[data-theme="perplexity"] .hljs-built_in { color: #2CA0AB; }
+[data-theme="perplexity"] .hljs-literal { color: #A84B2F; }
+[data-theme="perplexity"] .hljs-type { color: #1A6872; }
+[data-theme="perplexity"] .hljs-attr { color: #2E565E; }
+[data-theme="perplexity"] .hljs-tag { color: #1A6872; }
+[data-theme="perplexity"] .hljs-name { color: #1FB8CD; }
+[data-theme="perplexity"] .hljs-selector { color: #1A6872; }
+[data-theme="perplexity"] .hljs-property { color: #2CA0AB; }
 
 .editor blockquote {
     margin: 0.5em 0;

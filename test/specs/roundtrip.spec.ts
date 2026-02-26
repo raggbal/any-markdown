@@ -291,9 +291,35 @@ test.describe('ファイルベースRound-trip変換', () => {
     });
 
     test('Round-tripを2回実行しても空行が増えない', async ({ page }) => {
-        // 入力ファイルを読み込み
-        const inputPath = path.join(__dirname, '../../samples/b.md');
-        const inputMarkdown = fs.readFileSync(inputPath, 'utf-8');
+        // 各種Markdown要素を含むテストデータ
+        const inputMarkdown = [
+            '# 見出し1',
+            '',
+            '段落テキストです。',
+            '',
+            '## 見出し2',
+            '',
+            '- リスト1',
+            '- リスト2',
+            '  - ネストリスト',
+            '',
+            '1. 番号付き1',
+            '2. 番号付き2',
+            '',
+            '> 引用テキスト',
+            '',
+            '```javascript',
+            'const x = 1;',
+            '```',
+            '',
+            '| col1 | col2 |',
+            '| :--- | :--- |',
+            '| a | b |',
+            '',
+            '---',
+            '',
+            '**太字** と *斜体* と ~~取り消し線~~',
+        ].join('\n');
         
         // 1回目のRound-trip
         await page.evaluate((md) => {

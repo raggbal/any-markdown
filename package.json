@@ -2,7 +2,7 @@
   "name": "any-markdown",
   "displayName": "Any Markdown Editor",
   "description": "A WYSIWYG markdown editor for VS Code with seamless live preview",
-  "version": "0.195.330",
+  "version": "0.195.333",
   "publisher": "imaken",
   "icon": "media/icon.png",
   "license": "MIT",
@@ -106,7 +106,8 @@
             "sepia",
             "night",
             "dark",
-            "minimal"
+            "minimal",
+            "perplexity"
           ],
           "default": "github",
           "description": "Editor theme"
