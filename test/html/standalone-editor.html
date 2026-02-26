@@ -2329,6 +2329,194 @@
         return text;
     }
     
+    // Convert a DOM selection position (node + offset) to a plain text offset within container.
+    // Counts text node characters and <br> as \n.
+    function getTextOffsetInContainer(container, node, offset) {
+        let textPos = 0;
+        let found = false;
+
+        function countFull(n) {
+            if (n.nodeType === 3) { textPos += n.textContent.length; }
+            else if (n.nodeType === 1 && n.tagName === 'BR') { textPos += 1; }
+            else if (n.nodeType === 1) {
+                for (const c of n.childNodes) countFull(c);
+            }
+        }
+
+        function walk(current) {
+            if (found) return;
+            if (current === node) {
+                if (node.nodeType === 3) {
+                    textPos += offset;
+                } else if (node.nodeType === 1) {
+                    for (let i = 0; i < offset && i < current.childNodes.length; i++) {
+                        countFull(current.childNodes[i]);
+                    }
+                }
+                found = true;
+                return;
+            }
+            if (current.nodeType === 3) {
+                textPos += current.textContent.length;
+            } else if (current.nodeType === 1 && current.tagName === 'BR') {
+                textPos += 1;
+            } else if (current.nodeType === 1) {
+                for (const child of current.childNodes) {
+                    walk(child);
+                    if (found) return;
+                }
+            }
+        }
+
+        for (const child of container.childNodes) {
+            walk(child);
+            if (found) break;
+        }
+        return textPos;
+    }
+
+    // Convert a plain text offset back to a DOM position {node, offset} within container.
+    function textOffsetToDomPosition(container, textOffset) {
+        let pos = 0;
+        for (let i = 0; i < container.childNodes.length; i++) {
+            const child = container.childNodes[i];
+            if (child.nodeType === 3) {
+                const len = child.textContent.length;
+                if (pos + len >= textOffset) {
+                    return { node: child, offset: textOffset - pos };
+                }
+                pos += len;
+            } else if (child.nodeType === 1 && child.tagName === 'BR') {
+                if (pos === textOffset) {
+                    return { node: container, offset: i };
+                }
+                pos += 1;
+            } else if (child.nodeType === 1) {
+                // Should not happen in edit-mode code blocks, but handle for safety
+                for (let j = 0; j < child.childNodes.length; j++) {
+                    const sub = child.childNodes[j];
+                    if (sub.nodeType === 3) {
+                        const len = sub.textContent.length;
+                        if (pos + len >= textOffset) {
+                            return { node: sub, offset: textOffset - pos };
+                        }
+                        pos += len;
+                    }
+                }
+            }
+        }
+        // At the end
+        return { node: container, offset: container.childNodes.length };
+    }
+
+    // Indent/dedent all lines overlapping the current selection within a container element.
+    // Used for multi-line Tab/Shift+Tab in code blocks and blockquotes.
+    function indentLinesInContainer(container, isShiftTab) {
+        const sel = window.getSelection();
+        if (!sel || !sel.rangeCount) return false;
+        const range = sel.getRangeAt(0);
+
+        // 1. Convert selection to text offsets
+        const selStart = getTextOffsetInContainer(container, range.startContainer, range.startOffset);
+        const selEnd = getTextOffsetInContainer(container, range.endContainer, range.endOffset);
+
+        // 2. Get full text content
+        const fullText = getCodePlainText(container);
+        const lines = fullText.split('\n');
+
+        // 3. Pre-compute original line start offsets
+        const origLineStarts = [];
+        let p = 0;
+        for (let i = 0; i < lines.length; i++) {
+            origLineStarts.push(p);
+            p += lines[i].length + 1; // +1 for \n
+        }
+
+        // 4. Determine affected line range
+        let startLine = 0;
+        let endLine = lines.length - 1;
+        for (let i = 0; i < lines.length; i++) {
+            const lineEnd = origLineStarts[i] + lines[i].length;
+            if (origLineStarts[i] <= selStart && selStart <= lineEnd) {
+                startLine = i;
+            }
+            if (origLineStarts[i] <= selEnd && selEnd <= lineEnd) {
+                endLine = i;
+                break;
+            }
+        }
+        // If selection end is at the very start of a line and is not the start line, exclude that line
+        if (endLine > startLine && selEnd === origLineStarts[endLine]) {
+            endLine--;
+        }
+
+        // 5. Apply indent/dedent and track offset adjustments
+        let startAdjust = 0;
+        let endAdjust = 0;
+
+        for (let i = 0; i < lines.length; i++) {
+            if (i >= startLine && i <= endLine) {
+                const origLineStart = origLineStarts[i];
+                if (isShiftTab) {
+                    let spaces = 0;
+                    while (spaces < 4 && spaces < lines[i].length && lines[i][spaces] === ' ') {
+                        spaces++;
+                    }
+                    if (spaces > 0) {
+                        lines[i] = lines[i].slice(spaces);
+                        if (selStart > origLineStart + spaces) {
+                            startAdjust -= spaces;
+                        } else if (selStart > origLineStart) {
+                            startAdjust -= (selStart - origLineStart);
+                        }
+                        if (selEnd > origLineStart + spaces) {
+                            endAdjust -= spaces;
+                        } else if (selEnd > origLineStart) {
+                            endAdjust -= (selEnd - origLineStart);
+                        }
+                    }
+                } else {
+                    lines[i] = '    ' + lines[i];
+                    if (selStart >= origLineStart) {
+                        startAdjust += 4;
+                    }
+                    if (selEnd >= origLineStart) {
+                        endAdjust += 4;
+                    }
+                }
+            }
+        }
+
+        // 6. Rebuild DOM
+        const newText = lines.join('\n');
+        const newSelStart = Math.max(0, Math.min(selStart + startAdjust, newText.length));
+        const newSelEnd = Math.max(0, Math.min(selEnd + endAdjust, newText.length));
+
+        container.innerHTML = '';
+        const newLines = newText.split('\n');
+        for (let i = 0; i < newLines.length; i++) {
+            container.appendChild(document.createTextNode(newLines[i]));
+            if (i < newLines.length - 1) {
+                container.appendChild(document.createElement('br'));
+            }
+        }
+
+        // 7. Restore selection
+        try {
+            const startPos = textOffsetToDomPosition(container, newSelStart);
+            const endPos = textOffsetToDomPosition(container, newSelEnd);
+            const newRange = document.createRange();
+            newRange.setStart(startPos.node, startPos.offset);
+            newRange.setEnd(endPos.node, endPos.offset);
+            sel.removeAllRanges();
+            sel.addRange(newRange);
+        } catch (err) {
+            logger.log('Failed to restore selection after indentLinesInContainer:', err);
+        }
+
+        return true;
+    }
+
     // Setup all code blocks in the editor
     function setupAllCodeBlocks() {
         editor.querySelectorAll('pre').forEach(pre => {
@@ -7178,12 +7366,50 @@
                     return;
                 }
             }
-            
+
+            // Check if inside a code block or blockquote
+            if (sel && sel.rangeCount) {
+                let anchorEl = sel.anchorNode;
+                let startEl = anchorEl && anchorEl.nodeType === 3 ? anchorEl.parentElement : anchorEl;
+
+                const preEl = startEl?.closest?.('pre');
+                if (preEl && editor.contains(preEl)) {
+                    const codeEl = preEl.querySelector('code') || preEl;
+                    if (!sel.isCollapsed) {
+                        // Multi-line selection: indent/dedent all selected lines
+                        indentLinesInContainer(codeEl, e.shiftKey);
+                        syncMarkdown();
+                    } else if (e.shiftKey) {
+                        // Single-line Shift+Tab: dedent current line
+                        indentLinesInContainer(codeEl, true);
+                        syncMarkdown();
+                    } else {
+                        // Single-line Tab: insert 4 spaces at cursor
+                        document.execCommand('insertText', false, '    ');
+                    }
+                    return;
+                }
+
+                const bqEl = startEl?.closest?.('blockquote');
+                if (bqEl && editor.contains(bqEl)) {
+                    if (!sel.isCollapsed) {
+                        indentLinesInContainer(bqEl, e.shiftKey);
+                        syncMarkdown();
+                    } else if (e.shiftKey) {
+                        indentLinesInContainer(bqEl, true);
+                        syncMarkdown();
+                    } else {
+                        document.execCommand('insertText', false, '    ');
+                    }
+                    return;
+                }
+            }
+
             // Check for multi-line selection in list items (or cursor in list)
             if (sel && sel.rangeCount) {
                 const range = sel.getRangeAt(0);
                 const selectedLiElements = getSelectedListItems(range, sel);
-                
+
                 logger.log('Multi-selection Tab:', {
                     selectedCount: selectedLiElements.length,
                     shiftKey: e.shiftKey,
