@@ -74,6 +74,17 @@ npm run compile
 
 ---
 
+## Set as Default Editor for Markdown Files
+
+To always open `.md` files with Any Markdown Editor:
+
+1. Right-click any `.md` file in the Explorer
+2. Select **"Open With..."**
+3. Select **"Configure default editor for '*.md'..."**
+4. Select **"Any Markdown"**
+
+---
+
 ## Usage
 
 1. Open any `.md` or `.markdown` file
