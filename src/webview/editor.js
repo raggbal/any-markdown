@@ -10030,18 +10030,38 @@
 
     // ========== TOOLBAR ==========
 
+    // Save the editor selection before toolbar buttons steal focus
+    let savedToolbarRange = null;
+    toolbar.addEventListener('mousedown', function(e) {
+        const btn = e.target.closest('button');
+        if (!btn) return;
+        const sel = window.getSelection();
+        if (sel && sel.rangeCount > 0) {
+            savedToolbarRange = sel.getRangeAt(0).cloneRange();
+        } else {
+            savedToolbarRange = null;
+        }
+    });
+
     toolbar.addEventListener('click', function(e) {
         const btn = e.target.closest('button');
         if (!btn) return;
 
         const action = btn.dataset.action;
-        
+
         // Source toggle doesn't count as an edit
         if (action !== 'source') {
             markAsEdited(); // User has made an edit
         }
-        
+
         editor.focus();
+        // Restore selection that was lost when toolbar button stole focus
+        if (savedToolbarRange) {
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(savedToolbarRange);
+            savedToolbarRange = null;
+        }
 
         switch (action) {
             case 'bold':
@@ -10073,29 +10093,19 @@
                 }
                 break;
             case 'ul':
-                document.execCommand('insertUnorderedList');
-                syncMarkdown();
+                if (!convertListToType('ul')) {
+                    convertToList('ul');
+                }
                 break;
             case 'ol':
-                document.execCommand('insertOrderedList');
-                syncMarkdown();
+                if (!convertListToType('ol')) {
+                    convertToList('ol');
+                }
                 break;
             case 'task':
-                const ul = document.createElement('ul');
-                const li = document.createElement('li');
-                const cb = document.createElement('input');
-                cb.type = 'checkbox';
-                li.appendChild(cb);
-                li.appendChild(document.createTextNode(' '));
-                ul.appendChild(li);
-                const currentLine2 = getCurrentLine();
-                if (currentLine2) {
-                    currentLine2.after(ul);
-                } else {
-                    editor.appendChild(ul);
+                if (!convertListToType('task')) {
+                    convertToTaskList();
                 }
-                setCursorToEnd(li);
-                syncMarkdown();
                 break;
             case 'quote':
                 const bq = document.createElement('blockquote');
@@ -10116,11 +10126,12 @@
                     syncMarkdown();
                 }
                 break;
-            case 'codeblock':
+            case 'codeblock': {
                 const pre = document.createElement('pre');
-                pre.setAttribute('contenteditable', 'true');
+                pre.setAttribute('data-lang', '');
+                pre.setAttribute('data-mode', 'display');
                 const code = document.createElement('code');
-                code.textContent = '\n'; // Single newline for cursor placement
+                code.setAttribute('contenteditable', 'false');
                 pre.appendChild(code);
                 const currentLine4 = getCurrentLine();
                 if (currentLine4) {
@@ -10135,9 +10146,11 @@
                 } else {
                     editor.appendChild(pre);
                 }
-                setCursorToEnd(code);
+                setupCodeBlockUI(pre);
+                enterEditMode(pre);
                 syncMarkdown();
                 break;
+            }
             case 'link':
                 const linkText = window.getSelection().toString() || '';
                 vscode.postMessage({ type: 'insertLink', text: linkText });
@@ -10903,6 +10916,77 @@
         syncMarkdown();
     }
     
+    // Convert the list that contains the cursor to a different list type.
+    // targetType: 'ul' | 'ol' | 'task'
+    // Returns true if conversion was performed, false if cursor was not in a list.
+    function convertListToType(targetType) {
+        const sel = window.getSelection();
+        if (!sel || !sel.rangeCount) return false;
+
+        // Find the closest <li> ancestor
+        let node = sel.anchorNode;
+        let cursorLi = null;
+        while (node && node !== editor) {
+            if (node.nodeType === 1 && node.tagName === 'LI') {
+                cursorLi = node;
+                break;
+            }
+            node = node.parentNode;
+        }
+        if (!cursorLi) return false;
+
+        const parentList = cursorLi.parentElement;
+        if (!parentList || (parentList.tagName !== 'UL' && parentList.tagName !== 'OL')) return false;
+
+        // Determine current type
+        const isTask = !!parentList.querySelector(':scope > li > input[type="checkbox"]');
+        const currentType = parentList.tagName === 'OL' ? 'ol' : (isTask ? 'task' : 'ul');
+        if (currentType === targetType) return true; // Already the target type, nothing to do
+
+        const newList = document.createElement(targetType === 'ol' ? 'ol' : 'ul');
+        let newCursorLi = null;
+
+        for (const item of Array.from(parentList.children)) {
+            const newLi = document.createElement('li');
+
+            if (targetType === 'task') {
+                // Add checkbox + text content (strip existing checkboxes)
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                newLi.appendChild(checkbox);
+                // Copy inline content excluding input elements and their trailing space
+                let skipNextText = false;
+                for (const child of Array.from(item.childNodes)) {
+                    if (child.nodeType === 1 && child.tagName === 'INPUT') { skipNextText = true; continue; }
+                    if (skipNextText && child.nodeType === 3 && child.textContent === ' ') { skipNextText = false; continue; }
+                    skipNextText = false;
+                    if (child.nodeType === 1 && (child.tagName === 'UL' || child.tagName === 'OL')) continue; // skip nested lists
+                    newLi.appendChild(child.cloneNode(true));
+                }
+            } else {
+                // Copy inline content, strip checkboxes and their trailing space
+                let skipNextText = false;
+                for (const child of Array.from(item.childNodes)) {
+                    if (child.nodeType === 1 && child.tagName === 'INPUT') { skipNextText = true; continue; }
+                    if (skipNextText && child.nodeType === 3 && child.textContent === ' ') { skipNextText = false; continue; }
+                    skipNextText = false;
+                    newLi.appendChild(child.cloneNode(true));
+                }
+            }
+
+            if (!newLi.hasChildNodes() || newLi.innerHTML.trim() === '') {
+                newLi.innerHTML = '<br>';
+            }
+            newList.appendChild(newLi);
+            if (item === cursorLi) newCursorLi = newLi;
+        }
+
+        parentList.replaceWith(newList);
+        setCursorToEnd(newCursorLi || newList.firstElementChild);
+        syncMarkdown();
+        return true;
+    }
+
     function convertToBlockquote() {
         const sel = window.getSelection();
         if (!sel || !sel.rangeCount) return;
