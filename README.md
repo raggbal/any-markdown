@@ -35,6 +35,7 @@ A WYSIWYG markdown editor designed for the AI coding era. Edit markdown visually
 - Blockquotes
 - Horizontal rules
 - Links and Images (drag & drop, paste support)
+- Smart link creation — select text and paste a URL to create `[selected text](URL)`
 - Mermaid diagrams
 - KaTeX math equations
 - YAML Front Matter
@@ -124,11 +125,14 @@ npm run compile
 | Shortcut | Action |
 | --- | --- |
 | `Ctrl/Cmd + S` | Save |
+| `Ctrl/Cmd + Z` | Undo |
+| `Ctrl/Cmd + Shift + Z` | Redo |
 | `Ctrl/Cmd + B` | Bold |
 | `Ctrl/Cmd + I` | Italic |
 | `Ctrl/Cmd + K` | Insert link |
 | `Ctrl/Cmd + F` | Find |
 | `Ctrl/Cmd + H` | Find and replace |
+| `Ctrl/Cmd + L` | Open source file with selected lines in text editor |
 
 ### Escaping Block Elements
 
@@ -136,10 +140,13 @@ npm run compile
 | --- | --- | --- |
 | Code Block | `Shift+Enter` | Exit code block and create new paragraph |
 | Blockquote | `Shift+Enter` | Exit blockquote and create new paragraph |
+| Mermaid/Math | `Shift+Enter` | Exit block and create new paragraph |
 | Code Block | `↑` at first line | Exit to previous element |
 | Code Block | `↓` at last line | Exit to next element |
 | Blockquote | `↑` at first line | Exit to previous element |
 | Blockquote | `↓` at last line | Exit to next element |
+| Mermaid/Math | `↑` at first line | Exit to previous element |
+| Mermaid/Math | `↓` at last line | Exit to next element |
 
 ### Escaping Inline Elements
 
@@ -164,6 +171,14 @@ To exit inline formatting, type the closing marker followed by Space:
 | `←` / `→` | Navigate within/between cells |
 | `Cmd+A` | Select all text in current cell |
 
+### Code Block Operations
+
+| Key | Action |
+| --- | --- |
+| `Tab` | Insert 4 spaces |
+| `Shift+Tab` | Remove up to 4 leading spaces |
+| `Cmd+A` | Select all text within code block |
+
 ### List Operations
 
 | Key | Action |
@@ -172,6 +187,14 @@ To exit inline formatting, type the closing marker followed by Space:
 | `Shift+Tab` | Outdent list item (decrease nesting) |
 | `Enter` on empty item | Convert to paragraph or decrease nesting |
 | `Backspace` at start | Convert to paragraph |
+| Pattern at line start + Space | Convert list type in-place (e.g., `1. ` converts `- item` to ordered list) |
+
+### Multi-Block Selection
+
+| Key | Action |
+| --- | --- |
+| `Tab` | Insert 4 spaces at the beginning of each selected block |
+| `Shift+Tab` | Remove up to 4 leading spaces from each selected block |
 
 ---
 
@@ -278,11 +301,11 @@ FORCE_RELATIVE_PATH: true
 
 | Setting | Description | Default |
 | --- | --- | --- |
-| `any-markdown.theme` | Editor theme (`github`, `sepia`, `night`, `dark`, `minimal`) | `github` |
+| `any-markdown.theme` | Editor theme (`github`, `sepia`, `night`, `dark`, `minimal`, `perplexity`) | `github` |
 | `any-markdown.fontSize` | Base font size (px) | `16` |
 | `any-markdown.imageDefaultDir` | Default directory for saved images | `""` (same as markdown file) |
 | `any-markdown.forceRelativeImagePath` | Force relative paths for images | `false` |
-| `any-markdown.language` | UI language (`auto`, `en`, `ja`, `zh-cn`, `zh-tw`, `ko`, `es`, `fr`) | `auto` |
+| `any-markdown.language` | UI language (`default`, `en`, `ja`, `zh-cn`, `zh-tw`, `ko`, `es`, `fr`) | `default` |
 | `any-markdown.enableDebugLogging` | Enable debug logging in browser console | `false` |
 
 ### Themes
@@ -294,6 +317,7 @@ FORCE_RELATIVE_PATH: true
 | `night` | Dark theme with Tokyo Night inspired colors (blue tint) |
 | `dark` | Pure dark theme with neutral black/gray colors |
 | `minimal` | Distraction-free black and white design |
+| `perplexity` | Light theme with Perplexity brand colors (Paper White background) |
 
 ---
 
@@ -311,7 +335,7 @@ The editor UI supports the following languages:
 | Spanish | `es` |
 | French | `fr` |
 
-Set via `any-markdown.language` or use `auto` to follow VS Code's display language.
+Set via `any-markdown.language` or use `default` to follow VS Code's display language.
 
 ---
 
@@ -324,8 +348,11 @@ Available in Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`):
 | `Any MD: Open with Any Markdown Editor` | Open markdown file in WYSIWYG editor |
 | `Any MD: Insert Table` | Insert a new table |
 | `Any MD: Insert TOC` | Insert table of contents |
+| `Any MD: Export to PDF` | Export to PDF |
 | `Any MD: Open as Text` | Open in standard text editor |
 | `Any MD: Compare as Text` | Compare with text version |
+| `Any MD: Undo` | Undo last edit |
+| `Any MD: Redo` | Redo last undone edit |
 
 ---
 
@@ -333,9 +360,9 @@ Available in Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`):
 
 When another tool (e.g., AI coding assistants like Claude Code, Cursor, etc.) modifies the same markdown file while you have it open in Any Markdown:
 
-- **While the editor has focus**: External changes are **not reflected** in the editor. This is by design to prevent cursor jumps and editing disruptions.
-- **After losing focus** (clicking outside the editor): External changes are **automatically reloaded** into the editor.
-- **Important**: If you are editing in the WYSIWYG editor while an external tool modifies the same file, **your in-progress edits may be lost** when focus is removed, as the editor reloads the externally modified version. To avoid this, save your work before switching to another tool that modifies the same file.
+- **Block-level DOM diff**: Only changed blocks are updated — your cursor position and in-progress edits are preserved.
+- **Toast notification**: A notification appears allowing you to review and accept or dismiss external changes.
+- **Unsaved changes warning**: If you have unsaved edits, a confirmation dialog prevents accidental overwrites.
 
 ---
 

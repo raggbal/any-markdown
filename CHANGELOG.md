@@ -5,6 +5,39 @@ All notable changes to the "Any Markdown Editor" extension will be documented in
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.195.334] - 2026-02-27
+
+### Added
+- **Undo/Redo** — `Cmd+Z` / `Cmd+Shift+Z` with snapshot-based undo system (200-entry stack, toolbar buttons)
+- **KaTeX Math blocks** — `\`\`\`math` code blocks render LaTeX equations via KaTeX (each line independent, 500ms debounce re-render, error display)
+- **Perplexity theme** — Light theme with Perplexity brand colors
+- **Multi-block Tab/Shift+Tab** — Select multiple paragraphs and indent/dedent them all at once
+- **Code block Shift+Tab** — Dedent (remove up to 4 leading spaces) inside code blocks
+- **List type in-place conversion** — Type a different list pattern at line start (e.g., `1. ` in a `- ` list) to convert between unordered, ordered, and task lists (6-way)
+- **Cross-list Tab indent** — Tab at first item of a list indents into the last item of an adjacent list above
+- **Smart URL paste** — Select text and paste a URL to create `[selected text](URL)` link
+- **Code block expand button** — Open code block content in a separate VS Code editor tab with language support
+- **Cmd+L source navigation** — Select text in WYSIWYG editor, press `Cmd+L` to open the source file with exact lines selected
+- **External file change sync** — Block-level DOM diff preserves cursor position; toast notification for reload confirmation
+- **Toolbar scroll navigation** — `<` `>` buttons for horizontal toolbar scrolling when overflowing
+- **Toolbar icon buttons** — Toolbar buttons now use icons instead of text
+- **Export to PDF** command
+
+### Changed
+- Sync architecture rewritten with block-level DOM diff and edit state machine (idle/user-editing/external-updating)
+- Cursor restoration uses text-based block identification for better accuracy
+- Arrow key navigation between elements unified via `navigateToAdjacentElement()` function
+- Mermaid/Math blocks share common helper functions (`isSpecialWrapper`, `enterSpecialWrapperEditMode`, `exitSpecialWrapperDisplayMode`)
+
+### Fixed
+- Windows `\r\n` line endings now handled correctly
+- Numerous arrow key navigation fixes across all element types
+- Code block trailing empty line display in display mode
+- Mixed nested list Backspace merge and Shift+Tab behavior
+- Toolbar buttons now correctly apply formatting at cursor position (Selection save/restore)
+- Browser `<div>` generation prevented (uses `<p>` separator)
+- Shift+Arrow key range selection no longer blocked by navigation code
+
 ## [0.195.186] - 2026-02-17
 
 ### Fixed
