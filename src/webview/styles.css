@@ -185,7 +185,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--toolbar-bg);
+    background: var(--toolbar-bg, #f6f8fa) !important;
     border: none;
     cursor: pointer;
     color: var(--text-color);
@@ -193,20 +193,19 @@ body {
     font-size: 14px;
     font-weight: bold;
     padding: 0;
-    opacity: 0.8;
+    opacity: 1;
 }
 .toolbar-scroll-btn:hover {
-    opacity: 1;
-    background: var(--selection-bg);
+    background: var(--selection-bg) !important;
 }
 .toolbar-scroll-btn.hidden { display: none; }
 .toolbar-scroll-btn--left {
     left: 0;
-    box-shadow: 4px 0 8px -2px rgba(0,0,0,0.1);
+    box-shadow: 4px 0 8px -2px rgba(0,0,0,0.2);
 }
 .toolbar-scroll-btn--right {
     right: 0;
-    box-shadow: -4px 0 8px -2px rgba(0,0,0,0.1);
+    box-shadow: -4px 0 8px -2px rgba(0,0,0,0.2);
 }
 /* Toolbar groups */
 .toolbar-group {

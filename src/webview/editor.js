@@ -7217,6 +7217,25 @@
                 
                 syncMarkdown();
             } else {
+                // Guard: if selection spans multiple block elements, do nothing
+                // (prevents data loss when Shift+Arrow selects across paragraphs)
+                const selCheck = window.getSelection();
+                if (selCheck && selCheck.rangeCount && !selCheck.isCollapsed) {
+                    const rangeCheck = selCheck.getRangeAt(0);
+                    let startBlock = rangeCheck.startContainer;
+                    while (startBlock && startBlock !== editor && startBlock.parentNode !== editor) {
+                        startBlock = startBlock.parentNode;
+                    }
+                    let endBlock = rangeCheck.endContainer;
+                    while (endBlock && endBlock !== editor && endBlock.parentNode !== editor) {
+                        endBlock = endBlock.parentNode;
+                    }
+                    if (startBlock !== endBlock) {
+                        // Selection spans multiple blocks - ignore Tab/Shift+Tab
+                        return;
+                    }
+                }
+
                 if (e.shiftKey) {
                     // Shift+Tab: remove up to 4 leading spaces from current line
                     const sel2 = window.getSelection();
