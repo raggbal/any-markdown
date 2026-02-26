@@ -5811,12 +5811,24 @@
                         }
                     });
                     firstTextNode = walker.nextNode();
-                    
+
+                    // Case: cursor is on the li element itself (e.g. before checkbox)
+                    if (range.startContainer === liElement) {
+                        if (range.startOffset === 0) return true;
+                        // offset 1 with checkbox as first child = cursor just after checkbox = beginning of text
+                        var childAtOffset = liElement.childNodes[range.startOffset];
+                        var childBefore = liElement.childNodes[range.startOffset - 1];
+                        if (childBefore && childBefore.nodeType === 1 && childBefore.tagName === 'INPUT' &&
+                            childBefore.type === 'checkbox') {
+                            return true;
+                        }
+                    }
+
                     if (!firstTextNode) {
                         // No text node, check if cursor is at position 0 of the li
                         return range.startContainer === liElement && range.startOffset === 0;
                     }
-                    
+
                     // Check if cursor is at the beginning of the first text node
                     return range.startContainer === firstTextNode && range.startOffset === 0;
                 })();
@@ -5830,16 +5842,31 @@
                 });
                 
                 // Case 1: Cursor at beginning of NON-EMPTY li, li is in a nested list, and li is the first child
-                // Merge with parent li's content
+                // Check if there's a previous sibling list (e.g. ol before ul in mixed nested lists)
+                // If so, merge with the last li of that sibling list instead of parent li
                 // Note: Empty li items are handled by the existing logic (convert to paragraph)
                 if (isAtBeginning && isNestedList && !liElement.previousElementSibling && !isEmptyItem) {
                     const parentLi = list.parentNode;
-                    if (parentLi && parentLi.tagName && parentLi.tagName.toLowerCase() === 'li') {
-                        logger.log('At beginning of first nested li (non-empty) - merging with parentLi');
-                        logger.log('parentLi.innerHTML BEFORE:', parentLi.innerHTML);
-                        
+
+                    // Check for previous sibling list within the same parent li
+                    const prevSiblingList = list.previousElementSibling;
+                    const hasPrevSiblingList = prevSiblingList && prevSiblingList.tagName &&
+                        (prevSiblingList.tagName.toLowerCase() === 'ul' || prevSiblingList.tagName.toLowerCase() === 'ol');
+
+                    if (hasPrevSiblingList && prevSiblingList.lastElementChild) {
+                        // Case 1a: Merge with last li of the previous sibling list
+                        logger.log('At beginning of first nested li (non-empty) - merging with previous sibling list last li');
+
                         e.preventDefault();
-                        
+
+                        // Drill down to the deepest last li (visually the line just above)
+                        var targetLi = prevSiblingList.lastElementChild;
+                        var deepNestedList = targetLi ? targetLi.querySelector(':scope > ul, :scope > ol') : null;
+                        while (deepNestedList && deepNestedList.lastElementChild) {
+                            targetLi = deepNestedList.lastElementChild;
+                            deepNestedList = targetLi.querySelector(':scope > ul, :scope > ol');
+                        }
+
                         // Get content of current li (excluding nested list and checkbox)
                         const currentContent = [];
                         for (const child of Array.from(liElement.childNodes)) {
@@ -5851,22 +5878,102 @@
                             }
                             currentContent.push(child);
                         }
-                        
+
                         // Save the nested list from current li if any
                         const savedNestedList = nestedListInItem;
                         if (savedNestedList) {
                             savedNestedList.remove();
                         }
-                        
+
+                        // Find position in targetLi (before any nested lists)
+                        let insertBeforeNode = null;
+                        for (const child of targetLi.childNodes) {
+                            if (child.nodeType === 1 && (child.tagName === 'UL' || child.tagName === 'OL')) {
+                                insertBeforeNode = child;
+                                break;
+                            }
+                        }
+
+                        // Remove trailing <br> from target li
+                        const targetLastChild = insertBeforeNode ? insertBeforeNode.previousSibling : targetLi.lastChild;
+                        if (targetLastChild && targetLastChild.nodeType === 1 && targetLastChild.tagName.toLowerCase() === 'br') {
+                            targetLastChild.remove();
+                        }
+
+                        // Mark cursor position (end of target li's text)
+                        let cursorNode = insertBeforeNode ? insertBeforeNode.previousSibling : targetLi.lastChild;
+                        let cursorOffset = cursorNode && cursorNode.nodeType === 3 ? cursorNode.textContent.length : 0;
+
+                        // Append content from current li to target li
+                        for (const child of currentContent) {
+                            if (insertBeforeNode) {
+                                targetLi.insertBefore(child, insertBeforeNode);
+                            } else {
+                                targetLi.appendChild(child);
+                            }
+                        }
+
+                        // Move nested lists from current li to target li
+                        if (savedNestedList) {
+                            targetLi.appendChild(savedNestedList);
+                        }
+
+                        // Remove current li
+                        liElement.remove();
+
+                        // If current list is now empty, remove it
+                        if (list.children.length === 0) {
+                            list.remove();
+                        }
+
+                        // Set cursor position
+                        if (cursorNode && cursorNode.nodeType === 3 && cursorNode.isConnected) {
+                            const newRange = document.createRange();
+                            newRange.setStart(cursorNode, cursorOffset);
+                            newRange.collapse(true);
+                            sel.removeAllRanges();
+                            sel.addRange(newRange);
+                        } else {
+                            setCursorToEnd(targetLi);
+                        }
+
+                        syncMarkdownSync();
+                        return;
+
+                    } else if (parentLi && parentLi.tagName && parentLi.tagName.toLowerCase() === 'li') {
+                        // Case 1b: Original behavior - merge with parent li's content
+                        logger.log('At beginning of first nested li (non-empty) - merging with parentLi');
+                        logger.log('parentLi.innerHTML BEFORE:', parentLi.innerHTML);
+
+                        e.preventDefault();
+
+                        // Get content of current li (excluding nested list and checkbox)
+                        const currentContent = [];
+                        for (const child of Array.from(liElement.childNodes)) {
+                            if (child.nodeType === 1 && (child.tagName.toLowerCase() === 'ul' || child.tagName.toLowerCase() === 'ol')) {
+                                continue; // Skip nested lists
+                            }
+                            if (child.nodeType === 1 && child.tagName === 'INPUT' && child.type === 'checkbox') {
+                                continue; // Skip checkbox
+                            }
+                            currentContent.push(child);
+                        }
+
+                        // Save the nested list from current li if any
+                        const savedNestedList = nestedListInItem;
+                        if (savedNestedList) {
+                            savedNestedList.remove();
+                        }
+
                         // Find the position to insert content in parentLi (before the nested list)
                         const parentNestedList = parentLi.querySelector(':scope > ul, :scope > ol');
-                        
+
                         // Remove the <br> from parentLi if it exists (it's a placeholder for empty li)
                         const parentBr = parentLi.querySelector(':scope > br');
                         if (parentBr && parentNestedList && parentBr.nextSibling === parentNestedList) {
                             parentBr.remove();
                         }
-                        
+
                         // Insert current li's content into parentLi (before the nested list)
                         for (const child of currentContent) {
                             if (parentNestedList) {
@@ -5875,15 +5982,15 @@
                                 parentLi.appendChild(child);
                             }
                         }
-                        
+
                         // Remove the current li
                         liElement.remove();
-                        
+
                         // If the list is now empty, remove it
                         if (list.children.length === 0) {
                             list.remove();
                         }
-                        
+
                         // If there was a nested list in current li, append it to parentLi
                         if (savedNestedList) {
                             const existingNestedList = parentLi.querySelector(':scope > ul, :scope > ol');
@@ -10547,23 +10654,29 @@
         if (isMod && e.shiftKey && e.key === 'U') {
             e.preventDefault();
             e.stopPropagation();
-            convertToList('ul');
+            if (!convertListToType('ul')) {
+                convertToList('ul');
+            }
             return;
         }
-        
+
         // Ordered list (Ctrl+Shift+O)
         if (isMod && e.shiftKey && e.key === 'O') {
             e.preventDefault();
             e.stopPropagation();
-            convertToList('ol');
+            if (!convertListToType('ol')) {
+                convertToList('ol');
+            }
             return;
         }
-        
+
         // Task list (Ctrl+Shift+X)
         if (isMod && e.shiftKey && e.key === 'X') {
             e.preventDefault();
             e.stopPropagation();
-            convertToTaskList();
+            if (!convertListToType('task')) {
+                convertToTaskList();
+            }
             return;
         }
         
@@ -10964,16 +11077,55 @@
         syncMarkdown();
     }
     
-    // Convert the list that contains the cursor to a different list type.
+    // Convert a single <li> element's content to the target type.
+    // Handles adding/removing checkboxes and preserves nested lists.
+    // Returns the new <li> element.
+    function convertLiToType(sourceLi, targetType) {
+        var newLi = document.createElement('li');
+        var hasCheckbox = !!sourceLi.querySelector(':scope > input[type="checkbox"]');
+
+        if (targetType === 'task' && !hasCheckbox) {
+            // Add checkbox, keep all children (including nested lists)
+            var checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            newLi.appendChild(checkbox);
+            for (var i = 0; i < sourceLi.childNodes.length; i++) {
+                newLi.appendChild(sourceLi.childNodes[i].cloneNode(true));
+            }
+        } else if (targetType !== 'task' && hasCheckbox) {
+            // Remove checkbox, keep everything else (including nested lists)
+            var skipNextSpace = false;
+            for (var i = 0; i < sourceLi.childNodes.length; i++) {
+                var child = sourceLi.childNodes[i];
+                if (child.nodeType === 1 && child.tagName === 'INPUT') { skipNextSpace = true; continue; }
+                if (skipNextSpace && child.nodeType === 3 && child.textContent === ' ') { skipNextSpace = false; continue; }
+                skipNextSpace = false;
+                newLi.appendChild(child.cloneNode(true));
+            }
+        } else {
+            // No checkbox change needed - clone all children
+            for (var i = 0; i < sourceLi.childNodes.length; i++) {
+                newLi.appendChild(sourceLi.childNodes[i].cloneNode(true));
+            }
+        }
+
+        if (!newLi.hasChildNodes() || newLi.innerHTML.trim() === '') {
+            newLi.innerHTML = '<br>';
+        }
+
+        return newLi;
+    }
+
+    // Convert the list items at cursor or selection to a different list type.
     // targetType: 'ul' | 'ol' | 'task'
     // Returns true if conversion was performed, false if cursor was not in a list.
     function convertListToType(targetType) {
-        const sel = window.getSelection();
+        var sel = window.getSelection();
         if (!sel || !sel.rangeCount) return false;
 
-        // Find the closest <li> ancestor
-        let node = sel.anchorNode;
-        let cursorLi = null;
+        // Find the closest <li> ancestor from cursor
+        var node = sel.anchorNode;
+        var cursorLi = null;
         while (node && node !== editor) {
             if (node.nodeType === 1 && node.tagName === 'LI') {
                 cursorLi = node;
@@ -10983,53 +11135,112 @@
         }
         if (!cursorLi) return false;
 
-        const parentList = cursorLi.parentElement;
+        var parentList = cursorLi.parentElement;
         if (!parentList || (parentList.tagName !== 'UL' && parentList.tagName !== 'OL')) return false;
 
-        // Determine current type
-        const isTask = !!parentList.querySelector(':scope > li > input[type="checkbox"]');
-        const currentType = parentList.tagName === 'OL' ? 'ol' : (isTask ? 'task' : 'ul');
-        if (currentType === targetType) return true; // Already the target type, nothing to do
+        // Get items to convert (single cursor = 1 item, selection = multiple items)
+        var range = sel.getRangeAt(0);
+        var targetItems = range.collapsed
+            ? [cursorLi]
+            : getSelectedListItems(range, sel);
 
-        const newList = document.createElement(targetType === 'ol' ? 'ol' : 'ul');
-        let newCursorLi = null;
+        if (targetItems.length === 0) return false;
 
-        for (const item of Array.from(parentList.children)) {
-            const newLi = document.createElement('li');
+        // Filter to only direct children of the same parent list
+        var itemsToConvert = targetItems.filter(function(li) { return li.parentNode === parentList; });
+        if (itemsToConvert.length === 0) return false;
 
-            if (targetType === 'task') {
-                // Add checkbox + text content (strip existing checkboxes)
-                const checkbox = document.createElement('input');
-                checkbox.type = 'checkbox';
-                newLi.appendChild(checkbox);
-                // Copy inline content excluding input elements and their trailing space
-                let skipNextText = false;
-                for (const child of Array.from(item.childNodes)) {
-                    if (child.nodeType === 1 && child.tagName === 'INPUT') { skipNextText = true; continue; }
-                    if (skipNextText && child.nodeType === 3 && child.textContent === ' ') { skipNextText = false; continue; }
-                    skipNextText = false;
-                    if (child.nodeType === 1 && (child.tagName === 'UL' || child.tagName === 'OL')) continue; // skip nested lists
-                    newLi.appendChild(child.cloneNode(true));
-                }
-            } else {
-                // Copy inline content, strip checkboxes and their trailing space
-                let skipNextText = false;
-                for (const child of Array.from(item.childNodes)) {
-                    if (child.nodeType === 1 && child.tagName === 'INPUT') { skipNextText = true; continue; }
-                    if (skipNextText && child.nodeType === 3 && child.textContent === ' ') { skipNextText = false; continue; }
-                    skipNextText = false;
-                    newLi.appendChild(child.cloneNode(true));
-                }
+        // Check if all target items are already the target type
+        var allAlreadyTarget = itemsToConvert.every(function(li) {
+            var liHasCheckbox = !!li.querySelector(':scope > input[type="checkbox"]');
+            var liType = parentList.tagName === 'OL' ? 'ol' : (liHasCheckbox ? 'task' : 'ul');
+            return liType === targetType;
+        });
+        if (allAlreadyTarget) return true;
+
+        // Determine parent tag for target type
+        var targetParentTag = targetType === 'ol' ? 'OL' : 'UL';
+        var currentParentTag = parentList.tagName; // 'UL' or 'OL'
+
+        // Gather all direct <li> children of parentList in order
+        var allItems = [];
+        for (var i = 0; i < parentList.children.length; i++) {
+            if (parentList.children[i].tagName === 'LI') {
+                allItems.push(parentList.children[i]);
             }
+        }
+        var convertSet = new Set(itemsToConvert);
 
-            if (!newLi.hasChildNodes() || newLi.innerHTML.trim() === '') {
-                newLi.innerHTML = '<br>';
+        // Find the index range of items to convert
+        var firstConvertIdx = -1;
+        var lastConvertIdx = -1;
+        for (var i = 0; i < allItems.length; i++) {
+            if (convertSet.has(allItems[i])) {
+                if (firstConvertIdx === -1) firstConvertIdx = i;
+                lastConvertIdx = i;
             }
-            newList.appendChild(newLi);
-            if (item === cursorLi) newCursorLi = newLi;
         }
 
-        parentList.replaceWith(newList);
+        if (targetParentTag === currentParentTag) {
+            // CASE A: Same parent tag (ul<->task) - modify <li> items in-place
+            var newCursorLi = null;
+            for (var i = 0; i < itemsToConvert.length; i++) {
+                var li = itemsToConvert[i];
+                var newLi = convertLiToType(li, targetType);
+                li.replaceWith(newLi);
+                if (li === cursorLi) newCursorLi = newLi;
+            }
+            setupInteractiveElements();
+            setCursorToEnd(newCursorLi || itemsToConvert[0]);
+            syncMarkdown();
+            return true;
+        }
+
+        // CASE B: Different parent tag - need to split the list
+        var beforeItems = allItems.slice(0, firstConvertIdx);
+        var convertItems = allItems.slice(firstConvertIdx, lastConvertIdx + 1);
+        var afterItems = allItems.slice(lastConvertIdx + 1);
+
+        var fragments = [];
+
+        // 1. Before list (keep original type)
+        if (beforeItems.length > 0) {
+            var beforeList = document.createElement(currentParentTag.toLowerCase());
+            for (var i = 0; i < beforeItems.length; i++) {
+                beforeList.appendChild(beforeItems[i]); // Move, not clone
+            }
+            fragments.push(beforeList);
+        }
+
+        // 2. Converted items (new type)
+        var newList = document.createElement(targetParentTag.toLowerCase());
+        var newCursorLi = null;
+        for (var i = 0; i < convertItems.length; i++) {
+            var newLi = convertLiToType(convertItems[i], targetType);
+            newList.appendChild(newLi);
+            if (convertItems[i] === cursorLi) newCursorLi = newLi;
+        }
+        fragments.push(newList);
+
+        // 3. After list (keep original type)
+        if (afterItems.length > 0) {
+            var afterList = document.createElement(currentParentTag.toLowerCase());
+            for (var i = 0; i < afterItems.length; i++) {
+                afterList.appendChild(afterItems[i]); // Move, not clone
+            }
+            fragments.push(afterList);
+        }
+
+        // Replace parentList with the fragments
+        var parentParent = parentList.parentNode;
+        var refNode = parentList.nextSibling;
+        parentList.remove();
+
+        for (var i = 0; i < fragments.length; i++) {
+            parentParent.insertBefore(fragments[i], refNode);
+        }
+
+        setupInteractiveElements();
         setCursorToEnd(newCursorLi || newList.firstElementChild);
         syncMarkdown();
         return true;
@@ -12912,6 +13123,11 @@
         window.__testApi.insertTableColumnRight = insertTableColumnRight;
         window.__testApi.syncMarkdown = syncMarkdown;
         window.__testApi.setCursorToLastLineStartByDOM = setCursorToLastLineStartByDOM;
+
+        // List conversion functions for testing
+        window.__testApi.convertListToType = convertListToType;
+        window.__testApi.convertToList = convertToList;
+        window.__testApi.convertToTaskList = convertToTaskList;
         
         // Also expose directly on window for backward compatibility with existing tests
         window.initializeTableColumnWidths = initializeTableColumnWidths;
