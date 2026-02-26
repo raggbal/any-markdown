@@ -416,6 +416,12 @@
     }
 
     function init() {
+        // Force browser to use <p> instead of <div> when pressing Enter in contenteditable
+        try {
+            document.execCommand('defaultParagraphSeparator', false, 'p');
+        } catch (e) {
+            // Some browsers don't support this command
+        }
         try {
             renderFromMarkdown();
         } catch (e) {
@@ -6674,7 +6680,7 @@
 
             // Check for markdown table pattern: | col1 | col2 |
             const tableCells = checkTablePattern(text);
-            if (tableCells && tag === 'p') {
+            if (tableCells && (tag === 'p' || tag === 'div')) {
                 e.preventDefault();
                 convertToTable(tableCells, currentLine);
                 return;
@@ -6683,7 +6689,7 @@
             // Check for horizontal rule: ---
             const trimmedText = text.trim();
             logger.log('Checking HR pattern:', { text: text, trimmed: trimmedText, tag: tag, match: /^-{3,}$/.test(trimmedText) });
-            if (/^-{3,}$/.test(trimmedText) && tag === 'p') {
+            if (/^-{3,}$/.test(trimmedText) && (tag === 'p' || tag === 'div')) {
                 e.preventDefault();
                 // Directly convert to HR here
                 const hr = document.createElement('hr');
@@ -9759,6 +9765,48 @@
         if (isSourceMode) return;
         markActivelyEditing();
         markAsEdited(); // User has made an edit
+
+        // Normalize <div> to <p>: Chromium's contenteditable sometimes creates <div>
+        // despite defaultParagraphSeparator('p'), especially after tables or other block elements.
+        var divChildren = editor.querySelectorAll(':scope > div:not(.mermaid-wrapper):not(.math-wrapper):not(.find-replace-container)');
+        if (divChildren.length > 0) {
+            // Save cursor position
+            var sel = window.getSelection();
+            var savedRange = (sel && sel.rangeCount > 0) ? sel.getRangeAt(0).cloneRange() : null;
+            var cursorInDiv = false;
+            var cursorDiv = null;
+            if (savedRange) {
+                var cursorNode = savedRange.startContainer;
+                while (cursorNode && cursorNode !== editor) {
+                    if (cursorNode.nodeType === 1 && cursorNode.tagName === 'DIV' && cursorNode.parentNode === editor) {
+                        cursorDiv = cursorNode;
+                        cursorInDiv = true;
+                        break;
+                    }
+                    cursorNode = cursorNode.parentNode;
+                }
+            }
+            for (var i = 0; i < divChildren.length; i++) {
+                var div = divChildren[i];
+                // Skip divs that are part of known structures
+                if (div.classList.length > 0) continue;
+                var p = document.createElement('p');
+                while (div.firstChild) {
+                    p.appendChild(div.firstChild);
+                }
+                div.replaceWith(p);
+                // If cursor was in this div, restore it in the new <p>
+                if (cursorInDiv && div === cursorDiv && savedRange && sel) {
+                    try {
+                        sel.removeAllRanges();
+                        sel.addRange(savedRange);
+                    } catch (ex) {
+                        // Range may be invalid if nodes moved
+                    }
+                }
+            }
+        }
+
         // Debounced sync - only updates markdown after user stops typing
         debouncedSync();
     });

@@ -583,6 +583,12 @@
     }
 
     function init() {
+        // Force browser to use <p> instead of <div> when pressing Enter in contenteditable
+        try {
+            document.execCommand('defaultParagraphSeparator', false, 'p');
+        } catch (e) {
+            // Some browsers don't support this command
+        }
         try {
             renderFromMarkdown();
         } catch (e) {
@@ -6841,7 +6847,7 @@
 
             // Check for markdown table pattern: | col1 | col2 |
             const tableCells = checkTablePattern(text);
-            if (tableCells && tag === 'p') {
+            if (tableCells && (tag === 'p' || tag === 'div')) {
                 e.preventDefault();
                 convertToTable(tableCells, currentLine);
                 return;
@@ -6850,7 +6856,7 @@
             // Check for horizontal rule: ---
             const trimmedText = text.trim();
             logger.log('Checking HR pattern:', { text: text, trimmed: trimmedText, tag: tag, match: /^-{3,}$/.test(trimmedText) });
-            if (/^-{3,}$/.test(trimmedText) && tag === 'p') {
+            if (/^-{3,}$/.test(trimmedText) && (tag === 'p' || tag === 'div')) {
                 e.preventDefault();
                 // Directly convert to HR here
                 const hr = document.createElement('hr');
@@ -7097,6 +7103,13 @@
                 } else {
                     // Tab: indent
                     indentListItem(liElement);
+                }
+
+                // If liElement was converted to a paragraph and removed from DOM
+                // (e.g. Shift+Tab on top-level item), convertListItemToParagraph
+                // already set the cursor and called syncMarkdown – nothing left to do.
+                if (!liElement.isConnected) {
+                    return;
                 }
 
                 // Restore cursor position using the saved text offset
@@ -9919,6 +9932,48 @@
         if (isSourceMode) return;
         markActivelyEditing();
         markAsEdited(); // User has made an edit
+
+        // Normalize <div> to <p>: Chromium's contenteditable sometimes creates <div>
+        // despite defaultParagraphSeparator('p'), especially after tables or other block elements.
+        var divChildren = editor.querySelectorAll(':scope > div:not(.mermaid-wrapper):not(.math-wrapper):not(.find-replace-container)');
+        if (divChildren.length > 0) {
+            // Save cursor position
+            var sel = window.getSelection();
+            var savedRange = (sel && sel.rangeCount > 0) ? sel.getRangeAt(0).cloneRange() : null;
+            var cursorInDiv = false;
+            var cursorDiv = null;
+            if (savedRange) {
+                var cursorNode = savedRange.startContainer;
+                while (cursorNode && cursorNode !== editor) {
+                    if (cursorNode.nodeType === 1 && cursorNode.tagName === 'DIV' && cursorNode.parentNode === editor) {
+                        cursorDiv = cursorNode;
+                        cursorInDiv = true;
+                        break;
+                    }
+                    cursorNode = cursorNode.parentNode;
+                }
+            }
+            for (var i = 0; i < divChildren.length; i++) {
+                var div = divChildren[i];
+                // Skip divs that are part of known structures
+                if (div.classList.length > 0) continue;
+                var p = document.createElement('p');
+                while (div.firstChild) {
+                    p.appendChild(div.firstChild);
+                }
+                div.replaceWith(p);
+                // If cursor was in this div, restore it in the new <p>
+                if (cursorInDiv && div === cursorDiv && savedRange && sel) {
+                    try {
+                        sel.removeAllRanges();
+                        sel.addRange(savedRange);
+                    } catch (ex) {
+                        // Range may be invalid if nodes moved
+                    }
+                }
+            }
+        }
+
         // Debounced sync - only updates markdown after user stops typing
         debouncedSync();
     });
@@ -10190,18 +10245,38 @@
 
     // ========== TOOLBAR ==========
 
+    // Save the editor selection before toolbar buttons steal focus
+    let savedToolbarRange = null;
+    toolbar.addEventListener('mousedown', function(e) {
+        const btn = e.target.closest('button');
+        if (!btn) return;
+        const sel = window.getSelection();
+        if (sel && sel.rangeCount > 0) {
+            savedToolbarRange = sel.getRangeAt(0).cloneRange();
+        } else {
+            savedToolbarRange = null;
+        }
+    });
+
     toolbar.addEventListener('click', function(e) {
         const btn = e.target.closest('button');
         if (!btn) return;
 
         const action = btn.dataset.action;
-        
+
         // Source toggle doesn't count as an edit
         if (action !== 'source') {
             markAsEdited(); // User has made an edit
         }
-        
+
         editor.focus();
+        // Restore selection that was lost when toolbar button stole focus
+        if (savedToolbarRange) {
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(savedToolbarRange);
+            savedToolbarRange = null;
+        }
 
         switch (action) {
             case 'bold':
@@ -10233,29 +10308,19 @@
                 }
                 break;
             case 'ul':
-                document.execCommand('insertUnorderedList');
-                syncMarkdown();
+                if (!convertListToType('ul')) {
+                    convertToList('ul');
+                }
                 break;
             case 'ol':
-                document.execCommand('insertOrderedList');
-                syncMarkdown();
+                if (!convertListToType('ol')) {
+                    convertToList('ol');
+                }
                 break;
             case 'task':
-                const ul = document.createElement('ul');
-                const li = document.createElement('li');
-                const cb = document.createElement('input');
-                cb.type = 'checkbox';
-                li.appendChild(cb);
-                li.appendChild(document.createTextNode(' '));
-                ul.appendChild(li);
-                const currentLine2 = getCurrentLine();
-                if (currentLine2) {
-                    currentLine2.after(ul);
-                } else {
-                    editor.appendChild(ul);
+                if (!convertListToType('task')) {
+                    convertToTaskList();
                 }
-                setCursorToEnd(li);
-                syncMarkdown();
                 break;
             case 'quote':
                 const bq = document.createElement('blockquote');
@@ -10276,11 +10341,12 @@
                     syncMarkdown();
                 }
                 break;
-            case 'codeblock':
+            case 'codeblock': {
                 const pre = document.createElement('pre');
-                pre.setAttribute('contenteditable', 'true');
+                pre.setAttribute('data-lang', '');
+                pre.setAttribute('data-mode', 'display');
                 const code = document.createElement('code');
-                code.textContent = '\n'; // Single newline for cursor placement
+                code.setAttribute('contenteditable', 'false');
                 pre.appendChild(code);
                 const currentLine4 = getCurrentLine();
                 if (currentLine4) {
@@ -10295,9 +10361,11 @@
                 } else {
                     editor.appendChild(pre);
                 }
-                setCursorToEnd(code);
+                setupCodeBlockUI(pre);
+                enterEditMode(pre);
                 syncMarkdown();
                 break;
+            }
             case 'link':
                 const linkText = window.getSelection().toString() || '';
                 vscode.postMessage({ type: 'insertLink', text: linkText });
@@ -11063,6 +11131,77 @@
         syncMarkdown();
     }
     
+    // Convert the list that contains the cursor to a different list type.
+    // targetType: 'ul' | 'ol' | 'task'
+    // Returns true if conversion was performed, false if cursor was not in a list.
+    function convertListToType(targetType) {
+        const sel = window.getSelection();
+        if (!sel || !sel.rangeCount) return false;
+
+        // Find the closest <li> ancestor
+        let node = sel.anchorNode;
+        let cursorLi = null;
+        while (node && node !== editor) {
+            if (node.nodeType === 1 && node.tagName === 'LI') {
+                cursorLi = node;
+                break;
+            }
+            node = node.parentNode;
+        }
+        if (!cursorLi) return false;
+
+        const parentList = cursorLi.parentElement;
+        if (!parentList || (parentList.tagName !== 'UL' && parentList.tagName !== 'OL')) return false;
+
+        // Determine current type
+        const isTask = !!parentList.querySelector(':scope > li > input[type="checkbox"]');
+        const currentType = parentList.tagName === 'OL' ? 'ol' : (isTask ? 'task' : 'ul');
+        if (currentType === targetType) return true; // Already the target type, nothing to do
+
+        const newList = document.createElement(targetType === 'ol' ? 'ol' : 'ul');
+        let newCursorLi = null;
+
+        for (const item of Array.from(parentList.children)) {
+            const newLi = document.createElement('li');
+
+            if (targetType === 'task') {
+                // Add checkbox + text content (strip existing checkboxes)
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                newLi.appendChild(checkbox);
+                // Copy inline content excluding input elements and their trailing space
+                let skipNextText = false;
+                for (const child of Array.from(item.childNodes)) {
+                    if (child.nodeType === 1 && child.tagName === 'INPUT') { skipNextText = true; continue; }
+                    if (skipNextText && child.nodeType === 3 && child.textContent === ' ') { skipNextText = false; continue; }
+                    skipNextText = false;
+                    if (child.nodeType === 1 && (child.tagName === 'UL' || child.tagName === 'OL')) continue; // skip nested lists
+                    newLi.appendChild(child.cloneNode(true));
+                }
+            } else {
+                // Copy inline content, strip checkboxes and their trailing space
+                let skipNextText = false;
+                for (const child of Array.from(item.childNodes)) {
+                    if (child.nodeType === 1 && child.tagName === 'INPUT') { skipNextText = true; continue; }
+                    if (skipNextText && child.nodeType === 3 && child.textContent === ' ') { skipNextText = false; continue; }
+                    skipNextText = false;
+                    newLi.appendChild(child.cloneNode(true));
+                }
+            }
+
+            if (!newLi.hasChildNodes() || newLi.innerHTML.trim() === '') {
+                newLi.innerHTML = '<br>';
+            }
+            newList.appendChild(newLi);
+            if (item === cursorLi) newCursorLi = newLi;
+        }
+
+        parentList.replaceWith(newList);
+        setCursorToEnd(newCursorLi || newList.firstElementChild);
+        syncMarkdown();
+        return true;
+    }
+
     function convertToBlockquote() {
         const sel = window.getSelection();
         if (!sel || !sel.rangeCount) return;
