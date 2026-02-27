@@ -359,7 +359,6 @@ Available in Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`):
 | `Any MD: Open with Any Markdown Editor` | Open markdown file in WYSIWYG editor |
 | `Any MD: Insert Table` | Insert a new table |
 | `Any MD: Insert TOC` | Insert table of contents |
-| `Any MD: Export to PDF` | Export to PDF |
 | `Any MD: Open as Text` | Open in standard text editor |
 | `Any MD: Compare as Text` | Compare with text version |
 | `Any MD: Undo` | Undo last edit |
