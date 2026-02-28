@@ -13067,6 +13067,29 @@
                     }
                 });
 
+                // Custom rule: Robust fenced code block with language extraction
+                // Handles Shiki-styled code blocks (language= attribute instead of class=)
+                // and code blocks with indented whitespace before <code>
+                turndownService.addRule('fencedCodeWithLang', {
+                    filter: function(node) {
+                        return node.nodeName === 'PRE' && node.querySelector('code');
+                    },
+                    replacement: function(content, node) {
+                        var code = node.querySelector('code');
+                        var cls = code.className || '';
+                        // Extract language from: class="language-xxx", language="xxx" attr, or data-lang="xxx"
+                        var lang = (cls.match(/language-(\S+)/) || [null, ''])[1];
+                        if (!lang) lang = code.getAttribute('language') || node.getAttribute('language') || '';
+                        if (!lang) lang = node.getAttribute('data-lang') || '';
+                        // Clean language: remove non-alphanumeric suffixes like "theme={null}"
+                        lang = lang.split(/\s+/)[0] || '';
+                        // Filter out non-language class names
+                        if (['hljs', 'nohighlight', 'shiki'].indexOf(lang) !== -1) lang = '';
+                        var text = code.textContent || '';
+                        return '\n\n```' + lang + '\n' + text.replace(/\n$/, '') + '\n```\n\n';
+                    }
+                });
+
                 // Custom rule: Normalize link content
                 // When <a> tags contain block elements (div, span) or newlines,
                 // Turndown produces multi-line markdown links like:
