@@ -5283,6 +5283,7 @@
             markdown = htmlToMarkdown();
             notifyChange();
             pendingSync = false;
+            updatePlaceholder();
         });
     }
     
@@ -5291,6 +5292,7 @@
         markAsEdited(); // Any sync implies user edit
         markdown = htmlToMarkdown();
         notifyChange();
+        updatePlaceholder();
     }
 
     // ========== HTML TO MARKDOWN CONVERSION HELPERS ==========
@@ -13061,7 +13063,46 @@
                     }
                 });
 
+                // Custom rule: Compact list items (remove blank lines between items)
+                // Turndown's default listItem rule produces "loose" lists with blank lines
+                // when <li> contains <p> elements (common in web pages, Google Docs).
+                // Override to always produce "tight" lists without blank lines.
+                turndownService.addRule('compactListItem', {
+                    filter: 'li',
+                    replacement: function (content, node, options) {
+                        content = content
+                            .replace(/^\n+/, '')           // remove leading newlines
+                            .replace(/\n+$/, '');          // remove trailing newlines
+                        // Indent nested content (only internal newlines, not trailing)
+                        content = content.replace(/\n/gm, '\n    ');
+
+                        var prefix = options.bulletListMarker + ' ';
+                        var parent = node.parentNode;
+                        if (parent.nodeName === 'OL') {
+                            var start = parent.getAttribute('start');
+                            var index = Array.prototype.indexOf.call(parent.children, node);
+                            prefix = (start ? Number(start) + index : index + 1) + '. ';
+                        }
+
+                        return (
+                            prefix + content + (node.nextSibling ? '\n' : '')
+                        );
+                    }
+                });
+
                 pastedMd = turndownService.turndown(html);
+
+                // Post-process: Remove blank lines between consecutive list items
+                // Safety net for edge cases where the custom listItem rule doesn't catch all cases
+                var prevPastedMd;
+                do {
+                    prevPastedMd = pastedMd;
+                    pastedMd = pastedMd.replace(
+                        /(^[ \t]*(?:[-*+]|\d+\.)\s+.*)\n{2,}([ \t]*(?:[-*+]|\d+\.)\s)/gm,
+                        '$1\n$2'
+                    );
+                } while (pastedMd !== prevPastedMd);
+
                 logger.log('Converted external HTML to markdown via Turndown');
             } catch (err) {
                 logger.error('Turndown error:', err);
