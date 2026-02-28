@@ -5,6 +5,16 @@ All notable changes to the "Any Markdown Editor" extension will be documented in
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.195.350] - 2026-03-01
+
+### Fixed
+- **Broken links when pasting HTML** — Fixed multi-line markdown links produced when pasting HTML containing block elements inside `<a>` tags (e.g. from Claude Code Docs)
+
+## [0.195.349] - 2026-03-01
+
+### Added
+- **Keyboard shortcuts** — Toggle Source Mode (`Cmd+/` / `Ctrl+/`) and Open in Text Editor (`Cmd+.` / `Ctrl+.`)
+
 ## [0.195.348] - 2026-03-01
 
 ### Fixed

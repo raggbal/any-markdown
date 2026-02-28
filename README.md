@@ -361,8 +361,20 @@ Available in Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`):
 | `Any MD: Insert TOC` | Insert table of contents |
 | `Any MD: Open as Text` | Open in standard text editor |
 | `Any MD: Compare as Text` | Compare with text version |
+| `Any MD: Toggle Source Mode` | Switch between WYSIWYG and source mode |
 | `Any MD: Undo` | Undo last edit |
 | `Any MD: Redo` | Redo last undone edit |
+
+### Keyboard Shortcuts
+
+These shortcuts are active only when the Any Markdown editor is focused:
+
+| Shortcut (Mac / Win) | Action |
+| --- | --- |
+| `Cmd+/` / `Ctrl+/` | Toggle Source Mode |
+| `Cmd+.` / `Ctrl+.` | Open in Text Editor |
+| `Cmd+Z` / `Ctrl+Z` | Undo |
+| `Cmd+Shift+Z` / `Ctrl+Shift+Z` | Redo |
 
 ---
 

@@ -335,6 +335,13 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
         this.activeWebviewPanel?.webview.postMessage({ type: 'performRedo' });
     }
 
+    /**
+     * Send toggle source mode command to the active webview
+     */
+    public sendToggleSourceMode(): void {
+        this.activeWebviewPanel?.webview.postMessage({ type: 'toggleSourceMode' });
+    }
+
     public async resolveCustomTextEditor(
         document: vscode.TextDocument,
         webviewPanel: vscode.WebviewPanel,

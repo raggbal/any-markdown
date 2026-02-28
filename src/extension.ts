@@ -104,6 +104,13 @@ export function activate(context: vscode.ExtensionContext) {
         })
     );
 
+    // Toggle source mode - forwarded to webview
+    context.subscriptions.push(
+        vscode.commands.registerCommand('any-markdown.toggleSourceMode', () => {
+            provider.sendToggleSourceMode();
+        })
+    );
+
     // Open markdown file in standard text editor
     context.subscriptions.push(
         vscode.commands.registerCommand('any-markdown.openAsText', async (uri?: vscode.Uri) => {

@@ -12170,6 +12170,10 @@
             if (!isSourceMode) undoManager.redo();
             return;
         }
+        if (message.type === 'toggleSourceMode') {
+            toggleSourceMode();
+            return;
+        }
         if (message.type === 'update') {
             logger.log('[Any MD] update message received, content length:', message.content?.length);
 
@@ -13060,6 +13064,28 @@
                         content = content.trim();
                         if (!content) return '';
                         return '~~' + content + '~~';
+                    }
+                });
+
+                // Custom rule: Normalize link content
+                // When <a> tags contain block elements (div, span) or newlines,
+                // Turndown produces multi-line markdown links like:
+                //   [\n  How Claude Code works\n  ](/docs/en/...)
+                // This rule collapses whitespace/newlines into a single-line link.
+                turndownService.addRule('normalizeLink', {
+                    filter: function(node) {
+                        return node.nodeName === 'A' && node.getAttribute('href');
+                    },
+                    replacement: function(content, node) {
+                        var href = node.getAttribute('href');
+                        if (href) href = href.replace(/([()])/g, '\\$1');
+                        var title = node.getAttribute('title');
+                        if (title) title = ' "' + title.replace(/"/g, '\\"') + '"';
+                        else title = '';
+                        // Collapse multi-line link text (e.g. <a><div>text</div></a>)
+                        content = content.replace(/\n+/g, ' ').replace(/\s+/g, ' ').trim();
+                        if (!content) return '';
+                        return '[' + content + '](' + href + title + ')';
                     }
                 });
 
