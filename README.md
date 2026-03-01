@@ -10,6 +10,11 @@ A WYSIWYG markdown editor designed for the AI coding era. Edit markdown visually
 
 ![assets/images/1771689676522.png](assets/images/1771689676522.png)
 
+## Demo (gif)
+
+You can freely use markdown using only the keyboard.
+lists, tables, code blocks, and everything else!And when you want to request AI Chat, select the range and press cmd+l (ctr+l).![Demo](assets/videos/movie.gif)
+
 ## Features
 
 ### AI-Friendly Editing
