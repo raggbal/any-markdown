@@ -6267,6 +6267,16 @@
                             currentContent.push(child);
                         }
 
+                        // Strip leading whitespace from first text node (task list items have
+                        // a formatting space " b" after the checkbox that should not appear
+                        // in the merged text)
+                        if (currentContent.length > 0 && currentContent[0].nodeType === 3) {
+                            currentContent[0].textContent = currentContent[0].textContent.replace(/^\s+/, '');
+                            if (!currentContent[0].textContent) {
+                                currentContent.shift();
+                            }
+                        }
+
                         // Save the nested list from current li if any
                         const savedNestedList = nestedListInItem;
                         if (savedNestedList) {
@@ -6299,12 +6309,21 @@
                             list.remove();
                         }
 
-                        // If there was a nested list in current li, append it to parentLi
+                        // If there was a nested list in current li, insert it before the remaining siblings.
+                        // b was the first item, so its children (c) must come BEFORE d, e, ...
                         if (savedNestedList) {
                             const existingNestedList = parentLi.querySelector(':scope > ul, :scope > ol');
                             if (existingNestedList) {
-                                while (savedNestedList.firstChild) {
-                                    existingNestedList.appendChild(savedNestedList.firstChild);
+                                if (savedNestedList.tagName === existingNestedList.tagName) {
+                                    // Same list type: merge items at the BEGINNING (before d)
+                                    const firstExistingChild = existingNestedList.firstChild;
+                                    while (savedNestedList.firstChild) {
+                                        existingNestedList.insertBefore(savedNestedList.firstChild, firstExistingChild);
+                                    }
+                                } else {
+                                    // Different list type: insert savedNestedList itself before existingNestedList
+                                    // (preserves list type of c, keeps visual order c before d)
+                                    existingNestedList.parentNode.insertBefore(savedNestedList, existingNestedList);
                                 }
                             } else {
                                 parentLi.appendChild(savedNestedList);
@@ -6411,7 +6430,11 @@
                         
                         logger.log('parentLi.innerHTML FINAL:', parentLi.innerHTML);
                         logger.log('editor.innerHTML FINAL:', editor.innerHTML);
-                        
+
+                        // Merge adjacent text nodes so "a" + "b" → "ab"
+                        // (browser auto-updates live Range objects on normalize)
+                        parentLi.normalize();
+
                         syncMarkdown();
                         return;
                     }
@@ -8751,6 +8774,15 @@
                     nodesToMove.push(child);
                 }
 
+                // Strip leading whitespace from first text node (task list items have
+                // a formatting space " b" after the checkbox that should not appear in merged text)
+                if (nodesToMove.length > 0 && nodesToMove[0].nodeType === 3) {
+                    nodesToMove[0].textContent = nodesToMove[0].textContent.replace(/^\s+/, '');
+                    if (!nodesToMove[0].textContent) {
+                        nodesToMove.shift();
+                    }
+                }
+
                 // Save first moved node for cursor positioning when prev li was empty
                 const firstMovedNode = nodesToMove.length > 0 ? nodesToMove[0] : null;
 
@@ -8777,15 +8809,22 @@
                 }
                 
                 // Add nested lists to visualPrev
+                // b was the first item, so its children (nestedLists) must come BEFORE
+                // any existing sibling content already in visualPrev.
                 if (nestedLists.length > 0) {
                     // Check if visualPrev already has a nested list
                     const existingNestedList = visualPrev.querySelector(':scope > ul, :scope > ol');
                     if (existingNestedList) {
-                        // Merge into existing nested list
                         for (const nl of nestedLists) {
-                            // Move all children of nl to existing nested list
-                            while (nl.firstChild) {
-                                existingNestedList.appendChild(nl.firstChild);
+                            if (nl.tagName === existingNestedList.tagName) {
+                                // Same list type: insert items at the BEGINNING (before existing children)
+                                const firstExistingChild = existingNestedList.firstChild;
+                                while (nl.firstChild) {
+                                    existingNestedList.insertBefore(nl.firstChild, firstExistingChild);
+                                }
+                            } else {
+                                // Different list type: insert the whole sub-list before existingNestedList
+                                existingNestedList.parentNode.insertBefore(nl, existingNestedList);
                             }
                         }
                     } else {
@@ -8795,7 +8834,7 @@
                         }
                     }
                 }
-                
+
                 // Set cursor
                 if (cursorNode) {
                     // Previous li had text - place cursor at end of that text (= boundary)
@@ -8826,7 +8865,11 @@
                 } else {
                     setCursorToEnd(visualPrev);
                 }
-                
+
+                // Merge adjacent text nodes so "a" + "b" → "ab"
+                // (browser auto-updates live Range objects on normalize)
+                visualPrev.normalize();
+
                 return true;
             }
             

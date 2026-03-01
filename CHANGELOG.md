@@ -5,6 +5,11 @@ All notable changes to the "Any Markdown Editor" extension will be documented in
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.195.353] - 2026-03-01
+
+### Fixed
+- **Backspace on nested list item moves child items to wrong position** — Fixed child list items (c) incorrectly appearing below sibling items (d) after merging a nested item into its parent
+
 ## [0.195.352] - 2026-03-01
 
 ### Fixed
