@@ -10710,6 +10710,7 @@
     function convertListItemToParagraph(li) {
         logger.log('convertListItemToParagraph called', { liText: li.textContent });
         const parentList = li.parentNode;
+        const listTagName = parentList.tagName.toLowerCase();
 
         // Get text content (excluding checkbox if any)
         // Also collect nested lists (ul/ol) to preserve them
@@ -10729,18 +10730,44 @@
         }
         logger.log('convertListItemToParagraph: content extracted', { content, nestedListCount: nestedLists.length });
 
+        // Collect following siblings of li in the parent list.
+        // They must be placed into a new list AFTER the paragraph to preserve line order.
+        var followingItems = [];
+        var sib = li.nextElementSibling;
+        while (sib) {
+            followingItems.push(sib);
+            sib = sib.nextElementSibling;
+        }
+        for (var j = 0; j < followingItems.length; j++) {
+            followingItems[j].remove();
+        }
+
         // Create paragraph
         const p = document.createElement('p');
         p.innerHTML = content.trim() || '<br>';
 
-        // Insert paragraph after the list
-        if (parentList.nextSibling) {
-            parentList.parentNode.insertBefore(p, parentList.nextSibling);
+        // Remove the li from the list
+        li.remove();
+
+        // Determine insertion point for the paragraph:
+        // - If parentList still has children (items that preceded the target li),
+        //   insert p after parentList.
+        // - If parentList is now empty (li was the first or only item),
+        //   insert p at parentList's position and remove parentList.
+        if (parentList.children.length === 0) {
+            parentList.parentNode.insertBefore(p, parentList);
+            parentList.remove();
         } else {
-            parentList.parentNode.appendChild(p);
+            if (parentList.nextSibling) {
+                parentList.parentNode.insertBefore(p, parentList.nextSibling);
+            } else {
+                parentList.parentNode.appendChild(p);
+            }
         }
 
-        // Insert nested lists after the paragraph as independent top-level lists
+        // Insert elements after p in correct visual order:
+        // 1. nestedLists (children of the original li – visually below li's own text)
+        // 2. followingItems as a new list (siblings of li – visually after all of li's content)
         var insertAfter = p;
         for (var i = 0; i < nestedLists.length; i++) {
             if (insertAfter.nextSibling) {
@@ -10750,15 +10777,20 @@
             }
             insertAfter = nestedLists[i];
         }
+
+        if (followingItems.length > 0) {
+            var newList = document.createElement(listTagName);
+            for (var k = 0; k < followingItems.length; k++) {
+                newList.appendChild(followingItems[k]);
+            }
+            if (insertAfter.nextSibling) {
+                insertAfter.parentNode.insertBefore(newList, insertAfter.nextSibling);
+            } else {
+                insertAfter.parentNode.appendChild(newList);
+            }
+        }
         logger.log('convertListItemToParagraph: paragraph and nested lists inserted');
 
-        // Remove the li from the list
-        li.remove();
-
-        // If list is now empty, remove it
-        if (parentList.children.length === 0) {
-            parentList.remove();
-        }
         logger.log('convertListItemToParagraph: li removed, setting cursor');
 
         // Set cursor to the new paragraph
