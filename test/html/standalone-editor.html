@@ -6149,6 +6149,32 @@
                     logger.log('Backspace with selection - li found, handling');
                     e.preventDefault();
 
+                    // Before deleteContents, collect endLi and all <li> elements in between
+                    let endLi = null;
+                    let endNode = range.endContainer;
+                    while (endNode && endNode !== editor) {
+                        if (endNode.nodeType === 1 && endNode.tagName.toLowerCase() === 'li') {
+                            endLi = endNode;
+                            break;
+                        }
+                        endNode = endNode.parentNode;
+                    }
+
+                    // Collect all <li> elements between startLi and endLi (exclusive of startLi)
+                    const affectedLis = [];
+                    if (endLi && endLi !== liElement) {
+                        const allLis = Array.from(editor.querySelectorAll('li'));
+                        const startIdx = allLis.indexOf(liElement);
+                        const endIdx = allLis.indexOf(endLi);
+                        if (startIdx !== -1 && endIdx !== -1) {
+                            const minIdx = Math.min(startIdx, endIdx);
+                            const maxIdx = Math.max(startIdx, endIdx);
+                            for (let i = minIdx + 1; i <= maxIdx; i++) {
+                                affectedLis.push(allLis[i]);
+                            }
+                        }
+                    }
+
                     // Get nested list before deletion
                     const nestedList = liElement.querySelector(':scope > ul, :scope > ol');
                     const checkbox = liElement.querySelector(':scope > input[type="checkbox"]');
@@ -6156,6 +6182,45 @@
                     // Save cursor position before deletion - after deleteContents,
                     // the range collapses to the start of the deleted region
                     range.deleteContents();
+
+                    // Clean up empty <li> elements that were in the selection (excluding startLi)
+                    for (const affectedLi of affectedLis) {
+                        if (!affectedLi.isConnected) continue;
+                        // Check if this li is now empty (no direct text content)
+                        let hasContent = false;
+                        for (const child of affectedLi.childNodes) {
+                            if (child.nodeType === 3 && child.textContent.trim()) {
+                                hasContent = true;
+                                break;
+                            }
+                            if (child.nodeType === 1) {
+                                const tag = child.tagName?.toLowerCase();
+                                if (tag === 'ul' || tag === 'ol' || tag === 'br' || tag === 'input') continue;
+                                if (child.textContent.trim()) {
+                                    hasContent = true;
+                                    break;
+                                }
+                            }
+                        }
+                        if (!hasContent) {
+                            const parentList = affectedLi.parentNode;
+                            // Promote nested list children to parent list before removing
+                            const nestedLists = Array.from(affectedLi.querySelectorAll(':scope > ul, :scope > ol'));
+                            for (const nl of nestedLists) {
+                                while (nl.firstChild) {
+                                    parentList.insertBefore(nl.firstChild, affectedLi);
+                                }
+                                nl.remove();
+                            }
+                            affectedLi.remove();
+                            // Clean up empty parent list
+                            if (parentList && parentList.isConnected &&
+                                (parentList.tagName?.toLowerCase() === 'ul' || parentList.tagName?.toLowerCase() === 'ol') &&
+                                parentList.children.length === 0) {
+                                parentList.remove();
+                            }
+                        }
+                    }
 
                     // After deleteContents, the selection range is collapsed at the deletion point.
                     // We preserve this cursor position for partial text deletions.

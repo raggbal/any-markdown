@@ -5,6 +5,16 @@ All notable changes to the "Any Markdown Editor" extension will be documented in
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.195.358] - 2026-03-02
+
+### Fixed
+- **Nested list items lost or empty bullets remain after range-selecting and pressing Backspace** — Fixed by promoting nested list children to parent list before removing empty items, preserving child content without leaving empty bullets
+
+## [0.195.356] - 2026-03-02
+
+### Fixed
+- **Empty bullets remain after range-selecting nested list items and pressing Backspace** — Fixed empty `<li>` elements (bullets) remaining in the DOM when selecting multiple list items and pressing Backspace
+
 ## [0.195.353] - 2026-03-01
 
 ### Fixed
