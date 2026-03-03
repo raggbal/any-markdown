@@ -13281,6 +13281,16 @@
 
                 pastedMd = turndownService.turndown(html);
 
+                // Post-process: Un-escape Markdown block-level syntax markers
+                // Turndown escapes characters like -, +, #, > at line starts to prevent
+                // Markdown interpretation (preserving original HTML paragraph semantics).
+                // Since we're pasting into a Markdown editor, we want these interpreted as Markdown.
+                pastedMd = pastedMd.replace(/^\\([-+*]) /gm, '$1 ');         // list markers: \- , \+ , \*
+                pastedMd = pastedMd.replace(/^\\(#{1,6}) /gm, '$1 ');        // headings: \# , \## , etc.
+                pastedMd = pastedMd.replace(/^\\(>) ?/gm, '$1 ');            // blockquote: \>
+                pastedMd = pastedMd.replace(/^(\d+)\\(\. )/gm, '$1$2');      // ordered list: 1\.
+                pastedMd = pastedMd.replace(/^\\(~~~)/gm, '$1');             // code fence: \~~~
+
                 // Post-process: Remove blank lines between consecutive list items
                 // Safety net for edge cases where the custom listItem rule doesn't catch all cases
                 var prevPastedMd;
