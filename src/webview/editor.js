@@ -683,7 +683,115 @@
         logger.log('setCursorToLastLineStartByDOM: lineBreaks count =', lineBreaks.length);
 
         if (lineBreaks.length === 0) {
-            // No line breaks at all, single line - go to start
+            // No DOM line breaks — could be a soft-wrapped paragraph.
+            // Use getBoundingClientRect to find the start of the last visual line.
+            var textNodes = [];
+            var tw = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, null, false);
+            var tn;
+            while (tn = tw.nextNode()) textNodes.push(tn);
+
+            if (textNodes.length === 0) {
+                setCursorToStart(element);
+                return;
+            }
+
+            // Build flat offset map: [{node, start}]
+            var totalLen = 0;
+            var nodeMap = [];
+            for (var i = 0; i < textNodes.length; i++) {
+                nodeMap.push({ node: textNodes[i], start: totalLen });
+                totalLen += textNodes[i].length;
+            }
+
+            if (totalLen === 0) {
+                setCursorToStart(element);
+                return;
+            }
+
+            // Measure Y of the last character
+            var lastEntry = nodeMap[nodeMap.length - 1];
+            var lastNodeLen = lastEntry.node.length;
+            var tmpR = document.createRange();
+            if (lastNodeLen > 0) {
+                tmpR.setStart(lastEntry.node, lastNodeLen - 1);
+                tmpR.setEnd(lastEntry.node, lastNodeLen);
+            } else {
+                tmpR.setStart(lastEntry.node, 0);
+                tmpR.collapse(true);
+            }
+            var lastRect = tmpR.getBoundingClientRect();
+
+            if (lastRect.height === 0) {
+                // Cannot measure — fallback to end of element
+                setCursorToEnd(element);
+                return;
+            }
+
+            var lastLineY = lastRect.top;
+
+            // Measure Y of the first character
+            var firstNodeLen = nodeMap[0].node.length;
+            if (firstNodeLen > 0) {
+                tmpR.setStart(nodeMap[0].node, 0);
+                tmpR.setEnd(nodeMap[0].node, 1);
+            } else {
+                tmpR.setStart(nodeMap[0].node, 0);
+                tmpR.collapse(true);
+            }
+            var firstRect = tmpR.getBoundingClientRect();
+
+            // Single visual line — start is correct
+            if (Math.abs(lastLineY - firstRect.top) < 2) {
+                setCursorToStart(element);
+                return;
+            }
+
+            // Multi-line soft-wrap: binary search for first offset on last visual line
+            function getYAtOffset(globalOff) {
+                for (var j = nodeMap.length - 1; j >= 0; j--) {
+                    if (globalOff >= nodeMap[j].start) {
+                        var nd = nodeMap[j].node;
+                        var local = Math.min(globalOff - nodeMap[j].start, nd.length);
+                        var r = document.createRange();
+                        if (local < nd.length) {
+                            r.setStart(nd, local);
+                            r.setEnd(nd, local + 1);
+                        } else if (local > 0) {
+                            r.setStart(nd, local - 1);
+                            r.setEnd(nd, local);
+                        } else {
+                            r.setStart(nd, 0);
+                            r.collapse(true);
+                        }
+                        return r.getBoundingClientRect().top;
+                    }
+                }
+                return 0;
+            }
+
+            var lo = 0, hi = totalLen;
+            while (lo < hi) {
+                var mid = (lo + hi) >> 1;
+                if (getYAtOffset(mid) < lastLineY - 2) {
+                    lo = mid + 1;
+                } else {
+                    hi = mid;
+                }
+            }
+
+            // Place cursor at the found position
+            for (var i = nodeMap.length - 1; i >= 0; i--) {
+                if (lo >= nodeMap[i].start) {
+                    var localOff = Math.min(lo - nodeMap[i].start, nodeMap[i].node.length);
+                    range.setStart(nodeMap[i].node, localOff);
+                    range.collapse(true);
+                    sel.removeAllRanges();
+                    sel.addRange(range);
+                    scrollCursorIntoView();
+                    return;
+                }
+            }
+
             setCursorToStart(element);
             return;
         }
@@ -8213,7 +8321,11 @@
                     // Get element's first line rect
                     const elemRect = element.getBoundingClientRect();
                     // Cursor is at first line if its top is close to element's top
-                    return cursorRect.top < elemRect.top + cursorRect.height;
+                    // Tolerance of 2px to avoid floating-point false positives:
+                    // line-height values like 25.6px can't be represented exactly in IEEE 754,
+                    // so (elemRect.top + cursorRect.height) may be slightly larger than cursorRect.top
+                    // for the second visual line, causing incorrect "first line" detection.
+                    return cursorRect.top < elemRect.top + cursorRect.height - 2;
                 }
 
                 // Helper: check if cursor is at the last visual line of the element
@@ -8247,7 +8359,8 @@
                     }
                     const elemRect = element.getBoundingClientRect();
                     // Cursor is at last line if its bottom is close to element's bottom
-                    return cursorRect.bottom > elemRect.bottom - cursorRect.height;
+                    // Tolerance of 2px to avoid floating-point false positives (see isCursorAtFirstLine)
+                    return cursorRect.bottom > elemRect.bottom - cursorRect.height + 2;
                 }
 
                 if (e.key === 'ArrowUp') {
