@@ -826,6 +826,11 @@ body {
     position: absolute;
     pointer-events: none;
 }
+/* Command Palette - selection highlight preserved while palette is open (scoped to editor) */
+.editor ::highlight(command-palette-selection) {
+    background-color: var(--selection-bg);
+}
+
 /* Command Palette */
 .command-palette {
     position: fixed;
@@ -880,7 +885,6 @@ body {
     font-size: 13px;
     color: var(--text-color);
 }
-.command-palette-item:hover,
 .command-palette-item.selected {
     background: var(--selection-bg);
 }

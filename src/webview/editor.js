@@ -11189,6 +11189,16 @@
             executeCommandPaletteAction(item.dataset.action);
         });
 
+        // Unify hover and keyboard selection: mousemove moves .selected
+        commandPaletteList.addEventListener('mousemove', function(e) {
+            var item = e.target.closest('.command-palette-item');
+            if (!item) return;
+            if (item.classList.contains('selected')) return;
+            var prev = commandPaletteList.querySelector('.command-palette-item.selected');
+            if (prev) prev.classList.remove('selected');
+            item.classList.add('selected');
+        });
+
         // Handle input for filtering
         commandPaletteInput.addEventListener('input', function() {
             renderCommandPaletteItems(commandPaletteInput.value);
@@ -11296,7 +11306,14 @@
         if (newIdx >= items.length) newIdx = 0;
 
         items[newIdx].classList.add('selected');
+        // Temporarily disable pointer-events to prevent mousemove from
+        // overriding keyboard selection when scrollIntoView moves items
+        // under the stationary mouse cursor
+        commandPaletteList.style.pointerEvents = 'none';
         items[newIdx].scrollIntoView({ block: 'nearest' });
+        requestAnimationFrame(function() {
+            if (commandPaletteList) commandPaletteList.style.pointerEvents = '';
+        });
     }
 
     function commandPaletteOutsideClickHandler(e) {
@@ -11371,6 +11388,11 @@
         commandPaletteInput.value = '';
         renderCommandPaletteItems('');
 
+        // Show selection highlight via CSS Custom Highlight API (persists when input gets focus)
+        if (commandPaletteSavedRange && !commandPaletteSavedRange.collapsed && CSS.highlights) {
+            CSS.highlights.set('command-palette-selection', new Highlight(commandPaletteSavedRange));
+        }
+
         // Focus the input
         requestAnimationFrame(function() {
             commandPaletteInput.focus();
@@ -11395,6 +11417,9 @@
         window.removeEventListener('resize', commandPaletteRepositionHandler);
         editor.removeEventListener('scroll', commandPaletteRepositionHandler);
 
+        // Remove custom highlight
+        if (CSS.highlights) CSS.highlights.delete('command-palette-selection');
+
         // Restore editor focus and selection without scrolling
         editor.focus({ preventScroll: true });
         if (commandPaletteSavedRange) {
@@ -11412,6 +11437,9 @@
         document.removeEventListener('click', commandPaletteOutsideClickHandler);
         window.removeEventListener('resize', commandPaletteRepositionHandler);
         editor.removeEventListener('scroll', commandPaletteRepositionHandler);
+
+        // Remove custom highlight
+        if (CSS.highlights) CSS.highlights.delete('command-palette-selection');
 
         // Restore editor focus and selection without scrolling
         editor.focus({ preventScroll: true });
