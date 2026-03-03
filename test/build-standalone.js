@@ -29,7 +29,7 @@ editorScript = editorScript
 
 // HTMLテンプレート
 const html = `<!DOCTYPE html>
-<html lang="en" data-theme="github">
+<html lang="en" data-theme="github" data-toolbar-mode="full">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">

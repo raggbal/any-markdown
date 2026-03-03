@@ -5,6 +5,11 @@ All notable changes to the "Any Markdown Editor" extension will be documented in
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.195.368] - 2026-03-03
+
+### Added
+- **Simple Toolbar Mode** — New `any-markdown.toolbarMode` setting with `"full"` (default) and `"simple"` options. Simple mode shows only undo/redo and utility buttons (open text editor, source mode toggle) with a transparent background and no dividers. Use Cmd+/ (command palette) for other operations.
+
 ## [0.195.367] - 2026-03-03
 
 ### Fixed

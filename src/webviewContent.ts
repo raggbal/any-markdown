@@ -15,6 +15,7 @@ function getNonce(): string {
 interface EditorConfig {
     theme: string;
     fontSize: number;
+    toolbarMode?: string;
     documentBaseUri?: string;
     webviewMessages?: WebviewMessages;
     enableDebugLogging?: boolean;
@@ -48,6 +49,7 @@ export function getWebviewContent(
     const safeConfig: EditorConfig = {
         theme: config?.theme ?? 'github',
         fontSize: config?.fontSize ?? 16,
+        toolbarMode: config?.toolbarMode ?? 'full',
         documentBaseUri: config?.documentBaseUri ?? '',
         webviewMessages: config?.webviewMessages,
         enableDebugLogging: config?.enableDebugLogging ?? false
@@ -75,7 +77,7 @@ export function getWebviewContent(
         .replace('__CONTENT__', `'${base64Content}'`);
 
     return `<!DOCTYPE html>
-<html lang="en" data-theme="${safeConfig.theme}">
+<html lang="en" data-theme="${safeConfig.theme}" data-toolbar-mode="${safeConfig.toolbarMode}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">

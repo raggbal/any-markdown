@@ -270,6 +270,27 @@ body {
 /* Legacy fill-based icons (e.g. VS Code logo) */
 .toolbar button svg:not([fill="none"]) { fill: currentColor; }
 
+/* ===== Simple Toolbar Mode ===== */
+[data-toolbar-mode="simple"] .toolbar {
+    background: transparent;
+    border-bottom: none;
+}
+[data-toolbar-mode="simple"] .toolbar-group[data-group="inline"],
+[data-toolbar-mode="simple"] .toolbar-group[data-group="block"],
+[data-toolbar-mode="simple"] .toolbar-group[data-group="insert"] {
+    display: none;
+}
+[data-toolbar-mode="simple"] .toolbar-group + .toolbar-group::before {
+    display: none;
+}
+[data-toolbar-mode="simple"] .toolbar-scroll-btn {
+    display: none !important;
+}
+[data-toolbar-mode="simple"] .status-bar {
+    background: transparent;
+    border-top: none;
+}
+
 .editor-wrapper { flex: 1; overflow: auto; position: relative; }
 .editor {
     max-width: 860px;

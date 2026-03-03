@@ -322,6 +322,7 @@ FORCE_RELATIVE_PATH: true
 | `any-markdown.imageDefaultDir` | Default directory for saved images | `""` (same as markdown file) |
 | `any-markdown.forceRelativeImagePath` | Force relative paths for images | `false` |
 | `any-markdown.language` | UI language (`default`, `en`, `ja`, `zh-cn`, `zh-tw`, `ko`, `es`, `fr`) | `default` |
+| `any-markdown.toolbarMode` | Toolbar display mode (`full`, `simple`). Simple shows only undo/redo and utility buttons | `full` |
 | `any-markdown.enableDebugLogging` | Enable debug logging in browser console | `false` |
 
 ### Themes
