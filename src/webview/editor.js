@@ -2999,6 +2999,37 @@
         wrapper.dataset[type + 'Setup'] = 'true';
         renderFn(wrapper);
 
+        // Add click handler to enter edit mode
+        wrapper.addEventListener('click', function(e) {
+            if (wrapper.getAttribute('data-mode') !== 'edit') {
+                wrapper.setAttribute('data-mode', 'edit');
+                newCode.focus();
+                setCursorToEnd(newCode);
+            }
+        });
+
+        // Add input handler for live re-rendering
+        var renderTimeout = null;
+        newPre.addEventListener('input', function() {
+            if (renderTimeout) clearTimeout(renderTimeout);
+            renderTimeout = setTimeout(function() {
+                renderFn(wrapper);
+            }, 500);
+        });
+
+        // Add focusout handler to return to display mode
+        newCode.addEventListener('focusout', function(e) {
+            setTimeout(function() {
+                if (!wrapper.contains(document.activeElement)) {
+                    if (wrapper.getAttribute('data-mode') === 'edit') {
+                        wrapper.setAttribute('data-mode', 'display');
+                        renderFn(wrapper);
+                        syncMarkdown();
+                    }
+                }
+            }, 100);
+        });
+
         syncMarkdownSync();
     }
 
