@@ -8,14 +8,37 @@ A WYSIWYG markdown editor designed for the AI coding era. Edit markdown visually
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![GitHub Sponsors](https://img.shields.io/github/sponsors/raggbal?label=Sponsor)
 
-![assets/images/1771689676522.png](assets/images/1771689676522.png)
-
-## Demo (gif)
+**Redesigned for simplicity. **![assets/images/1772563198257.png](assets/images/1772563198257.png)
+**New: Action Palette (Cmd+/ / Ctrl+/)**
+![assets/images/1772563951196.png](assets/images/1772563951196.png)
+## 🎬 Demo (gif)
 
 You can freely use markdown using only the keyboard.
-lists, tables, code blocks, and everything else!And when you want to request AI Chat, select the range and press cmd+l (ctr+l).![Demo](assets/videos/movie.gif)
+lists, tables, code blocks, and everything else!And when you want to request AI Chat, select the range and press cmd+l (ctr+l).
+![Demo](assets/videos/movie.gif)
+> Note: The editor design shown in the gif above is from an older version.
 
-## Features
+## 🆕 Important Changes
+
+### Action Palette (Cmd+/ or Ctrl+/)
+
+You can now press `Cmd+/` (macOS) or `Ctrl+/` (Windows/Linux) to open the **Action Palette** — a Notion-like floating command menu that gives you quick access to all formatting and insertion actions (headings, lists, code blocks, tables, etc.).
+
+### Toolbar Mode: Simple is now the default
+
+With the Action Palette available, the toolbar has been simplified by default. The new `simple` mode shows only essential buttons (outline, undo/redo, open in text editor, source mode toggle) for a cleaner editing experience.
+
+If you prefer the previous full toolbar with all formatting buttons, change the setting:
+
+```json
+{
+  "any-markdown.toolbarMode": "full"
+}
+```
+
+---
+
+## ✨ Features
 
 ### AI-Friendly Editing
 
@@ -48,7 +71,7 @@ lists, tables, code blocks, and everything else!And when you want to request AI 
 
 ---
 
-## Installation
+## 📦 Installation
 
 ### From VS Code Marketplace
 
@@ -79,7 +102,7 @@ npm run compile
 
 ---
 
-## Set as Default Editor for Markdown Files
+## ⚙️ Set as Default Editor for Markdown Files
 
 To always open `.md` files with Any Markdown Editor:
 
@@ -90,7 +113,7 @@ To always open `.md` files with Any Markdown Editor:
 
 ---
 
-## Usage
+## 🚀 Usage
 
 1. Open any `.md` or `.markdown` file
 2. Right-click and select **"Open with Any Markdown Editor"**
@@ -98,7 +121,7 @@ To always open `.md` files with Any Markdown Editor:
 
 ---
 
-## Creating Markdown Elements
+## 📝 Creating Markdown Elements
 
 ### Block Elements
 
@@ -134,12 +157,17 @@ To always open `.md` files with Any Markdown Editor:
 
 ---
 
-## Special Operations
+## ⌨️ Special Operations
 
 ### General Shortcuts
 
+These shortcuts are active when the Any Markdown editor is focused:
+
 | Shortcut | Action |
 | --- | --- |
+| `Cmd+/` / `Ctrl+/` | Open Action Palette |
+| `Cmd+.` / `Ctrl+.` | Toggle Source Mode |
+| `Cmd+Shift+.` / `Ctrl+Shift+.` | Open in Text Editor |
 | `Ctrl/Cmd + S` | Save |
 | `Ctrl/Cmd + Z` | Undo |
 | `Ctrl/Cmd + Shift + Z` | Redo |
@@ -214,7 +242,7 @@ To exit inline formatting, type the closing marker followed by Space:
 
 ---
 
-## Code Block Features
+## 💻 Code Block Features
 
 ### Supported Languages
 
@@ -263,7 +291,7 @@ E = mc^2
 
 ---
 
-## Image Path Configuration
+## 🖼️ Image Path Configuration
 
 Images can be saved to custom directories when pasting or drag-and-dropping.
 
@@ -311,7 +339,7 @@ FORCE_RELATIVE_PATH: true
 
 ---
 
-## Configuration
+## 🎨 Configuration
 
 ### VS Code Settings
 
@@ -322,7 +350,7 @@ FORCE_RELATIVE_PATH: true
 | `any-markdown.imageDefaultDir` | Default directory for saved images | `""` (same as markdown file) |
 | `any-markdown.forceRelativeImagePath` | Force relative paths for images | `false` |
 | `any-markdown.language` | UI language (`default`, `en`, `ja`, `zh-cn`, `zh-tw`, `ko`, `es`, `fr`) | `default` |
-| `any-markdown.toolbarMode` | Toolbar display mode (`full`, `simple`). Simple shows only undo/redo and utility buttons | `full` |
+| `any-markdown.toolbarMode` | Toolbar display mode (`full`, `simple`). Simple shows only undo/redo and utility buttons (use `Cmd+/` for other operations) | `simple` |
 | `any-markdown.enableDebugLogging` | Enable debug logging in browser console | `false` |
 
 ### Themes
@@ -338,7 +366,7 @@ FORCE_RELATIVE_PATH: true
 
 ---
 
-## Supported Languages (i18n)
+## 🌐 Supported Languages (i18n)
 
 The editor UI supports the following languages:
 
@@ -356,7 +384,7 @@ Set via `any-markdown.language` or use `default` to follow VS Code's display lan
 
 ---
 
-## Commands
+## 🔧 Commands
 
 Available in Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`):
 
@@ -371,20 +399,9 @@ Available in Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`):
 | `Any MD: Undo` | Undo last edit |
 | `Any MD: Redo` | Redo last undone edit |
 
-### Keyboard Shortcuts
-
-These shortcuts are active only when the Any Markdown editor is focused:
-
-| Shortcut (Mac / Win) | Action |
-| --- | --- |
-| `Cmd+/` / `Ctrl+/` | Toggle Source Mode |
-| `Cmd+.` / `Ctrl+.` | Open in Text Editor |
-| `Cmd+Z` / `Ctrl+Z` | Undo |
-| `Cmd+Shift+Z` / `Ctrl+Shift+Z` | Redo |
-
 ---
 
-## External File Changes
+## 🔄 External File Changes
 
 When another tool (e.g., AI coding assistants like Claude Code, Cursor, etc.) modifies the same markdown file while you have it open in Any Markdown:
 
@@ -394,7 +411,7 @@ When another tool (e.g., AI coding assistants like Claude Code, Cursor, etc.) mo
 
 ---
 
-## Development
+## 🛠️ Development
 
 ```bash
 # Install dependencies
@@ -415,7 +432,7 @@ vsce package --no-dependencies
 
 ---
 
-## Support This Project
+## 💖 Support This Project
 
 If you find this extension useful, please consider:
 
@@ -428,13 +445,13 @@ Your support helps keep this project maintained and improved!
 
 ---
 
-## License
+## 📄 License
 
 MIT License - feel free to use this extension in your projects.
 
 ---
 
-## Acknowledgments
+## 🙏 Acknowledgments
 
 - Inspired by [Typora](https://typora.io/), [Notion](https://notion.so/), and [Obsidian](https://obsidian.md/)
 - Built with love for the VS Code community

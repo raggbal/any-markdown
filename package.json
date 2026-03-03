@@ -2,7 +2,7 @@
   "name": "any-markdown",
   "displayName": "Any Markdown Editor",
   "description": "A WYSIWYG markdown editor for VS Code with seamless live preview",
-  "version": "0.195.373",
+  "version": "0.195.374",
   "publisher": "imaken",
   "icon": "media/icon.png",
   "license": "MIT",
@@ -153,7 +153,7 @@
             "full",
             "simple"
           ],
-          "default": "full",
+          "default": "simple",
           "description": "Toolbar display mode. 'full' shows all buttons. 'simple' shows only undo/redo and utility buttons (use Cmd+/ for other operations). / ツールバー表示モード。'full'は全ボタン表示。'simple'はundo/redoとユーティリティのみ（他はCmd+/で操作）。"
         },
         "any-markdown.enableDebugLogging": {
@@ -223,8 +223,8 @@
       },
       {
         "command": "any-markdown.openAsText",
-        "key": "ctrl+,",
-        "mac": "cmd+,",
+        "key": "ctrl+shift+.",
+        "mac": "cmd+shift+.",
         "when": "activeCustomEditorId == 'any-markdown.editor'"
       }
     ]
