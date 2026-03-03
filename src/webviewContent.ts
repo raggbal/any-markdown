@@ -135,8 +135,8 @@ export function getWebviewContent(
                         <button data-action="table" title="${msg.insertTable}"></button>
                     </div>
                     <div class="toolbar-group" data-group="utility">
-                        <button data-action="openInTextEditor" title="${msg.openInTextEditor}"></button>
-                        <button data-action="source" title="${msg.toggleSourceMode}"></button>
+                        <button data-action="openInTextEditor" title="${msg.openInTextEditor} (${process.platform === 'darwin' ? 'Cmd' : 'Ctrl'}+,)"></button>
+                        <button data-action="source" title="${msg.toggleSourceMode} (${process.platform === 'darwin' ? 'Cmd' : 'Ctrl'}+.)"></button>
                     </div>
                 </div>
                 <button class="toolbar-scroll-btn toolbar-scroll-btn--right hidden" id="toolbarScrollRight">&#x276F;</button>

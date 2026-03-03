@@ -5,6 +5,12 @@ All notable changes to the "Any Markdown Editor" extension will be documented in
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.195.359] - 2026-03-03
+
+### Changed
+- **Keyboard shortcuts**: Toggle Source Mode changed to `Cmd+.` / `Ctrl+.`, Open in Text Editor changed to `Cmd+,` / `Ctrl+,`
+- **Toolbar tooltips**: Shortcut keys now shown on hover for Source Mode and Text Editor buttons
+
 ## [0.195.358] - 2026-03-02
 
 ### Fixed

@@ -2,7 +2,7 @@
   "name": "any-markdown",
   "displayName": "Any Markdown Editor",
   "description": "A WYSIWYG markdown editor for VS Code with seamless live preview",
-  "version": "0.195.358",
+  "version": "0.195.359",
   "publisher": "imaken",
   "icon": "media/icon.png",
   "license": "MIT",
@@ -208,14 +208,14 @@
       },
       {
         "command": "any-markdown.toggleSourceMode",
-        "key": "ctrl+/",
-        "mac": "cmd+/",
+        "key": "ctrl+.",
+        "mac": "cmd+.",
         "when": "activeCustomEditorId == 'any-markdown.editor'"
       },
       {
         "command": "any-markdown.openAsText",
-        "key": "ctrl+.",
-        "mac": "cmd+.",
+        "key": "ctrl+,",
+        "mac": "cmd+,",
         "when": "activeCustomEditorId == 'any-markdown.editor'"
       }
     ]
