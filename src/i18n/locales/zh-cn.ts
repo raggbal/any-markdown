@@ -83,4 +83,11 @@ export const webviewMessages = {
   externalChangeToast: '文件已被外部修改。编辑中不会反映更改。请点击编辑器外部以重新加载。',
   undo: '撤销 (Ctrl+Z)',
   redo: '重做 (Ctrl+Shift+Z)',
+  // Command palette
+  commandPaletteFilter: '输入筛选...',
+  commandPaletteInline: '内联',
+  commandPaletteHeadings: '标题',
+  commandPaletteLists: '列表',
+  commandPaletteBlocks: '块',
+  commandPaletteInsert: '插入',
 };

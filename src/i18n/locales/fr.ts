@@ -83,4 +83,11 @@ export const webviewMessages = {
   externalChangeToast: 'Fichier modifié en externe. Les modifications ne sont pas reflétées pendant l\'édition. Cliquez en dehors de l\'éditeur pour recharger.',
   undo: 'Annuler (Ctrl+Z)',
   redo: 'Rétablir (Ctrl+Shift+Z)',
+  // Command palette
+  commandPaletteFilter: 'Tapez pour filtrer...',
+  commandPaletteInline: 'En ligne',
+  commandPaletteHeadings: 'Titres',
+  commandPaletteLists: 'Listes',
+  commandPaletteBlocks: 'Blocs',
+  commandPaletteInsert: 'Insérer',
 };

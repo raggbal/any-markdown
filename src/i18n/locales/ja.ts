@@ -83,4 +83,11 @@ export const webviewMessages = {
   externalChangeToast: 'ファイルが外部で変更されました。編集中は反映されません。エディタ外をクリックしてフォーカスを外すと反映されます。',
   undo: '元に戻す (Ctrl+Z)',
   redo: 'やり直す (Ctrl+Shift+Z)',
+  // Command palette
+  commandPaletteFilter: '入力して絞り込み...',
+  commandPaletteInline: 'インライン',
+  commandPaletteHeadings: '見出し',
+  commandPaletteLists: 'リスト',
+  commandPaletteBlocks: 'ブロック',
+  commandPaletteInsert: '挿入',
 };

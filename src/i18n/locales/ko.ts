@@ -83,4 +83,11 @@ export const webviewMessages = {
   externalChangeToast: '파일이 외부에서 수정되었습니다. 편집 중에는 반영되지 않습니다. 편집기 외부를 클릭하면 반영됩니다.',
   undo: '실행 취소 (Ctrl+Z)',
   redo: '다시 실행 (Ctrl+Shift+Z)',
+  // Command palette
+  commandPaletteFilter: '입력하여 필터...',
+  commandPaletteInline: '인라인',
+  commandPaletteHeadings: '제목',
+  commandPaletteLists: '목록',
+  commandPaletteBlocks: '블록',
+  commandPaletteInsert: '삽입',
 };

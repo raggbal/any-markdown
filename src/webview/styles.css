@@ -826,4 +826,84 @@ body {
     position: absolute;
     pointer-events: none;
 }
+/* Command Palette */
+.command-palette {
+    position: fixed;
+    z-index: 10000;
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    width: 280px;
+    max-height: 360px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+.command-palette-search {
+    padding: 8px;
+    border-bottom: 1px solid var(--border-color);
+}
+.command-palette-input {
+    width: 100%;
+    padding: 6px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--bg-color);
+    color: var(--text-color);
+    font-size: 13px;
+    outline: none;
+    box-sizing: border-box;
+}
+.command-palette-input:focus {
+    border-color: var(--link-color);
+}
+.command-palette-list {
+    overflow-y: auto;
+    padding: 4px 0;
+}
+.command-palette-group-label {
+    padding: 4px 12px 2px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--text-color);
+    opacity: 0.5;
+    letter-spacing: 0.5px;
+}
+.command-palette-item {
+    display: flex;
+    align-items: center;
+    padding: 6px 12px;
+    cursor: pointer;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text-color);
+}
+.command-palette-item:hover,
+.command-palette-item.selected {
+    background: var(--selection-bg);
+}
+.command-palette-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    opacity: 0.7;
+}
+.command-palette-icon svg {
+    width: 14px;
+    height: 14px;
+}
+.command-palette-label {
+    flex: 1;
+}
+.command-palette-shortcut {
+    font-size: 11px;
+    opacity: 0.5;
+    white-space: nowrap;
+}
+
 ::selection { background: var(--selection-bg); }

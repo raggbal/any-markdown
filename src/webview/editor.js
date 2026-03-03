@@ -10957,6 +10957,7 @@
             undoManager.saveSnapshot();
         }
 
+        // Toolbar-only actions (not in command palette)
         switch (action) {
             case 'undo':
                 undoManager.undo();
@@ -10964,6 +10965,28 @@
             case 'redo':
                 undoManager.redo();
                 break;
+            case 'imageDir':
+                vscode.postMessage({ type: 'setImageDir' });
+                break;
+            case 'openOutline':
+                openSidebar();
+                break;
+            case 'openInTextEditor':
+                vscode.postMessage({ type: 'openInTextEditor' });
+                break;
+            case 'source':
+                toggleSourceMode();
+                break;
+            default:
+                // Shared actions (toolbar + command palette)
+                dispatchToolbarAction(action);
+                break;
+        }
+    });
+
+    // Shared action dispatcher used by both toolbar and command palette
+    function dispatchToolbarAction(action) {
+        switch (action) {
             case 'bold':
                 applyInlineFormat('strong');
                 syncMarkdown();
@@ -10976,18 +10999,25 @@
                 applyInlineFormat('del');
                 syncMarkdown();
                 break;
+            case 'code':
+                var codeSel = window.getSelection();
+                if (codeSel.toString()) {
+                    document.execCommand('insertHTML', false, '<code>' + codeSel.toString() + '</code>');
+                    syncMarkdown();
+                }
+                break;
             case 'heading1':
             case 'heading2':
             case 'heading3':
             case 'heading4':
             case 'heading5':
             case 'heading6':
-                const level = action.replace('heading', '');
-                const line = getCurrentLine();
-                if (line) {
-                    const h = document.createElement('h' + level);
-                    h.innerHTML = line.innerHTML || '<br>';
-                    line.replaceWith(h);
+                var headingLevel = action.replace('heading', '');
+                var headingLine = getCurrentLine();
+                if (headingLine) {
+                    var h = document.createElement('h' + headingLevel);
+                    h.innerHTML = headingLine.innerHTML || '<br>';
+                    headingLine.replaceWith(h);
                     setCursorToEnd(h);
                     syncMarkdown();
                 }
@@ -11008,9 +11038,9 @@
                 }
                 break;
             case 'quote':
-                const bq = document.createElement('blockquote');
+                var bq = document.createElement('blockquote');
                 bq.innerHTML = '<br>';
-                const currentLine3 = getCurrentLine();
+                var currentLine3 = getCurrentLine();
                 if (currentLine3) {
                     currentLine3.after(bq);
                 } else {
@@ -11019,28 +11049,19 @@
                 setCursorToEnd(bq);
                 syncMarkdown();
                 break;
-            case 'code':
-                const selection = window.getSelection();
-                if (selection.toString()) {
-                    document.execCommand('insertHTML', false, '<code>' + selection.toString() + '</code>');
-                    syncMarkdown();
-                }
-                break;
             case 'codeblock': {
-                const pre = document.createElement('pre');
+                var pre = document.createElement('pre');
                 pre.setAttribute('data-lang', '');
                 pre.setAttribute('data-mode', 'display');
-                const code = document.createElement('code');
-                code.setAttribute('contenteditable', 'false');
-                pre.appendChild(code);
-                const currentLine4 = getCurrentLine();
+                var codeEl = document.createElement('code');
+                codeEl.setAttribute('contenteditable', 'false');
+                pre.appendChild(codeEl);
+                var currentLine4 = getCurrentLine();
                 if (currentLine4) {
-                    const lineText = currentLine4.textContent?.trim() || '';
+                    var lineText = currentLine4.textContent?.trim() || '';
                     if (lineText === '' || currentLine4.innerHTML === '<br>') {
-                        // Empty line - replace it with code block
                         currentLine4.replaceWith(pre);
                     } else {
-                        // Line has content - insert after
                         currentLine4.after(pre);
                     }
                 } else {
@@ -11052,25 +11073,22 @@
                 break;
             }
             case 'link':
-                const linkText = window.getSelection().toString() || '';
+                var linkText = window.getSelection().toString() || '';
                 vscode.postMessage({ type: 'insertLink', text: linkText });
                 break;
             case 'image':
                 vscode.postMessage({ type: 'insertImage', position: 0 });
                 break;
-            case 'imageDir':
-                vscode.postMessage({ type: 'setImageDir' });
-                break;
             case 'table':
-                const table = '<table><tr><th>Header 1</th><th>Header 2</th></tr><tr><td>Cell</td><td>Cell</td></tr></table>';
-                document.execCommand('insertHTML', false, table);
+                var tableHtml = '<table><tr><th>Header 1</th><th>Header 2</th></tr><tr><td>Cell</td><td>Cell</td></tr></table>';
+                document.execCommand('insertHTML', false, tableHtml);
                 syncMarkdown();
                 break;
             case 'hr':
-                const hr = document.createElement('hr');
-                const p = document.createElement('p');
+                var hr = document.createElement('hr');
+                var p = document.createElement('p');
                 p.innerHTML = '<br>';
-                const currentLine5 = getCurrentLine();
+                var currentLine5 = getCurrentLine();
                 if (currentLine5) {
                     currentLine5.after(hr);
                     hr.after(p);
@@ -11081,20 +11099,339 @@
                 setCursorToEnd(p);
                 syncMarkdown();
                 break;
-            case 'openOutline':
-                openSidebar();
-                break;
-            case 'openInTextEditor':
-                vscode.postMessage({ type: 'openInTextEditor' });
-                break;
-            case 'source':
-                toggleSourceMode();
-                break;
         }
-    });
+    }
+
+    // ========== COMMAND PALETTE ==========
+
+    var COMMAND_PALETTE_ITEMS = [
+        // Group: Inline
+        { group: 'inline', action: 'bold',          i18nKey: 'bold',          icon: 'bold' },
+        { group: 'inline', action: 'italic',        i18nKey: 'italic',        icon: 'italic' },
+        { group: 'inline', action: 'strikethrough', i18nKey: 'strikethrough', icon: 'strikethrough' },
+        { group: 'inline', action: 'code',          i18nKey: 'inlineCode',    icon: 'code' },
+        // Group: Headings
+        { group: 'headings', action: 'heading1', i18nKey: 'heading1', icon: 'heading1' },
+        { group: 'headings', action: 'heading2', i18nKey: 'heading2', icon: 'heading2' },
+        { group: 'headings', action: 'heading3', i18nKey: 'heading3', icon: 'heading3' },
+        { group: 'headings', action: 'heading4', i18nKey: 'heading4', icon: 'heading4' },
+        { group: 'headings', action: 'heading5', i18nKey: 'heading5', icon: 'heading5' },
+        { group: 'headings', action: 'heading6', i18nKey: 'heading6', icon: 'heading6' },
+        // Group: Lists
+        { group: 'lists', action: 'ul',   i18nKey: 'unorderedList', icon: 'ul' },
+        { group: 'lists', action: 'ol',   i18nKey: 'orderedList',   icon: 'ol' },
+        { group: 'lists', action: 'task', i18nKey: 'taskList',      icon: 'task' },
+        // Group: Blocks
+        { group: 'blocks', action: 'quote',     i18nKey: 'blockquote',     icon: 'quote' },
+        { group: 'blocks', action: 'codeblock', i18nKey: 'codeBlock',      icon: 'codeblock' },
+        { group: 'blocks', action: 'hr',        i18nKey: 'horizontalRule', icon: 'hr' },
+        // Group: Insert
+        { group: 'insert', action: 'link',  i18nKey: 'insertLink',  icon: 'link' },
+        { group: 'insert', action: 'image', i18nKey: 'insertImage', icon: 'image' },
+        { group: 'insert', action: 'table', i18nKey: 'insertTable', icon: 'table' },
+    ];
+
+    var COMMAND_PALETTE_GROUPS = {
+        inline:   function() { return i18n.commandPaletteInline   || 'Inline'; },
+        headings: function() { return i18n.commandPaletteHeadings  || 'Headings'; },
+        lists:    function() { return i18n.commandPaletteLists     || 'Lists'; },
+        blocks:   function() { return i18n.commandPaletteBlocks    || 'Blocks'; },
+        insert:   function() { return i18n.commandPaletteInsert    || 'Insert'; },
+    };
+
+    var commandPalette = null;
+    var commandPaletteInput = null;
+    var commandPaletteList = null;
+    var commandPaletteSavedRange = null;
+    var commandPaletteVisible = false;
+
+    function parseI18nLabel(i18nKey) {
+        var fullText = i18n[i18nKey] || i18nKey;
+        var match = fullText.match(/^(.+?)\s*\((.+)\)$/);
+        if (match) {
+            return { label: match[1], shortcut: match[2] };
+        }
+        return { label: fullText, shortcut: '' };
+    }
+
+    function createCommandPalette() {
+        if (commandPalette) return;
+
+        commandPalette = document.createElement('div');
+        commandPalette.className = 'command-palette';
+        commandPalette.style.display = 'none';
+
+        // Search area
+        var searchDiv = document.createElement('div');
+        searchDiv.className = 'command-palette-search';
+        commandPaletteInput = document.createElement('input');
+        commandPaletteInput.type = 'text';
+        commandPaletteInput.className = 'command-palette-input';
+        commandPaletteInput.placeholder = i18n.commandPaletteFilter || 'Type to filter...';
+        searchDiv.appendChild(commandPaletteInput);
+        commandPalette.appendChild(searchDiv);
+
+        // List area
+        commandPaletteList = document.createElement('div');
+        commandPaletteList.className = 'command-palette-list';
+        commandPalette.appendChild(commandPaletteList);
+
+        // Prevent focus loss when clicking palette (except input)
+        commandPalette.addEventListener('mousedown', function(e) {
+            if (e.target === commandPaletteInput) return;
+            e.preventDefault();
+        });
+
+        // Handle item click
+        commandPaletteList.addEventListener('click', function(e) {
+            var item = e.target.closest('.command-palette-item');
+            if (!item) return;
+            executeCommandPaletteAction(item.dataset.action);
+        });
+
+        // Handle input for filtering
+        commandPaletteInput.addEventListener('input', function() {
+            renderCommandPaletteItems(commandPaletteInput.value);
+        });
+
+        // Handle keyboard navigation within the palette
+        commandPaletteInput.addEventListener('keydown', function(e) {
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                moveCommandPaletteSelection(1);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                moveCommandPaletteSelection(-1);
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                var selected = commandPaletteList.querySelector('.command-palette-item.selected');
+                if (selected) {
+                    executeCommandPaletteAction(selected.dataset.action);
+                }
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                closeCommandPalette();
+            }
+        });
+
+        document.body.appendChild(commandPalette);
+    }
+
+    function renderCommandPaletteItems(filter) {
+        commandPaletteList.innerHTML = '';
+
+        var normalizedFilter = (filter || '').toLowerCase().trim();
+        var currentGroup = null;
+        var visibleIndex = 0;
+        var isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+
+        for (var idx = 0; idx < COMMAND_PALETTE_ITEMS.length; idx++) {
+            var item = COMMAND_PALETTE_ITEMS[idx];
+            var parsed = parseI18nLabel(item.i18nKey);
+
+            // Filter: match against label, action name, or shortcut
+            if (normalizedFilter) {
+                var searchable = (parsed.label + ' ' + item.action + ' ' + parsed.shortcut).toLowerCase();
+                if (searchable.indexOf(normalizedFilter) === -1) continue;
+            }
+
+            // Insert group header if new group
+            if (item.group !== currentGroup) {
+                currentGroup = item.group;
+                var groupLabel = document.createElement('div');
+                groupLabel.className = 'command-palette-group-label';
+                groupLabel.textContent = COMMAND_PALETTE_GROUPS[item.group]();
+                commandPaletteList.appendChild(groupLabel);
+            }
+
+            // Create item element
+            var el = document.createElement('div');
+            el.className = 'command-palette-item';
+            if (visibleIndex === 0) el.classList.add('selected');
+            el.dataset.action = item.action;
+
+            // Icon
+            var iconSpan = document.createElement('span');
+            iconSpan.className = 'command-palette-icon';
+            iconSpan.innerHTML = LUCIDE_ICONS[item.icon] || '';
+            el.appendChild(iconSpan);
+
+            // Label
+            var labelSpan = document.createElement('span');
+            labelSpan.className = 'command-palette-label';
+            labelSpan.textContent = parsed.label;
+            el.appendChild(labelSpan);
+
+            // Shortcut
+            if (parsed.shortcut) {
+                var shortcutSpan = document.createElement('span');
+                shortcutSpan.className = 'command-palette-shortcut';
+                shortcutSpan.textContent = isMac ? parsed.shortcut.replace(/Ctrl/g, 'Cmd') : parsed.shortcut;
+                el.appendChild(shortcutSpan);
+            }
+
+            commandPaletteList.appendChild(el);
+            visibleIndex++;
+        }
+    }
+
+    function moveCommandPaletteSelection(direction) {
+        var items = commandPaletteList.querySelectorAll('.command-palette-item');
+        if (items.length === 0) return;
+
+        var currentIdx = -1;
+        for (var i = 0; i < items.length; i++) {
+            if (items[i].classList.contains('selected')) {
+                currentIdx = i;
+                break;
+            }
+        }
+
+        if (currentIdx >= 0) {
+            items[currentIdx].classList.remove('selected');
+        }
+
+        var newIdx = currentIdx + direction;
+        if (newIdx < 0) newIdx = items.length - 1;
+        if (newIdx >= items.length) newIdx = 0;
+
+        items[newIdx].classList.add('selected');
+        items[newIdx].scrollIntoView({ block: 'nearest' });
+    }
+
+    function commandPaletteOutsideClickHandler(e) {
+        if (commandPalette && !commandPalette.contains(e.target)) {
+            closeCommandPalette();
+        }
+    }
+
+    function commandPaletteRepositionHandler() {
+        if (commandPaletteVisible) closeCommandPalette();
+    }
+
+    function openCommandPalette() {
+        if (isSourceMode) return;
+        createCommandPalette();
+
+        // Save editor selection
+        var sel = window.getSelection();
+        if (sel && sel.rangeCount > 0) {
+            commandPaletteSavedRange = sel.getRangeAt(0).cloneRange();
+        } else {
+            commandPaletteSavedRange = null;
+        }
+
+        // Get cursor line rect for positioning
+        var anchorRect = null;
+        if (commandPaletteSavedRange) {
+            var rects = commandPaletteSavedRange.getClientRects();
+            if (rects.length > 0 && (rects[0].width > 0 || rects[0].height > 0)) {
+                anchorRect = rects[0];
+            }
+            // Collapsed range at empty line may return zero rect - use parent element
+            if (!anchorRect) {
+                var node = commandPaletteSavedRange.startContainer;
+                var el = node.nodeType === 3 ? node.parentElement : node;
+                if (el && el.getBoundingClientRect) {
+                    var elRect = el.getBoundingClientRect();
+                    if (elRect.height > 0) anchorRect = elRect;
+                }
+            }
+        }
+        if (!anchorRect) {
+            anchorRect = toolbar.getBoundingClientRect();
+        }
+
+        // Position below cursor line (or above if not enough space below)
+        var paletteHeight = 360;
+        var paletteWidth = 280;
+        var top, left;
+
+        if (anchorRect.bottom + paletteHeight + 4 <= window.innerHeight) {
+            // Below cursor line
+            top = anchorRect.bottom + 4;
+        } else {
+            // Above cursor line
+            top = anchorRect.top - paletteHeight - 4;
+            if (top < 0) top = 4;
+        }
+        left = anchorRect.left;
+
+        if (left + paletteWidth > window.innerWidth) {
+            left = window.innerWidth - paletteWidth - 8;
+        }
+        if (left < 4) left = 4;
+
+        commandPalette.style.top = top + 'px';
+        commandPalette.style.left = left + 'px';
+        commandPalette.style.display = 'flex';
+        commandPaletteVisible = true;
+
+        // Clear filter and render all items
+        commandPaletteInput.value = '';
+        renderCommandPaletteItems('');
+
+        // Focus the input
+        requestAnimationFrame(function() {
+            commandPaletteInput.focus();
+        });
+
+        // Close on click outside
+        setTimeout(function() {
+            document.addEventListener('click', commandPaletteOutsideClickHandler);
+        }, 0);
+
+        // Close on scroll/resize
+        window.addEventListener('resize', commandPaletteRepositionHandler);
+        editor.addEventListener('scroll', commandPaletteRepositionHandler);
+    }
+
+    function closeCommandPalette() {
+        if (!commandPalette || !commandPaletteVisible) return;
+
+        commandPalette.style.display = 'none';
+        commandPaletteVisible = false;
+        document.removeEventListener('click', commandPaletteOutsideClickHandler);
+        window.removeEventListener('resize', commandPaletteRepositionHandler);
+        editor.removeEventListener('scroll', commandPaletteRepositionHandler);
+
+        // Restore editor focus and selection without scrolling
+        editor.focus({ preventScroll: true });
+        if (commandPaletteSavedRange) {
+            var sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(commandPaletteSavedRange);
+            commandPaletteSavedRange = null;
+        }
+    }
+
+    function executeCommandPaletteAction(action) {
+        // Close palette
+        commandPalette.style.display = 'none';
+        commandPaletteVisible = false;
+        document.removeEventListener('click', commandPaletteOutsideClickHandler);
+        window.removeEventListener('resize', commandPaletteRepositionHandler);
+        editor.removeEventListener('scroll', commandPaletteRepositionHandler);
+
+        // Restore editor focus and selection without scrolling
+        editor.focus({ preventScroll: true });
+        if (commandPaletteSavedRange) {
+            var sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(commandPaletteSavedRange);
+            commandPaletteSavedRange = null;
+        }
+
+        // Save undo snapshot before action
+        undoManager.saveSnapshot();
+        markAsEdited();
+
+        // Dispatch via shared function (same as toolbar)
+        dispatchToolbarAction(action);
+    }
 
     // ========== UTILITIES ==========
-    
+
     // Sidebar toggle functions
     const openSidebarBtn = document.getElementById('openSidebarBtn');
     const closeSidebarBtn = document.getElementById('closeSidebar');
@@ -11355,6 +11692,7 @@
         // Save snapshot before structural shortcuts (not for save/find/select-all/undo/redo/copy/cut/paste/modifier-only)
         if (isMod && !isSourceMode && e.key !== 's' && e.key !== 'f' && e.key !== 'h' && e.key !== 'l' && e.key !== 'a'
             && e.key !== 'z' && e.key !== 'Z' && e.key !== 'y' && e.key !== 'v' && e.key !== 'c' && e.key !== 'x'
+            && e.key !== '/'
             && e.key !== 'Meta' && e.key !== 'Control' && e.key !== 'Shift' && e.key !== 'Alt') {
             undoManager.saveSnapshot();
         }
@@ -11479,7 +11817,19 @@
             insertHorizontalRule();
             return;
         }
-        
+
+        // Command Palette (Ctrl+/ or Cmd+/)
+        if (isMod && !e.shiftKey && e.key === '/') {
+            e.preventDefault();
+            e.stopPropagation();
+            if (commandPaletteVisible) {
+                closeCommandPalette();
+            } else {
+                openCommandPalette();
+            }
+            return;
+        }
+
         // Inline code (Ctrl+\`)
         if (isMod && !e.shiftKey && e.key === '\`') {
             e.preventDefault();
