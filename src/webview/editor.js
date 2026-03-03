@@ -15,7 +15,7 @@
     const outline = document.getElementById('outline');
     const wordCount = document.getElementById('wordCount');
     const statusLeft = document.getElementById('statusLeft');
-    const statusRight = document.getElementById('statusRight');
+    const statusImageDir = document.getElementById('statusImageDir');
     const sidebar = document.getElementById('sidebar');
     const toolbar = document.getElementById('toolbar');
 
@@ -11748,17 +11748,11 @@
         const chars = text.length;
         const lines = markdown.split('\n').length;
 
-        wordCount.innerHTML = 
-            '<div>' + i18n.words + ': ' + words + '</div>' +
-            '<div>' + i18n.characters + ': ' + chars + '</div>' +
-            '<div>' + i18n.lines + ': ' + lines + '</div>';
+        wordCount.textContent = words + ' ' + i18n.words + ' · ' + chars + ' ' + i18n.characters + ' · ' + lines + ' ' + i18n.lines;
     }
 
     function updateStatus() {
-        statusRight.textContent = markdown.split('\n').length + ' ' + i18n.linesCount;
-        
-        // Update IMAGE_DIR display
-        const statusImageDir = document.getElementById('statusImageDir');
+        // Update IMAGE_DIR display in sidebar footer
         if (statusImageDir) {
             let statusText = '';
             if (currentImageDir) {

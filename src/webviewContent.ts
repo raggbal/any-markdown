@@ -98,7 +98,11 @@ export function getWebviewContent(
                 <button class="sidebar-toggle" id="closeSidebar" title="${msg.closeOutline}">☰</button>
             </div>
             <nav class="outline" id="outline"></nav>
-            <div class="word-count" id="wordCount"></div>
+            <div class="sidebar-footer">
+                <div class="word-count" id="wordCount"></div>
+                <div class="sidebar-status-mode" id="statusLeft">${msg.livePreviewMode}</div>
+                <div class="sidebar-status-imagedir" id="statusImageDir"></div>
+            </div>
             <div class="sidebar-resizer" id="sidebarResizer"></div>
         </aside>
         <main class="editor-container">
@@ -166,11 +170,6 @@ export function getWebviewContent(
                 </div>
                 <div class="editor" id="editor" contenteditable="true" spellcheck="true"></div>
                 <textarea class="source-editor" id="sourceEditor" style="display: none;"></textarea>
-            </div>
-            <div class="status-bar" id="statusBar">
-                <span id="statusLeft">${msg.livePreviewMode}</span>
-                <span id="statusImageDir" class="status-image-dir"></span>
-                <span id="statusRight"></span>
             </div>
         </main>
     </div>

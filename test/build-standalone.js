@@ -150,7 +150,7 @@ const html = `<!DOCTYPE html>
     <div id="sidebarResizer" style="display:none;"></div>
     <div id="toolbar" style="display:none;"></div>
     <div id="statusLeft" style="display:none;"></div>
-    <div id="statusRight" style="display:none;"></div>
+    <div id="statusImageDir" style="display:none;"></div>
     <div id="wordCount" style="display:none;"></div>
     <div id="sourceEditor" style="display:none;"></div>
     <button id="closeSidebar" style="display:none;"></button>
