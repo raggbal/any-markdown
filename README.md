@@ -1,7 +1,7 @@
 <img src="media/icon.png" alt="Any Markdown" width="48" align="absmiddle"> Any Markdown - AI-Friendly WYSIWYG Markdown Editor for VS Code
 =
 
-A WYSIWYG markdown editor designed for the AI coding era. Edit markdown visually while AI assistants (Claude Code, Cursor, GitHub Copilot, etc.) modify the same file in real-time — your edits and AI's edits coexist safely. Inspired by Typora, Notion, and Obsidian.
+A WYSIWYG markdown editor designed for the AI coding era. Edit markdown visually while AI assistants (Claude Code, Cursor, GitHub Copilot, etc.) modify the same file in real-time — your edits and AI's edits coexist safely.
 
 ![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/imaken.any-markdown?label=VS%20Code%20Marketplace)
 ![Open VSX](https://img.shields.io/open-vsx/v/imaken/any-markdown?label=Open%20VSX)
@@ -22,7 +22,7 @@ lists, tables, code blocks, and everything else!And when you want to request AI 
 
 ### Action Palette (Cmd+/ or Ctrl+/)
 
-You can now press `Cmd+/` (macOS) or `Ctrl+/` (Windows/Linux) to open the **Action Palette** — a Notion-like floating command menu that gives you quick access to all formatting and insertion actions (headings, lists, code blocks, Mermaid diagrams, math blocks, tables, etc.).
+You can now press `Cmd+/` (macOS) or `Ctrl+/` (Windows/Linux) to open the **Action Palette** — a floating command menu that gives you quick access to all formatting and insertion actions (headings, lists, code blocks, Mermaid diagrams, math blocks, tables, etc.).
 
 ### Toolbar Mode: Simple is now the default
 
@@ -454,7 +454,6 @@ MIT License - feel free to use this extension in your projects.
 
 ## 🙏 Acknowledgments
 
-- Inspired by [Typora](https://typora.io/), [Notion](https://notion.so/), and [Obsidian](https://obsidian.md/)
 - Built with love for the VS Code community
 
 ---
