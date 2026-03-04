@@ -367,9 +367,13 @@
             src.startsWith('vscode-webview:')) {
             return src;
         }
-        // If absolute file path (starts with /), convert to vscode-resource URI
+        // If absolute file path (starts with /)
         if (src.startsWith('/')) {
-            // Use file+.vscode-resource.vscode-cdn.net format for absolute paths
+            if (documentBaseUri && documentBaseUri.startsWith('file://')) {
+                // Electron: use file:// protocol directly
+                return 'file://' + src;
+            }
+            // VSCode webview: use vscode-resource URI
             return 'https://file+.vscode-resource.vscode-cdn.net' + src;
         }
         // Resolve relative path against document base URI
@@ -14508,6 +14512,11 @@
             openSearchBox(true);
         }
     });
+
+    // Expose htmlToMarkdown globally for Electron's executeJavaScript
+    if (typeof window !== 'undefined') {
+        window.htmlToMarkdown = htmlToMarkdown;
+    }
 
     // Expose functions for testing (only when __testApi is defined)
     if (typeof window !== 'undefined' && window.__testApi) {

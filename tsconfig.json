@@ -12,5 +12,5 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true
   },
-  "exclude": ["node_modules", ".vscode-test", "media", "test", "playwright.config.ts", "samples", "src/i18n/locales"]
+  "exclude": ["node_modules", ".vscode-test", "media", "test", "playwright.config.ts", "samples", "src/i18n/locales", "electron"]
 }

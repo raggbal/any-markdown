@@ -1,0 +1,85 @@
+{
+  "name": "any-markdown-desktop",
+  "version": "0.1.0",
+  "description": "Any Markdown — WYSIWYG Markdown editor for desktop",
+  "main": "out/main.js",
+  "author": "imaken",
+  "license": "MIT",
+  "scripts": {
+    "compile": "cd .. && npm run compile && cd electron && tsc -p . && node ../scripts/copy-vendor.js",
+    "start": "npm run compile && ELECTRON_RUN_AS_NODE= electron .",
+    "build:mac": "npm run compile && ELECTRON_RUN_AS_NODE= electron-builder --mac",
+    "build:win": "npm run compile && ELECTRON_RUN_AS_NODE= electron-builder --win"
+  },
+  "dependencies": {
+    "chokidar": "^3.6.0",
+    "electron-store": "^8.2.0"
+  },
+  "devDependencies": {
+    "electron": "^28.3.3",
+    "electron-builder": "^25.1.8",
+    "typescript": "^5.3.0"
+  },
+  "build": {
+    "appId": "com.imaken.any-markdown",
+    "productName": "Any Markdown",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "out/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "../src/webview",
+        "to": "webview",
+        "filter": [
+          "editor.js",
+          "styles.css"
+        ]
+      },
+      {
+        "from": "../vendor",
+        "to": "vendor"
+      },
+      {
+        "from": "../out/locales",
+        "to": "locales",
+        "filter": ["*.js"]
+      }
+    ],
+    "mac": {
+      "icon": "build/icon.icns",
+      "category": "public.app-category.developer-tools",
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "fileAssociations": [
+        {
+          "ext": [
+            "md",
+            "markdown"
+          ],
+          "name": "Markdown Document",
+          "role": "Editor"
+        }
+      ]
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "fileAssociations": [
+        {
+          "ext": "md",
+          "name": "Markdown Document"
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}
