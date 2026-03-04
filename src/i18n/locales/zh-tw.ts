@@ -52,6 +52,8 @@ export const webviewMessages = {
   setImageDir: '設定圖片目錄',
   insertTable: '插入表格 (Ctrl+T)',
   horizontalRule: '水平線 (Ctrl+Shift+-)',
+  mermaidBlock: 'Mermaid 圖表',
+  mathBlock: '數學公式',
   searchPlaceholder: '搜尋...',
   replacePlaceholder: '取代...',
   searchPrev: '上一個 (Shift+Enter)',

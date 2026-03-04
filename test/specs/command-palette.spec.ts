@@ -68,7 +68,7 @@ test.describe('コマンドパレット', () => {
 
         // 全アイテム数を確認
         const allItems = await page.locator('.command-palette-item').count();
-        expect(allItems).toBe(19); // 19アイテム
+        expect(allItems).toBe(21); // 21アイテム (mermaid, math追加)
 
         // "heading" でフィルタ
         const input = page.locator('.command-palette-input');
@@ -82,7 +82,7 @@ test.describe('コマンドパレット', () => {
         await input.fill('');
         await page.waitForTimeout(100);
         const restoredItems = await page.locator('.command-palette-item').count();
-        expect(restoredItems).toBe(19);
+        expect(restoredItems).toBe(21);
     });
 
     test('↑↓でアイテム選択が移動する', async ({ page }) => {

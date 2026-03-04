@@ -8,9 +8,10 @@ A WYSIWYG markdown editor designed for the AI coding era. Edit markdown visually
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![GitHub Sponsors](https://img.shields.io/github/sponsors/raggbal?label=Sponsor)
 
-**Redesigned for simplicity. **![assets/images/1772563198257.png](assets/images/1772563198257.png)
+**New: Redesigned for simplicity. **![assets/images/1772563198257.png](assets/images/1772563198257.png)
 **New: Action Palette (Cmd+/ / Ctrl+/)**
 ![assets/images/1772563951196.png](assets/images/1772563951196.png)
+
 ## 🎬 Demo (gif)
 
 You can freely use markdown using only the keyboard.
@@ -22,7 +23,7 @@ lists, tables, code blocks, and everything else!And when you want to request AI 
 
 ### Action Palette (Cmd+/ or Ctrl+/)
 
-You can now press `Cmd+/` (macOS) or `Ctrl+/` (Windows/Linux) to open the **Action Palette** — a Notion-like floating command menu that gives you quick access to all formatting and insertion actions (headings, lists, code blocks, tables, etc.).
+You can now press `Cmd+/` (macOS) or `Ctrl+/` (Windows/Linux) to open the **Action Palette** — a Notion-like floating command menu that gives you quick access to all formatting and insertion actions (headings, lists, code blocks, Mermaid diagrams, math blocks, tables, etc.).
 
 ### Toolbar Mode: Simple is now the default
 

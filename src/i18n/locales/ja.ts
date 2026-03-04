@@ -52,6 +52,8 @@ export const webviewMessages = {
   setImageDir: '画像ディレクトリ設定',
   insertTable: 'テーブル挿入 (Ctrl+T)',
   horizontalRule: '水平線 (Ctrl+Shift+-)',
+  mermaidBlock: 'Mermaidダイアグラム',
+  mathBlock: '数式ブロック',
   searchPlaceholder: '検索...',
   replacePlaceholder: '置換...',
   searchPrev: '前へ (Shift+Enter)',

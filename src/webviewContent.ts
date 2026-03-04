@@ -132,6 +132,8 @@ export function getWebviewContent(
                         <button data-action="task" title="${msg.taskList}"></button>
                         <button data-action="quote" title="${msg.blockquote}"></button>
                         <button data-action="codeblock" title="${msg.codeBlock}"></button>
+                        <button data-action="mermaid" title="${msg.mermaidBlock}"></button>
+                        <button data-action="math" title="${msg.mathBlock}"></button>
                         <button data-action="hr" title="${msg.horizontalRule}"></button>
                     </div>
                     <div class="toolbar-group" data-group="insert">

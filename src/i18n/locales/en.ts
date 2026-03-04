@@ -52,6 +52,8 @@ export const webviewMessages = {
   setImageDir: 'Set Image Directory',
   insertTable: 'Insert Table (Ctrl+T)',
   horizontalRule: 'Horizontal Rule (Ctrl+Shift+-)',
+  mermaidBlock: 'Mermaid Diagram',
+  mathBlock: 'Math Block',
   searchPlaceholder: 'Search...',
   replacePlaceholder: 'Replace...',
   searchPrev: 'Previous (Shift+Enter)',

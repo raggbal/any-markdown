@@ -52,6 +52,8 @@ export const webviewMessages = {
   setImageDir: '이미지 디렉토리 설정',
   insertTable: '표 삽입 (Ctrl+T)',
   horizontalRule: '수평선 (Ctrl+Shift+-)',
+  mermaidBlock: 'Mermaid 다이어그램',
+  mathBlock: '수식 블록',
   searchPlaceholder: '검색...',
   replacePlaceholder: '바꾸기...',
   searchPrev: '이전 (Shift+Enter)',

@@ -56,6 +56,8 @@ export interface WebviewMessages {
   setImageDir: string;
   insertTable: string;
   horizontalRule: string;
+  mermaidBlock: string;
+  mathBlock: string;
   searchPlaceholder: string;
   replacePlaceholder: string;
   searchPrev: string;

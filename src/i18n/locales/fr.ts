@@ -52,6 +52,8 @@ export const webviewMessages = {
   setImageDir: 'Définir le répertoire d\'images',
   insertTable: 'Insérer un tableau (Ctrl+T)',
   horizontalRule: 'Ligne horizontale (Ctrl+Shift+-)',
+  mermaidBlock: 'Diagramme Mermaid',
+  mathBlock: 'Bloc mathématique',
   searchPlaceholder: 'Rechercher...',
   replacePlaceholder: 'Remplacer...',
   searchPrev: 'Précédent (Shift+Entrée)',
