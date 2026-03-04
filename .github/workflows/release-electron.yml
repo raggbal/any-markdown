@@ -5,6 +5,9 @@ on:
     tags:
       - 'electron-v*'
 
+permissions:
+  contents: write
+
 jobs:
   build-mac-arm64:
     runs-on: macos-latest
