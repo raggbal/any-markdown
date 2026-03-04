@@ -7,7 +7,7 @@ on:
 
 jobs:
   build-mac-arm64:
-    runs-on: macos-latest  # Apple Silicon (M1+)
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -25,7 +25,7 @@ jobs:
         run: |
           cd electron
           npm run compile
-          ELECTRON_RUN_AS_NODE= npx electron-builder --mac --arm64
+          npx electron-builder --mac --arm64
 
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
@@ -38,7 +38,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build-mac-x64:
-    runs-on: macos-13  # Intel Mac
+    runs-on: macos-latest  # cross-compile x64 on arm64 runner
     steps:
       - uses: actions/checkout@v4
 
@@ -56,14 +56,15 @@ jobs:
         run: |
           cd electron
           npm run compile
-          ELECTRON_RUN_AS_NODE= npx electron-builder --mac --x64
+          npx electron-builder --mac --x64
 
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            electron/dist/*.dmg
-            electron/dist/*.zip
+            electron/dist/*-x64.dmg
+            electron/dist/*-x64.zip
+            electron/dist/*-x64-mac.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

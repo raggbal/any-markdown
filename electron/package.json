@@ -3,7 +3,11 @@
   "version": "0.195.387",
   "description": "Any Markdown — WYSIWYG Markdown editor for desktop",
   "main": "out/main.js",
-  "author": "imaken",
+  "author": {
+    "name": "imaken",
+    "email": "imaken@users.noreply.github.com"
+  },
+  "homepage": "https://github.com/raggbal/any-markdown",
   "license": "MIT",
   "scripts": {
     "compile": "cd .. && npm run compile && cd electron && tsc -p . && node ../scripts/copy-vendor.js",

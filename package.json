@@ -232,7 +232,7 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./ && node build-locales.js && mkdir -p out/webview out/shared && cp src/webview/*.js src/webview/*.css out/webview/ && cp src/shared/*.js out/shared/ && node scripts/copy-vendor.js",
+    "compile": "tsc -p ./ && node build-locales.js && node scripts/copy-webview.js && node scripts/copy-vendor.js",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src --ext ts",
