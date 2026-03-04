@@ -242,17 +242,30 @@ body {
 }
 
 .editor-container { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-/* ===== Toolbar: Single row with scroll navigation ===== */
+/* ===== Toolbar: Fixed left/right + scrollable center ===== */
 .toolbar {
     display: flex;
     align-items: center;
     padding: 0;
     background: var(--toolbar-bg);
     border-bottom: 1px solid var(--border-color);
-    position: relative;
     height: 40px;
 }
-/* Scrollable inner container */
+/* Fixed left/right sections */
+.toolbar-fixed {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    padding: 4px 4px;
+    gap: 2px;
+}
+.toolbar-fixed--left {
+    padding-left: 12px;
+}
+.toolbar-fixed--right {
+    padding-right: 12px;
+}
+/* Scrollable inner container (center section) */
 .toolbar-inner {
     display: flex;
     align-items: center;
@@ -260,16 +273,14 @@ body {
     flex: 1;
     overflow-x: auto;
     overflow-y: hidden;
-    padding: 4px 12px;
+    padding: 4px 4px;
     scrollbar-width: none; /* Firefox */
     min-width: 0;
+    position: relative;
 }
 .toolbar-inner::-webkit-scrollbar { display: none; } /* Chrome/Safari */
 /* Scroll navigation buttons */
 .toolbar-scroll-btn {
-    position: absolute;
-    top: 0;
-    bottom: 0;
     width: 28px;
     display: flex;
     align-items: center;
@@ -283,17 +294,16 @@ body {
     font-weight: bold;
     padding: 0;
     opacity: 1;
+    flex-shrink: 0;
 }
 .toolbar-scroll-btn:hover {
     background: var(--selection-bg) !important;
 }
 .toolbar-scroll-btn.hidden { display: none; }
 .toolbar-scroll-btn--left {
-    left: 0;
     box-shadow: 4px 0 8px -2px rgba(0,0,0,0.2);
 }
 .toolbar-scroll-btn--right {
-    right: 0;
     box-shadow: -4px 0 8px -2px rgba(0,0,0,0.2);
 }
 /* Toolbar groups */
@@ -313,9 +323,10 @@ body {
     margin: 0 6px;
     flex-shrink: 0;
 }
-/* Utility group: pushed to right end */
-.toolbar-group[data-group="utility"] {
-    margin-left: auto;
+/* Separator between fixed sections and scroll buttons */
+.toolbar-fixed + .toolbar-scroll-btn::before,
+.toolbar-fixed + .toolbar-inner > .toolbar-group:first-child::before {
+    display: none;
 }
 /* Toolbar buttons */
 .toolbar button {
@@ -348,16 +359,20 @@ body {
     background: transparent;
     border-bottom: none;
 }
-[data-toolbar-mode="simple"] .toolbar-group[data-group="inline"],
-[data-toolbar-mode="simple"] .toolbar-group[data-group="block"],
-[data-toolbar-mode="simple"] .toolbar-group[data-group="insert"] {
+[data-toolbar-mode="simple"] .toolbar-inner {
     display: none;
 }
-[data-toolbar-mode="simple"] .toolbar-group + .toolbar-group::before {
+[data-toolbar-mode="simple"] .toolbar-fixed--left .toolbar-group + .toolbar-group::before {
+    display: none;
+}
+[data-toolbar-mode="simple"] .toolbar-fixed--right .toolbar-group + .toolbar-group::before {
     display: none;
 }
 [data-toolbar-mode="simple"] .toolbar-scroll-btn {
     display: none !important;
+}
+[data-toolbar-mode="simple"] .toolbar-fixed--right {
+    margin-left: auto;
 }
 
 .editor-wrapper { flex: 1; overflow: auto; position: relative; }

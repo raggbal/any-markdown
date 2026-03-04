@@ -101,13 +101,15 @@ export function generateEditorHtml(
         </aside>
         <main class="editor-container">
             <div class="toolbar" id="toolbar">
-                <button class="toolbar-scroll-btn toolbar-scroll-btn--left hidden" id="toolbarScrollLeft">&#x276E;</button>
-                <div class="toolbar-inner" id="toolbarInner">
+                <div class="toolbar-fixed toolbar-fixed--left">
                     <button data-action="openOutline" class="menu-btn hidden" id="openSidebarBtn" title="${config.webviewMessages.openOutline || 'Outline'}"></button>
                     <div class="toolbar-group" data-group="history">
                         <button data-action="undo" title="${config.webviewMessages.undo || 'Undo'}"></button>
                         <button data-action="redo" title="${config.webviewMessages.redo || 'Redo'}"></button>
                     </div>
+                </div>
+                <button class="toolbar-scroll-btn toolbar-scroll-btn--left hidden" id="toolbarScrollLeft">&#x276E;</button>
+                <div class="toolbar-inner" id="toolbarInner">
                     <div class="toolbar-group" data-group="inline">
                         <button data-action="bold" title="${config.webviewMessages.bold || 'Bold'}"></button>
                         <button data-action="italic" title="${config.webviewMessages.italic || 'Italic'}"></button>
@@ -136,12 +138,14 @@ export function generateEditorHtml(
                         <button data-action="imageDir" title="${config.webviewMessages.setImageDir || 'Image Dir'}"></button>
                         <button data-action="table" title="${config.webviewMessages.insertTable || 'Table'}"></button>
                     </div>
+                </div>
+                <button class="toolbar-scroll-btn toolbar-scroll-btn--right hidden" id="toolbarScrollRight">&#x276F;</button>
+                <div class="toolbar-fixed toolbar-fixed--right">
                     <div class="toolbar-group" data-group="utility">
                         <button data-action="openInTextEditor" title="${config.webviewMessages.openInTextEditor || 'Open in Text Editor'} (${process.platform === 'darwin' ? 'Cmd+Shift+.' : 'Ctrl+Shift+.'})"></button>
                         <button data-action="source" title="${config.webviewMessages.toggleSourceMode || 'Source Mode'} (${process.platform === 'darwin' ? 'Cmd' : 'Ctrl'}+.)"></button>
                     </div>
                 </div>
-                <button class="toolbar-scroll-btn toolbar-scroll-btn--right hidden" id="toolbarScrollRight">&#x276F;</button>
             </div>
             <div class="editor-wrapper" id="editorWrapper">
                 <div class="search-replace-box" id="searchReplaceBox" style="display: none;">

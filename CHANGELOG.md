@@ -5,6 +5,11 @@ All notable changes to the "Any Markdown Editor" extension will be documented in
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.195.392] - 2026-03-05
+
+### Changed
+- **Toolbar fixed left/right layout** — Outline, undo, redo buttons are now fixed on the left; open-in-text-editor and source-mode buttons are fixed on the right. Only the markdown formatting buttons (inline, block, insert) scroll when the toolbar overflows.
+
 ## [0.195.388] - 2026-03-05
 
 ### Fixed
