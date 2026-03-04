@@ -11803,7 +11803,14 @@
             item.addEventListener('click', () => {
                 const idx = parseInt(item.dataset.index);
                 if (headingsArray[idx]) {
-                    headingsArray[idx].scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    const wrapper = editor.closest('.editor-wrapper');
+                    if (wrapper) {
+                        const wrapperRect = wrapper.getBoundingClientRect();
+                        const headingRect = headingsArray[idx].getBoundingClientRect();
+                        wrapper.scrollTo({ top: wrapper.scrollTop + headingRect.top - wrapperRect.top, behavior: 'smooth' });
+                    } else {
+                        headingsArray[idx].scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
                 }
             });
         });
@@ -12800,7 +12807,14 @@
                         .replace(/\s+/g, '-'); // Replace spaces with hyphens
                     
                     if (slug === anchor || heading.id === anchor) {
-                        heading.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        const wrapper = editor.closest('.editor-wrapper');
+                        if (wrapper) {
+                            const wrapperRect = wrapper.getBoundingClientRect();
+                            const headingRect = heading.getBoundingClientRect();
+                            wrapper.scrollTo({ top: wrapper.scrollTop + headingRect.top - wrapperRect.top, behavior: 'smooth' });
+                        } else {
+                            heading.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }
                         // Briefly highlight the heading
                         heading.style.transition = 'background-color 0.3s';
                         heading.style.backgroundColor = 'var(--selection-bg)';
