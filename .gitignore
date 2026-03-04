@@ -25,9 +25,9 @@ test/html/vendor/
 Thumbs.db
 
 # Sample and documentation files (not needed for extension)
-samples/
-docs/
+/samples/
+/docs_dev/
 /images/
 /images2/
-test2/
+/test2/
 CLAUDE.md
