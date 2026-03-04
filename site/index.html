@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Any Markdown — AI-Friendly WYSIWYG Markdown Editor</title>
+  <meta name="description" content="A seamless WYSIWYG markdown editor for VS Code and desktop. Edit visually while AI modifies in real-time. Mermaid, KaTeX, tables, and more.">
+  <meta name="theme-color" content="#474DEE">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='559 560 928 910'%3E%3Cpath fill='%23474DEE' d='M1486.89 1241.53C1489.37 1308.51 1475.15 1368.43 1425.79 1415.91C1415.97 1425.36 1405.79 1434.54 1393.82 1441.16C1363.51 1457.94 1324.04 1469.76 1289.52 1469.97C1172.08 1470.72 1054.71 1470.86 937.297 1470.92L823.156 1470.79C783.173 1470.57 749.897 1472.2 710.445 1463.48C675.242 1455.78 642.891 1438.4 617.036 1413.3C586.949 1383.72 568.854 1344.06 562.498 1302.46C560.167 1287.21 560.26 1268.24 560.152 1252.63L559.866 923.223L559.849 818.973C559.848 780.617 557.811 748.778 566.45 710.983C586.528 623.138 660.307 569.162 747.889 562.372C774.007 560.348 800.692 561.118 826.929 561.133L930.282 561.333C1036.82 561.057 1146.13 560.266 1252.53 561.379C1319.02 560.452 1379.71 572.041 1428.75 620.659C1458.86 650.506 1478.12 690.57 1484.53 732.51C1486.87 747.872 1486.75 768.651 1486.87 784.494C1486.85 817.281 1487.05 850.069 1487.47 882.854C1487.93 961.98 1488 1041.11 1487.66 1120.24L1487.38 1201.65C1487.31 1212.79 1487.76 1230.87 1486.89 1241.53z'/%3E%3Cpath fill='%239858EB' d='M930.282 561.333C1036.82 561.057 1146.13 560.266 1252.53 561.379C1319.02 560.452 1379.71 572.041 1428.75 620.659C1458.86 650.506 1478.12 690.57 1484.53 732.51C1486.87 747.872 1486.75 768.651 1486.87 784.494C1486.85 817.281 1487.05 850.069 1487.47 882.854L1486.28 886.97C1485.12 884.084 1484.93 814.256 1484.54 804.478z'/%3E%3Cpath fill='%23fefefe' d='M1296.51 1002.48C1278.36 995.113 1263.4 983.728 1258.05 964.335C1246.08 920.867 1258.88 872.151 1249.97 828.307C1248.81 822.599 1241.81 816.001 1236.4 814.344C1225.53 808.34 1201.33 815.389 1196.42 807.722C1194.31 804.424 1195.07 780.901 1196.55 776.561C1203.65 770.88 1230.6 771.431 1239.78 772.656C1297.1 780.305 1298.2 823.912 1298.08 868.262L1297.98 910.902C1297.96 925.063 1297.64 939.925 1302.81 953.36C1313.28 980.553 1341.73 979.11 1345.1 985.944C1348.23 992.262 1346.6 1012.15 1346.11 1019.72C1328.87 1029.15 1307.62 1030.31 1301.93 1054.46C1293.69 1089.46 1299.97 1128.52 1297.77 1164.41C1297.37 1170.98 1296.8 1177.31 1296.44 1183.76C1286.31 1230.59 1251.92 1239.98 1209.01 1237.35C1194.62 1236.47 1195.87 1231.17 1195.42 1219.81C1194.52 1199.62 1194.39 1196.77 1215.56 1197.68C1236.88 1198.59 1250.23 1192.59 1252.04 1169.55C1253.71 1162.08 1253.23 1149.25 1253.2 1141.35L1252.99 1095.83C1252.82 1053.24 1252.25 1021.48 1296.51 1002.48z'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+    :root {
+      --blue: #474DEE;
+      --purple: #9858EB;
+      --pink: #CD70D3;
+      --bg-dark: #0a0a0f;
+      --bg-card: #13131a;
+      --bg-card-hover: #1a1a24;
+      --text: #e4e4e7;
+      --text-dim: #9ca3af;
+      --border: rgba(255,255,255,0.08);
+      --gradient: linear-gradient(135deg, var(--blue), var(--purple), var(--pink));
+      --gradient-text: linear-gradient(135deg, #7c80ff, #b87ef7, #e094e6);
+      --glow: 0 0 80px rgba(71,77,237,0.15), 0 0 160px rgba(152,88,235,0.08);
+    }
+
+    html { scroll-behavior: smooth }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-dark);
+      color: var(--text);
+      line-height: 1.6;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Noise texture overlay ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── Ambient glow ── */
+    .ambient {
+      position: fixed;
+      width: 600px; height: 600px;
+      border-radius: 50%;
+      filter: blur(120px);
+      opacity: 0.12;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .ambient-1 { background: var(--blue); top: -200px; left: -100px; }
+    .ambient-2 { background: var(--purple); top: 40%; right: -200px; }
+    .ambient-3 { background: var(--pink); bottom: -100px; left: 30%; }
+
+    /* ── Layout ── */
+    .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+
+    /* ── Nav ── */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      background: rgba(10,10,15,0.7);
+      backdrop-filter: blur(20px) saturate(1.4);
+      border-bottom: 1px solid var(--border);
+    }
+    nav .container {
+      display: flex; align-items: center; justify-content: space-between;
+      height: 64px;
+    }
+    .nav-brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--text); }
+    .nav-brand svg { width: 32px; height: 32px; }
+    .nav-brand span { font-weight: 700; font-size: 16px; letter-spacing: -0.02em; }
+    .nav-links { display: flex; align-items: center; gap: 28px; }
+    .nav-links a {
+      color: var(--text-dim); text-decoration: none; font-size: 14px; font-weight: 500;
+      transition: color 0.2s;
+    }
+    .nav-links a:hover { color: var(--text); }
+
+    /* ── Hero ── */
+    .hero {
+      padding: 160px 0 100px;
+      text-align: center;
+    }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 6px 16px 6px 8px;
+      background: rgba(71,77,237,0.1);
+      border: 1px solid rgba(71,77,237,0.2);
+      border-radius: 100px;
+      font-size: 13px; font-weight: 500;
+      color: #7c80ff;
+      margin-bottom: 32px;
+    }
+    .hero-badge-dot {
+      width: 8px; height: 8px;
+      background: var(--blue);
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+    .hero h1 {
+      font-size: clamp(40px, 6vw, 72px);
+      font-weight: 900;
+      letter-spacing: -0.04em;
+      line-height: 1.05;
+      margin-bottom: 24px;
+    }
+    .hero h1 .gradient {
+      background: var(--gradient-text);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero-sub {
+      font-size: clamp(16px, 2vw, 20px);
+      color: var(--text-dim);
+      max-width: 580px;
+      margin: 0 auto 48px;
+      line-height: 1.6;
+    }
+    .hero-buttons { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 12px 24px;
+      border-radius: 12px;
+      font-size: 15px; font-weight: 600;
+      text-decoration: none;
+      transition: all 0.2s;
+      cursor: pointer;
+      border: none;
+    }
+    .btn-primary {
+      background: var(--gradient);
+      color: #fff;
+      box-shadow: 0 4px 20px rgba(71,77,237,0.3);
+    }
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 30px rgba(71,77,237,0.4);
+    }
+    .btn-secondary {
+      background: rgba(255,255,255,0.06);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-secondary:hover {
+      background: rgba(255,255,255,0.1);
+      transform: translateY(-2px);
+    }
+    .btn svg { width: 18px; height: 18px; }
+
+    /* ── Screenshot ── */
+    .screenshot-wrap {
+      margin: 80px auto 0;
+      max-width: 900px;
+      position: relative;
+    }
+    .screenshot-wrap::before {
+      content: '';
+      position: absolute;
+      inset: -2px;
+      border-radius: 18px;
+      background: var(--gradient);
+      opacity: 0.4;
+      filter: blur(1px);
+      z-index: -1;
+    }
+    .screenshot-wrap img {
+      width: 100%;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      box-shadow: var(--glow), 0 32px 64px rgba(0,0,0,0.5);
+    }
+
+    /* ── Section ── */
+    section { padding: 100px 0; }
+    .section-label {
+      font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em;
+      background: var(--gradient-text);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 12px;
+    }
+    .section-title {
+      font-size: clamp(28px, 4vw, 40px);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      margin-bottom: 16px;
+    }
+    .section-desc {
+      font-size: 17px;
+      color: var(--text-dim);
+      max-width: 560px;
+      margin-bottom: 56px;
+    }
+
+    /* ── Feature grid ── */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 20px;
+    }
+    .feature-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px;
+      transition: all 0.3s;
+    }
+    .feature-card:hover {
+      background: var(--bg-card-hover);
+      border-color: rgba(255,255,255,0.12);
+      transform: translateY(-4px);
+      box-shadow: 0 16px 48px rgba(0,0,0,0.3);
+    }
+    .feature-icon {
+      width: 44px; height: 44px;
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 16px;
+      font-size: 20px;
+    }
+    .feature-icon-blue { background: rgba(71,77,237,0.15); color: #7c80ff; }
+    .feature-icon-purple { background: rgba(152,88,235,0.15); color: #b87ef7; }
+    .feature-icon-pink { background: rgba(205,112,211,0.15); color: #e094e6; }
+    .feature-card h3 {
+      font-size: 17px; font-weight: 700;
+      margin-bottom: 8px;
+      letter-spacing: -0.01em;
+    }
+    .feature-card p {
+      font-size: 14px; color: var(--text-dim); line-height: 1.6;
+    }
+
+    /* ── Bento grid (highlight features) ── */
+    .bento {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+    }
+    .bento-item {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 32px;
+      transition: all 0.3s;
+      position: relative;
+      overflow: hidden;
+    }
+    .bento-item:hover {
+      border-color: rgba(255,255,255,0.12);
+      transform: translateY(-2px);
+    }
+    .bento-item.span-2 { grid-column: span 2; }
+    .bento-item h3 { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+    .bento-item p { font-size: 14px; color: var(--text-dim); line-height: 1.6; }
+    .bento-code {
+      margin-top: 20px;
+      background: rgba(0,0,0,0.3);
+      border-radius: 10px;
+      padding: 16px 20px;
+      font-family: 'Menlo', 'Consolas', monospace;
+      font-size: 13px;
+      line-height: 1.7;
+      overflow-x: auto;
+    }
+    .bento-code .kw { color: #7c80ff; }
+    .bento-code .str { color: #e094e6; }
+    .bento-code .cm { color: #555; }
+    .bento-code .fn { color: #b87ef7; }
+
+    /* ── Download ── */
+    .download-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px;
+    }
+    .download-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 32px;
+      text-align: center;
+      transition: all 0.3s;
+      text-decoration: none;
+      color: var(--text);
+      display: block;
+    }
+    .download-card:hover {
+      background: var(--bg-card-hover);
+      border-color: rgba(255,255,255,0.12);
+      transform: translateY(-4px);
+      box-shadow: 0 16px 48px rgba(0,0,0,0.3);
+    }
+    .download-card-icon {
+      width: 56px; height: 56px;
+      margin: 0 auto 16px;
+      border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 28px;
+    }
+    .download-card h3 { font-size: 18px; font-weight: 700; margin-bottom: 6px; }
+    .download-card p { font-size: 14px; color: var(--text-dim); margin-bottom: 16px; }
+    .download-card .tag {
+      display: inline-block;
+      padding: 4px 12px;
+      background: rgba(71,77,237,0.1);
+      border: 1px solid rgba(71,77,237,0.2);
+      border-radius: 100px;
+      font-size: 12px; font-weight: 600;
+      color: #7c80ff;
+    }
+
+    /* ── Sponsor ── */
+    .sponsor-section {
+      text-align: center;
+      padding: 80px 0 120px;
+    }
+    .sponsor-card {
+      max-width: 600px;
+      margin: 0 auto;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 48px 40px;
+      position: relative;
+      overflow: hidden;
+    }
+    .sponsor-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: var(--gradient);
+    }
+    .sponsor-icon {
+      font-size: 40px;
+      margin-bottom: 20px;
+    }
+    .sponsor-card h2 {
+      font-size: 24px; font-weight: 800;
+      margin-bottom: 12px;
+    }
+    .sponsor-card p {
+      font-size: 15px;
+      color: var(--text-dim);
+      margin-bottom: 28px;
+      line-height: 1.7;
+    }
+
+    /* ── Footer ── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 32px 0;
+      text-align: center;
+    }
+    footer p { font-size: 13px; color: var(--text-dim); }
+    footer a { color: var(--text-dim); text-decoration: none; }
+    footer a:hover { color: var(--text); }
+
+    /* ── Keyboard shortcuts showcase ── */
+    kbd {
+      display: inline-block;
+      padding: 3px 8px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 6px;
+      font-family: 'Inter', sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      line-height: 1.4;
+      color: var(--text-dim);
+    }
+
+    /* ── Themes preview ── */
+    .themes-row {
+      display: flex; gap: 12px; flex-wrap: wrap; margin-top: 20px;
+    }
+    .theme-chip {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 14px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-size: 13px; font-weight: 500;
+    }
+    .theme-dot {
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 768px) {
+      .hero { padding: 120px 0 60px; }
+      .bento { grid-template-columns: 1fr; }
+      .bento-item.span-2 { grid-column: span 1; }
+      .nav-links { gap: 16px; }
+      .nav-links a { font-size: 13px; }
+      section { padding: 60px 0; }
+      .sponsor-card { padding: 32px 24px; }
+    }
+
+    /* ── Fade in animation ── */
+    .fade-in {
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity 0.6s ease, transform 0.6s ease;
+    }
+    .fade-in.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  </style>
+</head>
+<body>
+  <!-- Ambient glow -->
+  <div class="ambient ambient-1"></div>
+  <div class="ambient ambient-2"></div>
+  <div class="ambient ambient-3"></div>
+
+  <!-- Nav -->
+  <nav>
+    <div class="container">
+      <a href="#" class="nav-brand">
+        <svg viewBox="559 560 928 910" fill="none">
+          <path fill="#474DEE" d="M1486.89 1241.53C1489.37 1308.51 1475.15 1368.43 1425.79 1415.91C1415.97 1425.36 1405.79 1434.54 1393.82 1441.16C1363.51 1457.94 1324.04 1469.76 1289.52 1469.97C1172.08 1470.72 1054.71 1470.86 937.297 1470.92L823.156 1470.79C783.173 1470.57 749.897 1472.2 710.445 1463.48C675.242 1455.78 642.891 1438.4 617.036 1413.3C586.949 1383.72 568.854 1344.06 562.498 1302.46C560.167 1287.21 560.26 1268.24 560.152 1252.63L559.866 923.223L559.849 818.973C559.848 780.617 557.811 748.778 566.45 710.983C586.528 623.138 660.307 569.162 747.889 562.372C774.007 560.348 800.692 561.118 826.929 561.133L930.282 561.333C1036.82 561.057 1146.13 560.266 1252.53 561.379C1319.02 560.452 1379.71 572.041 1428.75 620.659C1458.86 650.506 1478.12 690.57 1484.53 732.51C1486.87 747.872 1486.75 768.651 1486.87 784.494C1486.85 817.281 1487.05 850.069 1487.47 882.854C1487.93 961.98 1488 1041.11 1487.66 1120.24L1487.38 1201.65C1487.31 1212.79 1487.76 1230.87 1486.89 1241.53z"/>
+          <path fill="#9858EB" d="M930.282 561.333C1036.82 561.057 1146.13 560.266 1252.53 561.379C1319.02 560.452 1379.71 572.041 1428.75 620.659C1458.86 650.506 1478.12 690.57 1484.53 732.51C1486.87 747.872 1486.75 768.651 1486.87 784.494C1486.85 817.281 1487.05 850.069 1487.47 882.854L1486.28 886.97C1485.12 884.084 1484.93 814.256 1484.54 804.478z"/>
+          <path fill="#CD70D3" d="M1252.53 561.379C1319.02 560.452 1379.71 572.041 1428.75 620.659C1458.86 650.506 1478.12 690.57 1484.53 732.51C1486.87 747.872 1486.75 768.651 1486.87 784.494C1486.85 817.281 1487.05 850.069 1487.47 882.854L1486.28 886.97z"/>
+          <path fill="#fefefe" d="M1296.51 1002.48C1278.36 995.113 1263.4 983.728 1258.05 964.335C1246.08 920.867 1258.88 872.151 1249.97 828.307C1248.81 822.599 1241.81 816.001 1236.4 814.344C1225.53 808.34 1201.33 815.389 1196.42 807.722C1194.31 804.424 1195.07 780.901 1196.55 776.561C1203.65 770.88 1230.6 771.431 1239.78 772.656C1297.1 780.305 1298.2 823.912 1298.08 868.262L1297.98 910.902C1297.96 925.063 1297.64 939.925 1302.81 953.36C1313.28 980.553 1341.73 979.11 1345.1 985.944C1348.23 992.262 1346.6 1012.15 1346.11 1019.72C1328.87 1029.15 1307.62 1030.31 1301.93 1054.46C1293.69 1089.46 1299.97 1128.52 1297.77 1164.41C1297.37 1170.98 1296.8 1177.31 1296.44 1183.76C1286.31 1230.59 1251.92 1239.98 1209.01 1237.35C1194.62 1236.47 1195.87 1231.17 1195.42 1219.81C1194.52 1199.62 1194.39 1196.77 1215.56 1197.68C1236.88 1198.59 1250.23 1192.59 1252.04 1169.55z"/>
+          <path fill="#fefefe" d="M1066.04 930.484C1066.27 926.092 1065.3 916.297 1068.88 913.172C1074.82 907.978 1135.13 910.576 1145.33 912.155C1163.08 914.902 1179.83 922.786 1190.63 937.565C1207 959.972 1206.62 1006.95 1202.23 1033.25C1200.13 1045.82 1196.96 1056.64 1189.08 1066.78C1187.09 1069.33 1183.26 1072.6 1181.94 1075.28C1153.8 1096.11 1130.26 1092.33 1097.11 1092.79C1088.37 1092.91 1077 1094.07 1069.23 1089.96C1067.15 1087.65 1066.73 1083.21 1066.67 1080.12C1065.77 1030.34 1067.25 980.267 1066.04 930.484z"/>
+          <path fill="#474DEE" d="M1108.81 948.752C1143.88 947.909 1161.1 949.335 1160.61 991.633C1160.41 1009.28 1162.47 1030.38 1151.61 1045.62C1138.39 1057.01 1125.45 1055.08 1108.95 1054.83L1108.81 948.752z"/>
+          <path fill="#fefefe" d="M811.086 772.372C819.374 771.303 846.7 771.08 852.182 777.216C853.556 783.095 855.144 800.393 852.158 805.981C846.2 817.127 824.351 808.104 811.861 814.278C806.125 815.977 799.296 823.177 798.202 829.143C790.368 871.897 801.465 918.325 791.681 961.02C786.704 982.74 771.773 994.511 751.923 1002.32C798.776 1022.05 796.166 1057.81 795.873 1102.06L795.566 1146C795.48 1159.15 794.7 1174.68 801.061 1185.61C810.839 1203 833.195 1195.66 848.241 1198.6C855.953 1200.11 854.242 1228.03 851.287 1233.48C849.999 1235.85 846.92 1235.86 844.758 1236.27C810.998 1239.62 775.806 1238.06 758.514 1203.37C749.553 1185.39 750.95 1165.06 750.998 1145.52L751.146 1094.96C751.194 1067.29 750.047 1037.04 719.136 1026.33C713.744 1024.46 708.379 1023.11 703.114 1020.9L702.181 1020.5C701.849 1011.39 699.465 996.282 702.454 987.903C705.705 978.792 736.199 979.616 745.754 954.095C762.38 909.686 735.32 833.545 764.638 796.086C776.483 780.952 792.474 774.593 811.086 772.372z"/>
+          <path fill="#fefefe" d="M867.808 911.132C877.997 910.87 899.098 909.335 907.898 912.487C914.205 919.149 944.848 995.173 949.084 1005.77C959.117 975.871 973.076 943.223 986.527 914.701C989.15 909.137 1025.25 908.833 1031.58 914.446C1033.95 923.821 1033.81 1073.72 1031.85 1088.36C1030.2 1090.27 1028.9 1091.36 1026.43 1092.06C1020.49 1093.73 998.92 1094.4 994.071 1090.67C989.391 1087.08 991.589 1041.22 991.662 1032.5C991.747 1014.46 991.58 997.295 993.267 979.308C985.372 996.805 969.952 1042.24 960.701 1055.97C952.529 1056.21 944.646 1056.01 936.486 1055.84C927.025 1041.04 908.373 993.542 901.773 976.415C904.027 988.989 907.264 1081.02 903.34 1088.3C902.197 1090.42 900.386 1091.96 897.967 1092.33C889.251 1093.67 872.224 1094.45 865.023 1089.42C863.861 1086.76 863.714 1084.21 863.717 1081.31C863.765 1026.59 863.14 971.797 863.936 917.097C863.974 914.49 866.119 912.982 867.808 911.132z"/>
+        </svg>
+        <span>Any Markdown</span>
+      </a>
+      <div class="nav-links">
+        <a href="#features">Features</a>
+        <a href="#download">Download</a>
+        <a href="#sponsor">Sponsor</a>
+        <a href="https://github.com/raggbal/any-markdown" target="_blank" rel="noopener">GitHub</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="container">
+      <div class="hero-badge">
+        <span class="hero-badge-dot"></span>
+        Open Source &middot; MIT License
+      </div>
+      <h1>
+        Markdown editing,<br>
+        <span class="gradient">reimagined.</span>
+      </h1>
+      <p class="hero-sub">
+        A seamless WYSIWYG markdown editor for VS Code and desktop.
+        Edit visually while AI modifies your files in real-time.
+      </p>
+      <div class="hero-buttons">
+        <a href="https://marketplace.visualstudio.com/items?itemName=imaken.any-markdown" class="btn btn-primary" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Install for VS Code
+        </a>
+        <a href="https://github.com/raggbal/any-markdown" class="btn btn-secondary" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+          View on GitHub
+        </a>
+      </div>
+
+      <div class="screenshot-wrap fade-in">
+        <img src="../assets/images/1772631963888.png" alt="Any Markdown editor screenshot" loading="lazy">
+      </div>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section id="features">
+    <div class="container">
+      <div class="section-label">Features</div>
+      <h2 class="section-title">Everything you need.<br>Nothing you don't.</h2>
+      <p class="section-desc">
+        A Typora-inspired editor built for the AI coding era.
+        Full Markdown support with zero configuration.
+      </p>
+
+      <div class="features-grid fade-in">
+        <div class="feature-card">
+          <div class="feature-icon feature-icon-blue">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+          </div>
+          <h3>True WYSIWYG</h3>
+          <p>No split panes. No preview tabs. What you see is what you get. Edit headings, lists, tables, and code blocks inline.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon feature-icon-purple">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+          </div>
+          <h3>AI-Friendly</h3>
+          <p>Edit visually while Copilot, Cursor, or Claude Code modify the same file. Block-level DOM diff keeps your cursor in place.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon feature-icon-pink">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+          </div>
+          <h3>Code Blocks</h3>
+          <p>Syntax highlighting for 20+ languages. Display/edit mode toggle. Expand to full VS Code editor with one click.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon feature-icon-blue">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          </div>
+          <h3>Tables</h3>
+          <p>Full table editing with cell navigation, column resize, row/column add/remove, and alignment controls. Arrow key navigation just works.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon feature-icon-purple">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          </div>
+          <h3>Mermaid Diagrams</h3>
+          <p>Write Mermaid syntax, see SVG diagrams rendered live. Click to edit, auto-render when done. Flowcharts, sequences, gantt, and more.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon feature-icon-pink">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>
+          </div>
+          <h3>KaTeX Math</h3>
+          <p>Beautiful math equations rendered with KaTeX. Each line is an independent expression. Real-time preview with 500ms debounce.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon feature-icon-blue">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+          </div>
+          <h3>7 Themes</h3>
+          <p>GitHub, Sepia, Night, Dark, Minimal, Things, and Perplexity. From bright daylight to late-night coding sessions.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon feature-icon-purple">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          </div>
+          <h3>Find &amp; Replace</h3>
+          <p>Ctrl+F search with highlight, match count, case sensitivity, word boundaries, and regex support. Ctrl+H for replace.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon feature-icon-pink">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </div>
+          <h3>7 Languages</h3>
+          <p>English, Japanese, Chinese (Simplified/Traditional), Korean, Spanish, and French. Auto-detect from VS Code locale.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Bento highlight -->
+  <section>
+    <div class="container">
+      <div class="bento fade-in">
+        <div class="bento-item span-2">
+          <h3>Keyboard-first design</h3>
+          <p>Every action has a shortcut. Action Palette (<kbd>Cmd</kbd>+<kbd>/</kbd>) for everything else.</p>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:20px;">
+            <span class="theme-chip"><kbd>Cmd</kbd>+<kbd>B</kbd> Bold</span>
+            <span class="theme-chip"><kbd>Cmd</kbd>+<kbd>I</kbd> Italic</span>
+            <span class="theme-chip"><kbd>Cmd</kbd>+<kbd>K</kbd> Link</span>
+            <span class="theme-chip"><kbd>Cmd</kbd>+<kbd>1-6</kbd> Headings</span>
+            <span class="theme-chip"><kbd>Cmd</kbd>+<kbd>.</kbd> Source</span>
+            <span class="theme-chip"><kbd>Tab</kbd> Indent</span>
+          </div>
+        </div>
+        <div class="bento-item">
+          <h3>Offline-first</h3>
+          <p>All libraries bundled locally. No CDN, no network requests. Works on air-gapped machines and slow connections.</p>
+          <div style="margin-top:20px; font-size: 36px; text-align: center; opacity: 0.6;">
+            <!-- airplane icon -->
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.4"><path d="M17.8 19.2L16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg>
+          </div>
+        </div>
+        <div class="bento-item">
+          <h3>Themes</h3>
+          <p>7 carefully crafted themes for every environment.</p>
+          <div class="themes-row">
+            <span class="theme-chip"><span class="theme-dot" style="background:#fff;"></span> GitHub</span>
+            <span class="theme-chip"><span class="theme-dot" style="background:#fbf8f1;"></span> Sepia</span>
+            <span class="theme-chip"><span class="theme-dot" style="background:#1a1b26;"></span> Night</span>
+            <span class="theme-chip"><span class="theme-dot" style="background:#1e1e1e;"></span> Dark</span>
+            <span class="theme-chip"><span class="theme-dot" style="background:#fafafa;"></span> Minimal</span>
+            <span class="theme-chip"><span class="theme-dot" style="background:#FBFAF4;"></span> Perplexity</span>
+            <span class="theme-chip"><span class="theme-dot" style="background:linear-gradient(135deg,#3478F6,#5AC8FA);"></span> Things</span>
+          </div>
+        </div>
+        <div class="bento-item span-2">
+          <h3>Pattern conversion</h3>
+          <p>Type Markdown naturally. It converts to rich text as you type.</p>
+          <div class="bento-code">
+            <span class="cm"># Type naturally</span><br>
+            <span class="kw"># </span>Heading &rarr; <span class="str">&lt;h1&gt;</span><br>
+            <span class="kw">- </span>List item &rarr; <span class="str">&lt;ul&gt;&lt;li&gt;</span><br>
+            <span class="kw">&gt; </span>Quote &rarr; <span class="str">&lt;blockquote&gt;</span><br>
+            <span class="kw">```</span>js &rarr; <span class="str">&lt;pre&gt;&lt;code&gt;</span> <span class="cm">with syntax highlighting</span><br>
+            <span class="kw">**</span>bold<span class="kw">**</span> &rarr; <span class="str">&lt;strong&gt;</span><br>
+            <span class="kw">| </span>a <span class="kw">|</span> b <span class="kw">|</span> &rarr; <span class="str">&lt;table&gt;</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Download -->
+  <section id="download">
+    <div class="container">
+      <div class="section-label">Download</div>
+      <h2 class="section-title">Get Any Markdown</h2>
+      <p class="section-desc">
+        Available as a VS Code extension and a standalone desktop app.
+      </p>
+
+      <div class="download-grid fade-in">
+        <a href="https://marketplace.visualstudio.com/items?itemName=imaken.any-markdown" class="download-card" target="_blank" rel="noopener">
+          <div class="download-card-icon" style="background:rgba(0,120,212,0.12);">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M24 2.5v19L18 24 0 19.5v-15L18 0l6 2.5zM1 19l17 4V1L1 5v14zm18-14v14l4 1V4l-4-1z" fill="#0078d4"/></svg>
+          </div>
+          <h3>VS Code Marketplace</h3>
+          <p>Official extension for Visual Studio Code</p>
+          <span class="tag">Recommended</span>
+        </a>
+
+        <a href="https://open-vsx.org/extension/imaken/any-markdown" class="download-card" target="_blank" rel="noopener">
+          <div class="download-card-icon" style="background:rgba(181,137,214,0.12);">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="#b589d6" stroke-width="2"/><path d="M8 12l3 3 5-5" stroke="#b589d6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <h3>Open VSX Registry</h3>
+          <p>For VSCodium, Gitpod, Eclipse Theia</p>
+          <span class="tag">Open Source</span>
+        </a>
+
+        <a href="https://github.com/raggbal/any-markdown/releases" class="download-card" target="_blank" rel="noopener">
+          <div class="download-card-icon" style="background:rgba(71,77,237,0.12);">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#474DEE" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          </div>
+          <h3>Desktop App</h3>
+          <p>Standalone Electron app for macOS &amp; Windows</p>
+          <span class="tag">Coming Soon</span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Sponsor -->
+  <section id="sponsor" class="sponsor-section">
+    <div class="container">
+      <div class="sponsor-card fade-in">
+        <div class="sponsor-icon">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" fill="url(#heart-gradient)"/><defs><linearGradient id="heart-gradient" x1="4" y1="4" x2="20" y2="20"><stop offset="0%" stop-color="#474DEE"/><stop offset="50%" stop-color="#9858EB"/><stop offset="100%" stop-color="#CD70D3"/></linearGradient></defs></svg>
+        </div>
+        <h2>Support the project</h2>
+        <p>
+          Any Markdown is free and open source, built with passion by an independent developer.
+          If it makes your workflow better, consider sponsoring to help keep it maintained and improved.
+        </p>
+        <a href="https://github.com/sponsors/raggbal" class="btn btn-primary" target="_blank" rel="noopener">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" fill="currentColor"/></svg>
+          Sponsor on GitHub
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <div class="container">
+      <p>
+        &copy; 2024&ndash;2026 Any Markdown &middot;
+        <a href="https://github.com/raggbal/any-markdown">GitHub</a> &middot;
+        <a href="https://github.com/raggbal/any-markdown/blob/main/LICENSE">MIT License</a>
+      </p>
+    </div>
+  </footer>
+
+  <!-- Scroll animation -->
+  <script>
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+        }
+      });
+    }, { threshold: 0.1 });
+    document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+  </script>
+</body>
+</html>

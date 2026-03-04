@@ -9,6 +9,7 @@ export function buildMenu(handlers: {
     save: () => void;
     saveAs: () => void;
     openPreferences: () => void;
+    checkForUpdates: () => void;
 }): Menu {
     const isMac = process.platform === 'darwin';
 
@@ -119,6 +120,11 @@ export function buildMenu(handlers: {
         {
             label: 'Help',
             submenu: [
+                {
+                    label: 'Check for Updates...',
+                    click: handlers.checkForUpdates,
+                },
+                { type: 'separator' },
                 {
                     label: 'GitHub Repository',
                     click: () => shell.openExternal('https://github.com/raggbal/any-markdown'),

@@ -5,6 +5,7 @@ import { FileManager } from './file-manager';
 import { SettingsManager } from './settings-manager';
 import { generateEditorHtml, writeHtmlToTempFile } from './html-generator';
 import { buildMenu } from './menu';
+import { setupUpdateChecker, checkForUpdates } from './updater';
 
 /**
  * Any Markdown — Electron Main Process
@@ -346,6 +347,10 @@ app.whenReady().then(() => {
             const win = BrowserWindow.getFocusedWindow();
             if (win) settingsManager.openSettingsWindow(win);
         },
+        checkForUpdates: () => {
+            const win = BrowserWindow.getFocusedWindow();
+            if (win) checkForUpdates(win, true);
+        },
     });
     Menu.setApplicationMenu(menu);
 
@@ -354,10 +359,19 @@ app.whenReady().then(() => {
         arg => !arg.startsWith('-') && (arg.endsWith('.md') || arg.endsWith('.markdown'))
     );
 
+    let firstWindow: BrowserWindow | undefined;
     if (filePaths.length > 0) {
-        filePaths.forEach(fp => createWindow(path.resolve(fp)));
+        filePaths.forEach(fp => {
+            const w = createWindow(path.resolve(fp));
+            if (!firstWindow) firstWindow = w;
+        });
     } else {
-        createWindow();
+        firstWindow = createWindow();
+    }
+
+    // Start background update checker
+    if (firstWindow) {
+        setupUpdateChecker(firstWindow);
     }
 });
 

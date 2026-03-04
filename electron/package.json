@@ -1,6 +1,6 @@
 {
   "name": "any-markdown-desktop",
-  "version": "0.1.0",
+  "version": "0.195.386",
   "description": "Any Markdown — WYSIWYG Markdown editor for desktop",
   "main": "out/main.js",
   "author": "imaken",
@@ -52,8 +52,14 @@
       "icon": "build/icon.icns",
       "category": "public.app-category.developer-tools",
       "target": [
-        "dmg",
-        "zip"
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        },
+        {
+          "target": "zip",
+          "arch": ["x64", "arm64"]
+        }
       ],
       "fileAssociations": [
         {
@@ -74,6 +80,21 @@
         {
           "ext": "md",
           "name": "Markdown Document"
+        }
+      ]
+    },
+    "linux": {
+      "icon": "build/icon.png",
+      "category": "Office",
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "fileAssociations": [
+        {
+          "ext": "md",
+          "name": "Markdown Document",
+          "mimeType": "text/markdown"
         }
       ]
     },

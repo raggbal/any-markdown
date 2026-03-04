@@ -1,0 +1,127 @@
+name: Release Electron App
+
+on:
+  push:
+    tags:
+      - 'electron-v*'
+
+jobs:
+  build-mac-arm64:
+    runs-on: macos-latest  # Apple Silicon (M1+)
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install electron dependencies
+        run: cd electron && npm ci
+
+      - name: Build macOS arm64
+        run: |
+          cd electron
+          npm run compile
+          ELECTRON_RUN_AS_NODE= npx electron-builder --mac --arm64
+
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            electron/dist/*-arm64.dmg
+            electron/dist/*-arm64.zip
+            electron/dist/*-arm64-mac.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-mac-x64:
+    runs-on: macos-13  # Intel Mac
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install electron dependencies
+        run: cd electron && npm ci
+
+      - name: Build macOS x64
+        run: |
+          cd electron
+          npm run compile
+          ELECTRON_RUN_AS_NODE= npx electron-builder --mac --x64
+
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            electron/dist/*.dmg
+            electron/dist/*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-win:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install electron dependencies
+        run: cd electron && npm ci
+
+      - name: Build Windows
+        run: |
+          cd electron
+          npm run compile
+          npx electron-builder --win
+
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            electron/dist/*.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install electron dependencies
+        run: cd electron && npm ci
+
+      - name: Build Linux
+        run: |
+          cd electron
+          npm run compile
+          npx electron-builder --linux
+
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            electron/dist/*.AppImage
+            electron/dist/*.deb
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
