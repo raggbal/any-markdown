@@ -377,6 +377,8 @@
     let hasUserEdited = false; // Flag to track if user has made any edits
     let currentImageDir = null; // IMAGE_DIR directive value (preserved during sync)
     let currentForceRelativePath = null; // FORCE_RELATIVE_PATH directive value (preserved during sync)
+    let imageDirDisplayPath = null; // Resolved display path from extension
+    let imageDirSource = null; // 'file' | 'settings' | 'default'
 
     // Active editing detection — replaces simple focus-based guard
     let isActivelyEditing = false;
@@ -588,9 +590,13 @@
             src.startsWith('vscode-webview:')) {
             return src;
         }
-        // If absolute file path (starts with /), convert to vscode-resource URI
+        // If absolute file path (starts with /)
         if (src.startsWith('/')) {
-            // Use file+.vscode-resource.vscode-cdn.net format for absolute paths
+            if (documentBaseUri && documentBaseUri.startsWith('file://')) {
+                // Electron: use file:// protocol directly
+                return 'file://' + src;
+            }
+            // VSCode webview: use vscode-resource URI
             return 'https://file+.vscode-resource.vscode-cdn.net' + src;
         }
         // Resolve relative path against document base URI
@@ -11878,7 +11884,15 @@
     closeSidebarBtn.addEventListener('click', function() {
         closeSidebar();
     });
-    
+
+    // Image directory settings button handler
+    const imageDirSettingsBtn = document.getElementById('imageDirSettingsBtn');
+    if (imageDirSettingsBtn) {
+        imageDirSettingsBtn.addEventListener('click', function() {
+            host.requestSetImageDir();
+        });
+    }
+
     // Sidebar resize functionality
     let isResizing = false;
     let startX = 0;
@@ -12020,7 +12034,14 @@
             item.addEventListener('click', () => {
                 const idx = parseInt(item.dataset.index);
                 if (headingsArray[idx]) {
-                    headingsArray[idx].scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    const wrapper = editor.closest('.editor-wrapper');
+                    if (wrapper) {
+                        const wrapperRect = wrapper.getBoundingClientRect();
+                        const headingRect = headingsArray[idx].getBoundingClientRect();
+                        wrapper.scrollTo({ top: wrapper.scrollTop + headingRect.top - wrapperRect.top, behavior: 'smooth' });
+                    } else {
+                        headingsArray[idx].scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
                 }
             });
         });
@@ -12038,14 +12059,19 @@
     function updateStatus() {
         // Update IMAGE_DIR display in sidebar footer
         if (statusImageDir) {
-            let statusText = '';
-            if (currentImageDir) {
-                statusText = '📁 ' + currentImageDir;
+            const pathEl = document.getElementById('imageDirPath');
+            const sourceEl = document.getElementById('imageDirSource');
+            if (pathEl && imageDirDisplayPath !== null) {
+                pathEl.textContent = '\u{1F4C1} ' + imageDirDisplayPath;
             }
-            if (currentForceRelativePath === true) {
-                statusText += (statusText ? '  ' : '') + '🔄 ' + i18n.relativePath;
+            if (sourceEl && imageDirSource) {
+                const labels = {
+                    file: i18n.imageDirSourceFile || 'File',
+                    settings: i18n.imageDirSourceSettings || 'Settings',
+                    default: i18n.imageDirSourceDefault || 'Default'
+                };
+                sourceEl.textContent = '(' + (labels[imageDirSource] || imageDirSource) + ')';
             }
-            statusImageDir.textContent = statusText;
         }
     }
 
@@ -12948,6 +12974,10 @@
             }
             updateStatus(); // Update status bar to show IMAGE_DIR and FORCE_RELATIVE_PATH
             syncMarkdown(); // Re-sync to include the new directives
+        } else if (message.type === 'imageDirStatus') {
+            imageDirDisplayPath = message.displayPath;
+            imageDirSource = message.source;
+            updateStatus();
         } else if (message.type === 'insertImageHtml') {
             logger.log('insertImageHtml received:', message);
             // Insert image at cursor position
@@ -13017,7 +13047,14 @@
                         .replace(/\s+/g, '-'); // Replace spaces with hyphens
                     
                     if (slug === anchor || heading.id === anchor) {
-                        heading.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        const wrapper = editor.closest('.editor-wrapper');
+                        if (wrapper) {
+                            const wrapperRect = wrapper.getBoundingClientRect();
+                            const headingRect = heading.getBoundingClientRect();
+                            wrapper.scrollTo({ top: wrapper.scrollTop + headingRect.top - wrapperRect.top, behavior: 'smooth' });
+                        } else {
+                            heading.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }
                         // Briefly highlight the heading
                         heading.style.transition = 'background-color 0.3s';
                         heading.style.backgroundColor = 'var(--selection-bg)';
@@ -14729,6 +14766,11 @@
             openSearchBox(true);
         }
     });
+
+    // Expose htmlToMarkdown globally for Electron's executeJavaScript
+    if (typeof window !== 'undefined') {
+        window.htmlToMarkdown = htmlToMarkdown;
+    }
 
     // Expose functions for testing (only when __testApi is defined)
     if (typeof window !== 'undefined' && window.__testApi) {

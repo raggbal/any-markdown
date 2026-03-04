@@ -85,6 +85,11 @@ export const webviewMessages = {
   externalChangeToast: '파일이 외부에서 수정되었습니다. 편집 중에는 반영되지 않습니다. 편집기 외부를 클릭하면 반영됩니다.',
   undo: '실행 취소 (Ctrl+Z)',
   redo: '다시 실행 (Ctrl+Shift+Z)',
+  // Image directory source labels
+  imageDirLabel: '이미지 저장 경로:',
+  imageDirSourceFile: '파일별 설정',
+  imageDirSourceSettings: '설정에 의해',
+  imageDirSourceDefault: '기본값',
   // Command palette
   commandPaletteFilter: '입력하여 필터...',
   commandPaletteInline: '인라인',

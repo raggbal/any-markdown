@@ -41,7 +41,8 @@ export type HostMessage =
     | { type: 'insertLinkHtml'; url: string; text: string }
     | { type: 'externalChangeDetected'; message: string }
     | { type: 'scrollToAnchor'; anchor: string }
-    | { type: 'imageDirInfo'; fileImageDir: string; defaultImageDir: string };
+    | { type: 'imageDirInfo'; fileImageDir: string; defaultImageDir: string }
+    | { type: 'imageDirStatus'; displayPath: string; source: 'file' | 'settings' | 'default' };
 
 /** window にグローバルとして注入される */
 declare global {

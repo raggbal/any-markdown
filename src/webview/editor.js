@@ -14,7 +14,6 @@
     const sourceEditor = document.getElementById('sourceEditor');
     const outline = document.getElementById('outline');
     const wordCount = document.getElementById('wordCount');
-    const statusLeft = document.getElementById('statusLeft');
     const statusImageDir = document.getElementById('statusImageDir');
     const sidebar = document.getElementById('sidebar');
     const toolbar = document.getElementById('toolbar');
@@ -156,6 +155,8 @@
     let hasUserEdited = false; // Flag to track if user has made any edits
     let currentImageDir = null; // IMAGE_DIR directive value (preserved during sync)
     let currentForceRelativePath = null; // FORCE_RELATIVE_PATH directive value (preserved during sync)
+    let imageDirDisplayPath = null; // Resolved display path from extension
+    let imageDirSource = null; // 'file' | 'settings' | 'default'
 
     // Active editing detection — replaces simple focus-based guard
     let isActivelyEditing = false;
@@ -11661,7 +11662,15 @@
     closeSidebarBtn.addEventListener('click', function() {
         closeSidebar();
     });
-    
+
+    // Image directory settings button handler
+    const imageDirSettingsBtn = document.getElementById('imageDirSettingsBtn');
+    if (imageDirSettingsBtn) {
+        imageDirSettingsBtn.addEventListener('click', function() {
+            host.requestSetImageDir();
+        });
+    }
+
     // Sidebar resize functionality
     let isResizing = false;
     let startX = 0;
@@ -11699,13 +11708,11 @@
             sourceEditor.value = markdown;
             sourceEditor.style.display = 'block';
             editor.style.display = 'none';
-            statusLeft.textContent = i18n.sourceMode;
         } else {
             markdown = sourceEditor.value;
             renderFromMarkdown();
             sourceEditor.style.display = 'none';
             editor.style.display = 'block';
-            statusLeft.textContent = i18n.livePreviewMode;
         }
     }
 
@@ -11828,14 +11835,20 @@
     function updateStatus() {
         // Update IMAGE_DIR display in sidebar footer
         if (statusImageDir) {
-            let statusText = '';
-            if (currentImageDir) {
-                statusText = '📁 ' + currentImageDir;
+            const pathEl = document.getElementById('imageDirPath');
+            const sourceEl = document.getElementById('imageDirSource');
+            if (pathEl && imageDirDisplayPath !== null) {
+                pathEl.textContent = imageDirDisplayPath;
+                pathEl.title = imageDirDisplayPath;
             }
-            if (currentForceRelativePath === true) {
-                statusText += (statusText ? '  ' : '') + '🔄 ' + i18n.relativePath;
+            if (sourceEl && imageDirSource) {
+                const labels = {
+                    file: i18n.imageDirSourceFile || 'File',
+                    settings: i18n.imageDirSourceSettings || 'Settings',
+                    default: i18n.imageDirSourceDefault || 'Default'
+                };
+                sourceEl.textContent = labels[imageDirSource] || imageDirSource;
             }
-            statusImageDir.textContent = statusText;
         }
     }
 
@@ -12738,6 +12751,10 @@
             }
             updateStatus(); // Update status bar to show IMAGE_DIR and FORCE_RELATIVE_PATH
             syncMarkdown(); // Re-sync to include the new directives
+        } else if (message.type === 'imageDirStatus') {
+            imageDirDisplayPath = message.displayPath;
+            imageDirSource = message.source;
+            updateStatus();
         } else if (message.type === 'insertImageHtml') {
             logger.log('insertImageHtml received:', message);
             // Insert image at cursor position

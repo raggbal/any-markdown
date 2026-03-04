@@ -114,8 +114,18 @@ export function getWebviewContent(
             <nav class="outline" id="outline"></nav>
             <div class="sidebar-footer">
                 <div class="word-count" id="wordCount"></div>
-                <div class="sidebar-status-mode" id="statusLeft">${msg.livePreviewMode}</div>
-                <div class="sidebar-status-imagedir" id="statusImageDir"></div>
+                <div class="sidebar-status-imagedir" id="statusImageDir">
+                    <div class="imagedir-header">
+                        <span class="imagedir-label">${msg.imageDirLabel}</span>
+                        <span class="imagedir-source" id="imageDirSource"></span>
+                        <button class="imagedir-settings-btn" id="imageDirSettingsBtn" title="${msg.setImageDir}">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+                        </button>
+                    </div>
+                    <div class="imagedir-info">
+                        <span class="imagedir-path" id="imageDirPath"></span>
+                    </div>
+                </div>
             </div>
             <div class="sidebar-resizer" id="sidebarResizer"></div>
         </aside>
@@ -153,7 +163,6 @@ export function getWebviewContent(
                     <div class="toolbar-group" data-group="insert">
                         <button data-action="link" title="${msg.insertLink}"></button>
                         <button data-action="image" title="${msg.insertImage}"></button>
-                        <button data-action="imageDir" title="${msg.setImageDir}"></button>
                         <button data-action="table" title="${msg.insertTable}"></button>
                     </div>
                     <div class="toolbar-group" data-group="utility">

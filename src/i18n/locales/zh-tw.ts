@@ -85,6 +85,11 @@ export const webviewMessages = {
   externalChangeToast: '檔案已被外部修改。編輯中不會反映變更。請點擊編輯器外部以重新載入。',
   undo: '復原 (Ctrl+Z)',
   redo: '重做 (Ctrl+Shift+Z)',
+  // Image directory source labels
+  imageDirLabel: '圖片儲存目錄:',
+  imageDirSourceFile: '按檔案設定',
+  imageDirSourceSettings: '按設定',
+  imageDirSourceDefault: '按預設',
   // Command palette
   commandPaletteFilter: '輸入篩選...',
   commandPaletteInline: '內聯',

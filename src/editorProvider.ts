@@ -268,6 +268,14 @@ class ImageDirectoryManager {
     }
     
     /**
+     * ファイル単位のIMAGE_DIRを取得
+     */
+    getFileImageDir(uriKey: string): string | undefined {
+        const dir = this.fileImageDirs.get(uriKey);
+        return dir || undefined;
+    }
+
+    /**
      * ファイル単位のIMAGE_DIRをクリア
      */
     clearFileImageDir(documentUri: vscode.Uri): void {
@@ -439,11 +447,56 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
             }
         };
 
+        // Send current image directory status to webview
+        const sendImageDirStatus = () => {
+            const docContent = document.getText();
+            const docPath = document.uri.fsPath;
+            const uriKey = document.uri.toString();
+            const docDir = path.dirname(docPath);
+
+            // Determine source
+            const fileImageDir = imageDirectoryManager.getFileImageDir(uriKey);
+            const docImageDir = extractImageDir(docContent);
+            const cfg = vscode.workspace.getConfiguration('any-markdown');
+            const settingsDir = cfg.get<string>('imageDefaultDir', '');
+
+            let source: 'file' | 'settings' | 'default';
+            if (fileImageDir || docImageDir) {
+                source = 'file';
+            } else if (settingsDir) {
+                source = 'settings';
+            } else {
+                source = 'default';
+            }
+
+            // Compute display path (same logic as toMarkdownPath for directories)
+            const absDir = imageDirectoryManager.getImageDirectory(document.uri, docContent);
+            const useAbsolute = imageDirectoryManager.shouldUseAbsolutePath(document.uri);
+            const forceRelative = imageDirectoryManager.shouldForceRelativePath(document.uri, docContent);
+
+            let displayPath: string;
+            if (forceRelative || !useAbsolute) {
+                displayPath = path.relative(docDir, absDir) || '.';
+                displayPath = displayPath.replace(/\\/g, '/');
+            } else {
+                displayPath = absDir;
+            }
+
+            webviewPanel.webview.postMessage({
+                type: 'imageDirStatus',
+                displayPath,
+                source
+            });
+        };
+
         // Initial content
         updateWebview();
 
         // Initialize IMAGE_DIR tracking
         imageDirectoryManager.initializeForDocument(document.uri, document.getText());
+
+        // Send initial image dir status (queued for webview)
+        sendImageDirStatus();
 
         // Sync policy: when user is actively editing, external changes are queued in webview.
         // When user is idle (even with focus), external changes are applied with cursor preservation.
@@ -468,6 +521,9 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
                 type: 'update',
                 content: content
             });
+
+            // Update image dir status (directive may have changed)
+            sendImageDirStatus();
 
             // Check for IMAGE_DIR changes (external edit)
             if (imageDirectoryManager.checkAndWarnIfChanged(document.uri, currentContent)) {
@@ -536,6 +592,7 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
                     initLocale(langConfig.get<string>('language', 'default'), vscode.env.language);
                 }
                 updateWebview();
+                sendImageDirStatus();
             }
         });
 
@@ -731,6 +788,7 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
                                 forceRelativePath: null  // null でクリア
                             });
                             vscode.window.showInformationMessage(t('imageDirCleared'));
+                            sendImageDirStatus();
                         } else {
                             // パスが入力された場合: FORCE_RELATIVE_PATH の設定を確認
                             const forceRelativeChoice = await vscode.window.showQuickPick(
@@ -757,6 +815,7 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
                                 
                                 const relativeMsg = forceRelativeChoice.value ? t('relativePathOn') : '';
                                 vscode.window.showInformationMessage(`${t('imageDirSet')}${inputDir} ${relativeMsg}`);
+                                sendImageDirStatus();
                             }
                         }
                     }

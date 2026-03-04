@@ -85,6 +85,11 @@ export const webviewMessages = {
   externalChangeToast: 'Fichier modifié en externe. Les modifications ne sont pas reflétées pendant l\'édition. Cliquez en dehors de l\'éditeur pour recharger.',
   undo: 'Annuler (Ctrl+Z)',
   redo: 'Rétablir (Ctrl+Shift+Z)',
+  // Image directory source labels
+  imageDirLabel: 'Répertoire d\'images :',
+  imageDirSourceFile: 'par fichier',
+  imageDirSourceSettings: 'par config.',
+  imageDirSourceDefault: 'par défaut',
   // Command palette
   commandPaletteFilter: 'Tapez pour filtrer...',
   commandPaletteInline: 'En ligne',

@@ -85,6 +85,11 @@ export interface WebviewMessages {
   externalChangeToast: string;
   undo: string;
   redo: string;
+  // Image directory source labels
+  imageDirLabel: string;
+  imageDirSourceFile: string;
+  imageDirSourceSettings: string;
+  imageDirSourceDefault: string;
 }
 
 // Supported locales

@@ -85,6 +85,11 @@ export const webviewMessages = {
   externalChangeToast: '文件已被外部修改。编辑中不会反映更改。请点击编辑器外部以重新加载。',
   undo: '撤销 (Ctrl+Z)',
   redo: '重做 (Ctrl+Shift+Z)',
+  // Image directory source labels
+  imageDirLabel: '图片保存目录:',
+  imageDirSourceFile: '按文件设置',
+  imageDirSourceSettings: '按设置',
+  imageDirSourceDefault: '按默认',
   // Command palette
   commandPaletteFilter: '输入筛选...',
   commandPaletteInline: '内联',
