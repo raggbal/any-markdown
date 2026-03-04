@@ -70,6 +70,20 @@ export function getWebviewContent(
     const styles = fs.readFileSync(stylesPath, 'utf8')
         .replace('__FONT_SIZE__', String(safeConfig.fontSize));
     
+    const hostBridgePath = path.join(__dirname, 'shared', 'vscode-host-bridge.js');
+    const hostBridgeScript = fs.readFileSync(hostBridgePath, 'utf8');
+
+    // Vendor library URIs (local instead of CDN)
+    const vendorDir = path.join(__dirname, '..', 'vendor');
+    const vendorUri = (file: string) => webview.asWebviewUri(
+        vscode.Uri.file(path.join(vendorDir, file))
+    );
+    const turndownUri = vendorUri('turndown.js');
+    const turndownGfmUri = vendorUri('turndown-plugin-gfm.js');
+    const mermaidUri = vendorUri('mermaid.min.js');
+    const katexJsUri = vendorUri('katex.min.js');
+    const katexCssUri = vendorUri('katex.min.css');
+
     const editorScript = fs.readFileSync(editorScriptPath, 'utf8')
         .replace('__DEBUG_MODE__', String(safeConfig.enableDebugLogging ?? false))
         .replace('__I18N__', JSON.stringify(msg))
@@ -81,7 +95,7 @@ export function getWebviewContent(
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline' https://fonts.googleapis.com; script-src 'nonce-${nonce}' https://unpkg.com https://cdn.jsdelivr.net; img-src ${webview.cspSource} https: http: data: file:; font-src ${webview.cspSource} https: https://fonts.gstatic.com data:; connect-src http://127.0.0.1:7244;">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline' https://fonts.googleapis.com; script-src 'nonce-${nonce}' ${webview.cspSource}; img-src ${webview.cspSource} https: http: data: file:; font-src ${webview.cspSource} https: https://fonts.gstatic.com data:; connect-src http://127.0.0.1:7244;">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap">
@@ -176,11 +190,14 @@ export function getWebviewContent(
         </main>
     </div>
 
-    <script src="https://unpkg.com/turndown/dist/turndown.js"></script>
-    <script src="https://unpkg.com/turndown-plugin-gfm/dist/turndown-plugin-gfm.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16/dist/katex.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/katex@0.16/dist/katex.min.js"></script>
+    <script src="${turndownUri}"></script>
+    <script src="${turndownGfmUri}"></script>
+    <script src="${mermaidUri}"></script>
+    <link rel="stylesheet" href="${katexCssUri}">
+    <script src="${katexJsUri}"></script>
+    <script nonce="${nonce}">
+        ${hostBridgeScript}
+    </script>
     <script nonce="${nonce}">
         ${editorScript}
     </script>

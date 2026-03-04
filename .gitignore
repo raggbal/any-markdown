@@ -1,6 +1,7 @@
 node_modules/
 out/
 dist/
+vendor/
 *.vsix
 .vscode-test/
 .DS_Store
@@ -14,6 +15,7 @@ dist/
 # Test artifacts
 test-results/
 playwright-report/
+test/html/vendor/
 
 # Temporary files
 *.log

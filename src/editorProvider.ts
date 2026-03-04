@@ -532,7 +532,8 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
             if (e.affectsConfiguration('any-markdown')) {
                 // Re-initialize locale if language setting changed
                 if (e.affectsConfiguration('any-markdown.language')) {
-                    initLocale();
+                    const langConfig = vscode.workspace.getConfiguration('any-markdown');
+                    initLocale(langConfig.get<string>('language', 'default'), vscode.env.language);
                 }
                 updateWebview();
             }

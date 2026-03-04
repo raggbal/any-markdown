@@ -1,5 +1,4 @@
 // Internationalization support - Dynamic loading version
-import * as vscode from 'vscode';
 import * as path from 'path';
 
 // Type definitions
@@ -129,16 +128,14 @@ function resolveLocale(lang: string): string {
 }
 
 /**
- * Get configured language from settings
+ * Resolve effective language from configured language and system language
+ * @param configLang - 設定値 ('default' or 具体的なロケール)
+ * @param systemLang - システム言語 (VSCode: vscode.env.language, Electron: app.getLocale())
  */
-function getConfiguredLanguage(): string {
-  const config = vscode.workspace.getConfiguration('any-markdown');
-  const configLang = config.get<string>('language', 'default');
-  
+function resolveEffectiveLanguage(configLang: string, systemLang: string): string {
   if (!configLang || configLang === 'default') {
-    return vscode.env.language;
+    return systemLang;
   }
-  
   return configLang;
 }
 
@@ -172,9 +169,11 @@ function loadLocale(locale: string): { messages: Messages; webviewMessages: Webv
 
 /**
  * Initialize locale (called on activation and settings change)
+ * @param configLang - 設定値 ('default' or 具体的なロケール)
+ * @param systemLang - システム言語 (VSCode: vscode.env.language, Electron: app.getLocale())
  */
-export function initLocale(): void {
-  const lang = getConfiguredLanguage();
+export function initLocale(configLang: string, systemLang: string): void {
+  const lang = resolveEffectiveLanguage(configLang, systemLang);
   currentLocale = resolveLocale(lang);
   
   // Load fallback (English) first

@@ -11,10 +11,34 @@ const fs = require('fs');
 const path = require('path');
 
 const editorJsPath = path.join(__dirname, '../src/webview/editor.js');
+const testHostBridgePath = path.join(__dirname, '../src/shared/test-host-bridge.js');
 const outputPath = path.join(__dirname, 'html/standalone-editor.html');
+
+// vendor/ → test/html/vendor/ にコピー（テストサーバー用）
+const vendorSrc = path.join(__dirname, '../vendor');
+const vendorDest = path.join(__dirname, 'html/vendor');
+if (fs.existsSync(vendorSrc)) {
+    fs.mkdirSync(vendorDest, { recursive: true });
+    for (const file of fs.readdirSync(vendorSrc)) {
+        const srcPath = path.join(vendorSrc, file);
+        if (fs.statSync(srcPath).isDirectory()) {
+            // fonts/ ディレクトリ
+            const destDir = path.join(vendorDest, file);
+            fs.mkdirSync(destDir, { recursive: true });
+            for (const f of fs.readdirSync(srcPath)) {
+                fs.copyFileSync(path.join(srcPath, f), path.join(destDir, f));
+            }
+        } else {
+            fs.copyFileSync(srcPath, path.join(vendorDest, file));
+        }
+    }
+}
 
 // editor.jsを読み込み
 let editorScript = fs.readFileSync(editorJsPath, 'utf-8');
+
+// テスト用HostBridgeを読み込み
+const testHostBridgeScript = fs.readFileSync(testHostBridgePath, 'utf-8');
 
 // プレースホルダーを置換
 editorScript = editorScript
@@ -22,10 +46,6 @@ editorScript = editorScript
     .replace('__I18N__', '{}')
     .replace('__DOCUMENT_BASE_URI__', '')
     .replace('__CONTENT__', '``');
-
-// VSCode固有のコードを除去/置換
-editorScript = editorScript
-    .replace(/const vscode = acquireVsCodeApi\(\);/g, '// vscode API is mocked');
 
 // HTMLテンプレート
 const html = `<!DOCTYPE html>
@@ -174,25 +194,11 @@ const html = `<!DOCTYPE html>
     </div>
     <div class="editor" id="editor" contenteditable="true" spellcheck="false"></div>
     
-    <script src="https://unpkg.com/turndown/dist/turndown.js"></script>
-    <script src="https://unpkg.com/turndown-plugin-gfm/dist/turndown-plugin-gfm.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="vendor/turndown.js"></script>
+    <script src="vendor/turndown-plugin-gfm.js"></script>
+    <script src="vendor/mermaid.min.js"></script>
     <script>
-    // Test API (must be defined before editor script)
-    window.__testApi = {
-        messages: [],
-        ready: false,
-        getMarkdown: null,
-        getHtml: null,
-        setMarkdown: null
-    };
-    
-    // VSCode API mock
-    const vscode = {
-        postMessage: (msg) => {
-            window.__testApi.messages.push(msg);
-        }
-    };
+    __TEST_HOST_BRIDGE__
     </script>
     <script>
     __EDITOR_SCRIPT__
@@ -200,5 +206,7 @@ const html = `<!DOCTYPE html>
 </body>
 </html>`;
 
-fs.writeFileSync(outputPath, html.replace('__EDITOR_SCRIPT__', editorScript));
+fs.writeFileSync(outputPath, html
+    .replace('__TEST_HOST_BRIDGE__', testHostBridgeScript)
+    .replace('__EDITOR_SCRIPT__', editorScript));
 console.log('Generated:', outputPath);

@@ -7,7 +7,7 @@
         error: DEBUG_MODE ? (...args) => console.error('[DEBUG]', ...args) : () => {}
     };
     
-    const vscode = acquireVsCodeApi();
+    const host = window.hostBridge;
     const i18n = __I18N__;
     logger.log('[Any MD] i18n loaded:', i18n.livePreviewMode ? 'OK' : 'EMPTY', '- Sample:', i18n.bold || '(none)');
     const editor = document.getElementById('editor');
@@ -2245,7 +2245,7 @@
         editor.querySelectorAll('a').forEach(a => {
             a.addEventListener('click', e => {
                 e.preventDefault();
-                vscode.postMessage({ type: 'openLink', href: a.getAttribute('href') });
+                host.openLink(a.getAttribute('href'));
             });
         });
 
@@ -11112,13 +11112,13 @@
                 undoManager.redo();
                 break;
             case 'imageDir':
-                vscode.postMessage({ type: 'setImageDir' });
+                host.requestSetImageDir();
                 break;
             case 'openOutline':
                 openSidebar();
                 break;
             case 'openInTextEditor':
-                vscode.postMessage({ type: 'openInTextEditor' });
+                host.openInTextEditor();
                 break;
             case 'source':
                 toggleSourceMode();
@@ -11248,10 +11248,10 @@
             }
             case 'link':
                 var linkText = window.getSelection().toString() || '';
-                vscode.postMessage({ type: 'insertLink', text: linkText });
+                host.requestInsertLink(linkText);
                 break;
             case 'image':
-                vscode.postMessage({ type: 'insertImage', position: 0 });
+                host.requestInsertImage();
                 break;
             case 'table':
                 var tableHtml = '<table><tr><th>Header 1</th><th>Header 2</th></tr><tr><td>Cell</td><td>Cell</td></tr></table>';
@@ -11709,7 +11709,7 @@
     function notifyChangeImmediate() {
         // Only save if user has made edits (prevents saving on initial load)
         if (!hasUserEdited) return;
-        vscode.postMessage({ type: 'edit', content: markdown });
+        host.syncContent(markdown);
         updateOutline();
         updateWordCount();
         updateStatus();
@@ -11721,7 +11721,7 @@
         if (!hasUserEdited) return;
         clearTimeout(saveTimeout);
         saveTimeout = setTimeout(() => {
-            vscode.postMessage({ type: 'edit', content: markdown });
+            host.syncContent(markdown);
             updateOutline();
             updateWordCount();
             updateStatus();
@@ -11745,7 +11745,7 @@
         isActivelyEditing = true;
 
         if (wasIdle) {
-            vscode.postMessage({ type: 'editingStateChanged', editing: true });
+            host.reportEditingState(true);
         }
 
         clearTimeout(editingIdleTimer);
@@ -11759,7 +11759,7 @@
             }
 
             isActivelyEditing = false;
-            vscode.postMessage({ type: 'editingStateChanged', editing: false });
+            host.reportEditingState(false);
 
             // Apply queued external changes now that we're idle
             applyQueuedExternalChange();
@@ -11852,10 +11852,7 @@
                                 const reader = new FileReader();
                                 reader.onload = function(event) {
                                     const dataUrl = event.target.result;
-                                    vscode.postMessage({
-                                        type: 'saveImageAndInsert',
-                                        dataUrl: dataUrl
-                                    });
+                                    host.saveImageAndInsert(dataUrl);
                                     logger.log('Image sent to extension for saving (Kiro)');
                                 };
                                 reader.readAsDataURL(blob);
@@ -11903,9 +11900,9 @@
             clearTimeout(syncTimeout);
             if (hasUserEdited) {
                 markdown = htmlToMarkdown();
-                vscode.postMessage({ type: 'edit', content: markdown });
+                host.syncContent(markdown);
             }
-            vscode.postMessage({ type: 'save' });
+            host.save();
             hasUserEdited = false;
             return;
         }
@@ -12229,12 +12226,7 @@
             var safeEnd = Math.min(endLine, fullLines.length - 1);
             var mdSelected = fullLines.slice(startLine, safeEnd + 1).join('\n').trim();
 
-            vscode.postMessage({
-                type: 'sendToChat',
-                startLine: startLine,
-                endLine: endLine,
-                selectedMarkdown: mdSelected
-            });
+            host.sendToChat(startLine, endLine, mdSelected);
             return;
         }
     });
@@ -12680,9 +12672,8 @@
         syncMarkdown();
     }
 
-    // Handle messages from VS Code
-    window.addEventListener('message', function(event) {
-        const message = event.data;
+    // Handle messages from host (VSCode / Electron / test)
+    host.onMessage(function(message) {
         if (message.type === 'performUndo') {
             if (!isSourceMode) undoManager.undo();
             return;
@@ -13018,10 +13009,7 @@
         if (filePath) {
             logger.log('Found image file path:', filePath);
             // Send to extension to read the file
-            vscode.postMessage({
-                type: 'readAndInsertImage',
-                filePath: filePath
-            });
+            host.readAndInsertImage(filePath);
             return;
         }
         
@@ -13058,10 +13046,7 @@
             const dataUrl = event.target.result;
             
             // Send to extension to save as file (filename always generated by extension as timestamp)
-            vscode.postMessage({
-                type: 'saveImageAndInsert',
-                dataUrl: dataUrl
-            });
+            host.saveImageAndInsert(dataUrl);
             logger.log('Image sent to extension for saving');
         };
         reader.onerror = function(err) {
@@ -13457,10 +13442,7 @@
                         const reader = new FileReader();
                         reader.onload = function(event) {
                             const dataUrl = event.target.result;
-                            vscode.postMessage({
-                                type: 'saveImageAndInsert',
-                                dataUrl: dataUrl
-                            });
+                            host.saveImageAndInsert(dataUrl);
                             logger.log('Image sent to extension for saving');
                         };
                         reader.readAsDataURL(file);
@@ -14205,39 +14187,39 @@
 
     // Focus/blur notifications for sync policy
     editor.addEventListener('focus', function() {
-        vscode.postMessage({ type: 'webviewFocus' });
+        host.reportFocus();
     });
     editor.addEventListener('blur', function() {
         // Flush pending edits immediately on blur
         if (!isSourceMode && hasUserEdited) {
             clearTimeout(syncTimeout);
             markdown = htmlToMarkdown();
-            vscode.postMessage({ type: 'edit', content: markdown });
+            host.syncContent(markdown);
         }
 
         // Force idle state on blur
         clearTimeout(editingIdleTimer);
         isActivelyEditing = false;
-        vscode.postMessage({ type: 'editingStateChanged', editing: false });
-        vscode.postMessage({ type: 'webviewBlur' });
+        host.reportEditingState(false);
+        host.reportBlur();
 
         // Apply queued external changes now that we're definitely idle
         applyQueuedExternalChange();
     });
 
     sourceEditor.addEventListener('focus', function() {
-        vscode.postMessage({ type: 'webviewFocus' });
+        host.reportFocus();
     });
     sourceEditor.addEventListener('blur', function() {
         if (isSourceMode && hasUserEdited) {
             markdown = sourceEditor.value;
-            vscode.postMessage({ type: 'edit', content: markdown });
+            host.syncContent(markdown);
         }
 
         clearTimeout(editingIdleTimer);
         isActivelyEditing = false;
-        vscode.postMessage({ type: 'editingStateChanged', editing: false });
-        vscode.postMessage({ type: 'webviewBlur' });
+        host.reportEditingState(false);
+        host.reportBlur();
 
         applyQueuedExternalChange();
     });
@@ -14251,7 +14233,7 @@
                 clearTimeout(syncTimeout);
                 markdown = htmlToMarkdown();
             }
-            vscode.postMessage({ type: 'edit', content: markdown });
+            host.syncContent(markdown);
         }
     });
     

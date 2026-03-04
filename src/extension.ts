@@ -4,7 +4,8 @@ import { initLocale, t } from './i18n/messages';
 
 export function activate(context: vscode.ExtensionContext) {
     // Initialize localization
-    initLocale();
+    const config = vscode.workspace.getConfiguration('any-markdown');
+    initLocale(config.get<string>('language', 'default'), vscode.env.language);
     
     console.log('Any Markdown Editor is now active!');
 
