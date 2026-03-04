@@ -326,6 +326,46 @@
       font-size: 12px; font-weight: 600;
       color: #7c80ff;
     }
+    .download-card.desktop-card { text-align: left; }
+    .download-card.desktop-card .download-card-icon { margin: 0 0 16px; }
+    .download-card.desktop-card h3 { text-align: center; }
+    .download-card.desktop-card > p { text-align: center; }
+    .platform-list { list-style: none; margin: 0; padding: 0; }
+    .platform-list li {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 0;
+      border-top: 1px solid var(--border);
+      font-size: 13px;
+    }
+    .platform-list li:last-child { border-bottom: 1px solid var(--border); }
+    .platform-label {
+      display: flex; align-items: center; gap: 8px;
+      color: var(--text);
+      font-weight: 500;
+    }
+    .platform-label svg { width: 16px; height: 16px; opacity: 0.7; }
+    .platform-file {
+      color: var(--text-dim);
+      font-size: 12px;
+      text-decoration: none;
+      padding: 3px 10px;
+      border-radius: 6px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    .platform-file:hover {
+      background: rgba(255,255,255,0.08);
+      color: var(--text);
+    }
+    .desktop-version {
+      text-align: center;
+      margin-top: 12px;
+      font-size: 11px;
+      color: var(--text-dim);
+      opacity: 0.6;
+    }
 
     /* ── Sponsor ── */
     .sponsor-section {
@@ -652,14 +692,45 @@
           <span class="tag">Open Source</span>
         </a>
 
-        <a href="https://github.com/raggbal/any-markdown/releases" class="download-card" target="_blank" rel="noopener">
+        <!-- desktop-app-start -->
+        <div class="download-card desktop-card">
           <div class="download-card-icon" style="background:rgba(71,77,237,0.12);">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#474DEE" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
           </div>
           <h3>Desktop App</h3>
-          <p>Standalone app for macOS, Windows &amp; Linux</p>
-          <span class="tag">macOS / Windows / Linux</span>
-        </a>
+          <p>Standalone Electron app</p>
+          <ul class="platform-list">
+            <li>
+              <span class="platform-label">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83"/><path d="M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11"/></svg>
+                macOS (Apple Silicon)
+              </span>
+              <span style="display:flex;gap:6px;">
+                <a href="https://github.com/raggbal/any-markdown/releases/download/electron-v0.195.387/Any.Markdown-0.195.387-arm64.dmg" class="platform-file">.dmg</a>
+                <a href="https://github.com/raggbal/any-markdown/releases/download/electron-v0.195.387/Any.Markdown-0.195.387-arm64-mac.zip" class="platform-file">.zip</a>
+              </span>
+            </li>
+            <li>
+              <span class="platform-label">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>
+                Windows
+              </span>
+              <a href="https://github.com/raggbal/any-markdown/releases/download/electron-v0.195.387/Any.Markdown.Setup.0.195.387.exe" class="platform-file">.exe</a>
+            </li>
+            <li>
+              <span class="platform-label">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12.504 0c-.155 0-.311.003-.465.01a11.39 11.39 0 00-3.095.588c-.27.088-.478.245-.586.478-.107.23-.122.497-.035.742.088.245.265.44.502.54.236.1.5.113.745.035a9.908 9.908 0 012.692-.514c.398-.023.79-.023 1.19.002a9.85 9.85 0 014.2 1.237 9.86 9.86 0 013.37 3.103 9.88 9.88 0 011.533 4.422c.122.956.09 1.93-.093 2.88a9.89 9.89 0 01-1.324 3.545c-.022.035-.05.065-.05.1-.84 1.34-1.95 2.47-3.25 3.31a9.92 9.92 0 01-4.06 1.67c-.96.16-1.94.16-2.9.01a9.88 9.88 0 01-3.86-1.5c-.14-.09-.27-.18-.4-.28-1.24-.91-2.28-2.07-3.05-3.4A9.9 9.9 0 011.2 12.25c-.05-.47-.07-.94-.06-1.41.03-1.07.2-2.13.5-3.14.12-.38.26-.76.42-1.12.48-1.1 1.13-2.1 1.93-2.97.26-.28.54-.55.83-.8C6.2 1.56 8.14.61 10.26.2c.47-.09.95-.15 1.43-.18.26-.02.52-.03.78-.03L12.504 0zm-.31 2.05c-.45.01-.9.05-1.34.13-1.85.32-3.53 1.13-4.88 2.35-.26.24-.5.49-.73.76-.7.79-1.27 1.68-1.69 2.64-.14.32-.27.65-.37.99-.27.89-.42 1.82-.45 2.76-.01.42.01.83.05 1.24a8.88 8.88 0 001.05 3.49c.68 1.18 1.59 2.2 2.67 3.01.12.09.24.17.36.25a8.88 8.88 0 003.44 1.34c.86.14 1.73.14 2.58-.01a8.89 8.89 0 003.63-1.49c1.16-.75 2.15-1.75 2.9-2.95 0-.03.02-.05.03-.08a8.87 8.87 0 001.18-3.17c.16-.85.19-1.72.08-2.57a8.87 8.87 0 00-1.37-3.95A8.86 8.86 0 0015.5 2.8a8.85 8.85 0 00-3.31-.75h-.004z"/><path d="M12.5 5.2c-.278 0-.504.226-.504.504v4.792H7.504a.504.504 0 100 1.008h4.492v4.792a.504.504 0 101.008 0v-4.792h4.492a.504.504 0 100-1.008H13.004V5.704c0-.278-.226-.504-.504-.504z"/></svg>
+                Linux
+              </span>
+              <span style="display:flex;gap:6px;">
+                <a href="https://github.com/raggbal/any-markdown/releases/download/electron-v0.195.387/Any.Markdown-0.195.387.AppImage" class="platform-file">.AppImage</a>
+                <a href="https://github.com/raggbal/any-markdown/releases/download/electron-v0.195.387/any-markdown-desktop_0.195.387_amd64.deb" class="platform-file">.deb</a>
+              </span>
+            </li>
+          </ul>
+          <div class="desktop-version">v0.195.387 &middot; <a href="https://github.com/raggbal/any-markdown/releases" style="color:inherit;text-decoration:underline;" target="_blank" rel="noopener">All releases</a></div>
+        </div>
+        <!-- desktop-app-end -->
       </div>
     </div>
   </section>
