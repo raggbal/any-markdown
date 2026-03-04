@@ -8,10 +8,9 @@ A WYSIWYG markdown editor designed for the AI coding era. Edit markdown visually
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![GitHub Sponsors](https://img.shields.io/github/sponsors/raggbal?label=Sponsor)
 
-**New: Redesigned for simplicity. **![assets/images/1772563198257.png](assets/images/1772563198257.png)
+**New: Redesigned for simplicity. **![assets/images/1772631963888.png](assets/images/1772631963888.png)
 **New: Action Palette (Cmd+/ / Ctrl+/)**
-![assets/images/1772563951196.png](assets/images/1772563951196.png)
-
+![assets/images/1772632052456.png](assets/images/1772632052456.png)
 ## 🎬 Demo (gif)
 
 You can freely use markdown using only the keyboard.
@@ -346,7 +345,7 @@ FORCE_RELATIVE_PATH: true
 
 | Setting | Description | Default |
 | --- | --- | --- |
-| `any-markdown.theme` | Editor theme (`github`, `sepia`, `night`, `dark`, `minimal`, `perplexity`) | `github` |
+| `any-markdown.theme` | Editor theme (`github`, `sepia`, `night`, `dark`, `minimal`, `perplexity`, `things`) | `things` |
 | `any-markdown.fontSize` | Base font size (px) | `16` |
 | `any-markdown.imageDefaultDir` | Default directory for saved images | `""` (same as markdown file) |
 | `any-markdown.forceRelativeImagePath` | Force relative paths for images | `false` |
@@ -358,12 +357,13 @@ FORCE_RELATIVE_PATH: true
 
 | Theme | Description |
 | --- | --- |
-| `github` | Clean GitHub-style rendering (default) |
+| `github` | Clean GitHub-style rendering |
 | `sepia` | Warm, paper-like appearance for comfortable reading |
 | `night` | Dark theme with Tokyo Night inspired colors (blue tint) |
 | `dark` | Pure dark theme with neutral black/gray colors |
 | `minimal` | Distraction-free black and white design |
 | `perplexity` | Light theme with Perplexity brand colors (Paper White background) |
+| `things` | Clean, minimal theme inspired by Things app (SF Pro font, blue accents) (default) |
 
 ---
 

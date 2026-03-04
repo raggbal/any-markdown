@@ -19,7 +19,7 @@ export interface ElectronSettings {
 }
 
 const DEFAULTS: ElectronSettings = {
-    theme: 'github',
+    theme: 'things',
     fontSize: 16,
     toolbarMode: 'simple',
     language: 'default',
@@ -123,6 +123,7 @@ export class SettingsManager {
             <option value="dark" ${settings.theme === 'dark' ? 'selected' : ''}>Dark</option>
             <option value="minimal" ${settings.theme === 'minimal' ? 'selected' : ''}>Minimal</option>
             <option value="perplexity" ${settings.theme === 'perplexity' ? 'selected' : ''}>Perplexity</option>
+            <option value="things" ${settings.theme === 'things' ? 'selected' : ''}>Things</option>
         </select>
     </div>
     <div class="field">

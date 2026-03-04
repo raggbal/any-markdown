@@ -5,6 +5,16 @@ All notable changes to the "Any Markdown Editor" extension will be documented in
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.195.386] - 2026-03-04
+
+### Changed
+- **Default theme** — Changed default theme from "GitHub" to "Things" for both VSCode and Electron.
+
+## [0.195.385] - 2026-03-04
+
+### Changed
+- **Things theme** — Made sidebar border color subtler to better match outline background.
+
 ## [0.195.382] - 2026-03-04
 
 ### Changed
