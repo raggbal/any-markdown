@@ -26,3 +26,4 @@ playwright.config.js
 test-*.js
 electron/**
 assets/**
+.claude/skills/publish/references/**

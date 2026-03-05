@@ -5,6 +5,14 @@ All notable changes to the "Any Markdown Editor" extension will be documented in
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.195.393] - 2026-03-05
+
+### Changed
+- **Shared editor body HTML** — Sidebar, toolbar, editor, and search box HTML generation is now shared between VSCode and Electron via a single source module (`editor-body-html.js`). This ensures Electron always stays in sync with VSCode UI changes.
+
+### Fixed
+- **Electron sidebar** — Image directory settings UI (gear button, path display) now appears in the Electron sidebar, matching the VSCode version.
+
 ## [0.195.392] - 2026-03-05
 
 ### Changed

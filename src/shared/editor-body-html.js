@@ -1,0 +1,114 @@
+'use strict';
+
+/**
+ * VSCode / Electron 共通のエディタボディHTML生成
+ *
+ * @param {Record<string, string>} messages - i18n メッセージ
+ * @param {string} platform - process.platform ('darwin' | 'win32' | 'linux')
+ * @returns {string} <div class="container">...</div> の HTML文字列
+ */
+function generateEditorBodyHtml(messages, platform) {
+    const msg = messages || {};
+    const m = (key) => msg[key] || '';
+    const mod = platform === 'darwin' ? 'Cmd' : 'Ctrl';
+
+    return `<div class="container">
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h3>Outline</h3>
+                <button class="sidebar-toggle" id="closeSidebar" title="${m('closeOutline')}">&#9776;</button>
+            </div>
+            <nav class="outline" id="outline"></nav>
+            <div class="sidebar-footer">
+                <div class="word-count" id="wordCount"></div>
+                <div class="sidebar-status-imagedir" id="statusImageDir">
+                    <div class="imagedir-header">
+                        <span class="imagedir-label">${m('imageDirLabel')}</span>
+                        <span class="imagedir-source" id="imageDirSource"></span>
+                        <button class="imagedir-settings-btn" id="imageDirSettingsBtn" title="${m('setImageDir')}">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+                        </button>
+                    </div>
+                    <div class="imagedir-info">
+                        <span class="imagedir-path" id="imageDirPath"></span>
+                    </div>
+                </div>
+            </div>
+            <div class="sidebar-resizer" id="sidebarResizer"></div>
+        </aside>
+        <main class="editor-container">
+            <div class="toolbar" id="toolbar">
+                <div class="toolbar-fixed toolbar-fixed--left">
+                    <button data-action="openOutline" class="menu-btn hidden" id="openSidebarBtn" title="${m('openOutline')}"></button>
+                    <div class="toolbar-group" data-group="history">
+                        <button data-action="undo" title="${m('undo')}"></button>
+                        <button data-action="redo" title="${m('redo')}"></button>
+                    </div>
+                </div>
+                <button class="toolbar-scroll-btn toolbar-scroll-btn--left hidden" id="toolbarScrollLeft">&#x276E;</button>
+                <div class="toolbar-inner" id="toolbarInner">
+                    <div class="toolbar-group" data-group="inline">
+                        <button data-action="bold" title="${m('bold')}"></button>
+                        <button data-action="italic" title="${m('italic')}"></button>
+                        <button data-action="strikethrough" title="${m('strikethrough')}"></button>
+                        <button data-action="code" title="${m('inlineCode')}"></button>
+                    </div>
+                    <div class="toolbar-group" data-group="block">
+                        <button data-action="heading1" title="${m('heading1')}"></button>
+                        <button data-action="heading2" title="${m('heading2')}"></button>
+                        <button data-action="heading3" title="${m('heading3')}"></button>
+                        <button data-action="heading4" title="${m('heading4')}"></button>
+                        <button data-action="heading5" title="${m('heading5')}"></button>
+                        <button data-action="heading6" title="${m('heading6')}"></button>
+                        <button data-action="ul" title="${m('unorderedList')}"></button>
+                        <button data-action="ol" title="${m('orderedList')}"></button>
+                        <button data-action="task" title="${m('taskList')}"></button>
+                        <button data-action="quote" title="${m('blockquote')}"></button>
+                        <button data-action="codeblock" title="${m('codeBlock')}"></button>
+                        <button data-action="mermaid" title="${m('mermaidBlock')}"></button>
+                        <button data-action="math" title="${m('mathBlock')}"></button>
+                        <button data-action="hr" title="${m('horizontalRule')}"></button>
+                    </div>
+                    <div class="toolbar-group" data-group="insert">
+                        <button data-action="link" title="${m('insertLink')}"></button>
+                        <button data-action="image" title="${m('insertImage')}"></button>
+                        <button data-action="table" title="${m('insertTable')}"></button>
+                    </div>
+                </div>
+                <button class="toolbar-scroll-btn toolbar-scroll-btn--right hidden" id="toolbarScrollRight">&#x276F;</button>
+                <div class="toolbar-fixed toolbar-fixed--right">
+                    <div class="toolbar-group" data-group="utility">
+                        <button data-action="openInTextEditor" title="${m('openInTextEditor')} (${mod}+Shift+.)"></button>
+                        <button data-action="source" title="${m('toggleSourceMode')} (${mod}+.)"></button>
+                    </div>
+                </div>
+            </div>
+            <div class="editor-wrapper" id="editorWrapper">
+                <div class="search-replace-box" id="searchReplaceBox" style="display: none;">
+                    <div class="search-row">
+                        <input type="text" id="searchInput" placeholder="${m('searchPlaceholder')}" />
+                        <span class="search-count" id="searchCount">0/0</span>
+                        <button id="searchPrev" title="${m('searchPrev')}">&#9650;</button>
+                        <button id="searchNext" title="${m('searchNext')}">&#9660;</button>
+                        <button id="toggleReplace" title="${m('toggleReplace')}">&#8693;</button>
+                        <button id="closeSearch" title="${m('closeSearch')}">&#10005;</button>
+                    </div>
+                    <div class="replace-row" id="replaceRow" style="display: none;">
+                        <input type="text" id="replaceInput" placeholder="${m('replacePlaceholder')}" />
+                        <button id="replaceOne" title="${m('replace')}">${m('replace')}</button>
+                        <button id="replaceAll" title="${m('replaceAll')}">${m('replaceAll')}</button>
+                    </div>
+                    <div class="search-options">
+                        <label><input type="checkbox" id="searchCaseSensitive" /> ${m('caseSensitive')}</label>
+                        <label><input type="checkbox" id="searchWholeWord" /> ${m('wholeWord')}</label>
+                        <label><input type="checkbox" id="searchRegex" /> ${m('regex')}</label>
+                    </div>
+                </div>
+                <div class="editor" id="editor" contenteditable="true" spellcheck="true"></div>
+                <textarea class="source-editor" id="sourceEditor" style="display: none;"></textarea>
+            </div>
+        </main>
+    </div>`;
+}
+
+module.exports = { generateEditorBodyHtml };

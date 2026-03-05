@@ -3,6 +3,9 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { WebviewMessages } from './i18n/messages';
 
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { generateEditorBodyHtml } = require('./shared/editor-body-html');
+
 function getNonce(): string {
     let text = '';
     const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -105,103 +108,7 @@ export function getWebviewContent(
     </style>
 </head>
 <body>
-    <div class="container">
-        <aside class="sidebar" id="sidebar">
-            <div class="sidebar-header">
-                <h3>Outline</h3>
-                <button class="sidebar-toggle" id="closeSidebar" title="${msg.closeOutline}">☰</button>
-            </div>
-            <nav class="outline" id="outline"></nav>
-            <div class="sidebar-footer">
-                <div class="word-count" id="wordCount"></div>
-                <div class="sidebar-status-imagedir" id="statusImageDir">
-                    <div class="imagedir-header">
-                        <span class="imagedir-label">${msg.imageDirLabel}</span>
-                        <span class="imagedir-source" id="imageDirSource"></span>
-                        <button class="imagedir-settings-btn" id="imageDirSettingsBtn" title="${msg.setImageDir}">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
-                        </button>
-                    </div>
-                    <div class="imagedir-info">
-                        <span class="imagedir-path" id="imageDirPath"></span>
-                    </div>
-                </div>
-            </div>
-            <div class="sidebar-resizer" id="sidebarResizer"></div>
-        </aside>
-        <main class="editor-container">
-            <div class="toolbar" id="toolbar">
-                <div class="toolbar-fixed toolbar-fixed--left">
-                    <button data-action="openOutline" class="menu-btn hidden" id="openSidebarBtn" title="${msg.openOutline}"></button>
-                    <div class="toolbar-group" data-group="history">
-                        <button data-action="undo" title="${msg.undo}"></button>
-                        <button data-action="redo" title="${msg.redo}"></button>
-                    </div>
-                </div>
-                <button class="toolbar-scroll-btn toolbar-scroll-btn--left hidden" id="toolbarScrollLeft">&#x276E;</button>
-                <div class="toolbar-inner" id="toolbarInner">
-                    <div class="toolbar-group" data-group="inline">
-                        <button data-action="bold" title="${msg.bold}"></button>
-                        <button data-action="italic" title="${msg.italic}"></button>
-                        <button data-action="strikethrough" title="${msg.strikethrough}"></button>
-                        <button data-action="code" title="${msg.inlineCode}"></button>
-                    </div>
-                    <div class="toolbar-group" data-group="block">
-                        <button data-action="heading1" title="${msg.heading1}"></button>
-                        <button data-action="heading2" title="${msg.heading2}"></button>
-                        <button data-action="heading3" title="${msg.heading3}"></button>
-                        <button data-action="heading4" title="${msg.heading4}"></button>
-                        <button data-action="heading5" title="${msg.heading5}"></button>
-                        <button data-action="heading6" title="${msg.heading6}"></button>
-                        <button data-action="ul" title="${msg.unorderedList}"></button>
-                        <button data-action="ol" title="${msg.orderedList}"></button>
-                        <button data-action="task" title="${msg.taskList}"></button>
-                        <button data-action="quote" title="${msg.blockquote}"></button>
-                        <button data-action="codeblock" title="${msg.codeBlock}"></button>
-                        <button data-action="mermaid" title="${msg.mermaidBlock}"></button>
-                        <button data-action="math" title="${msg.mathBlock}"></button>
-                        <button data-action="hr" title="${msg.horizontalRule}"></button>
-                    </div>
-                    <div class="toolbar-group" data-group="insert">
-                        <button data-action="link" title="${msg.insertLink}"></button>
-                        <button data-action="image" title="${msg.insertImage}"></button>
-                        <button data-action="table" title="${msg.insertTable}"></button>
-                    </div>
-                </div>
-                <button class="toolbar-scroll-btn toolbar-scroll-btn--right hidden" id="toolbarScrollRight">&#x276F;</button>
-                <div class="toolbar-fixed toolbar-fixed--right">
-                    <div class="toolbar-group" data-group="utility">
-                        <button data-action="openInTextEditor" title="${msg.openInTextEditor} (${process.platform === 'darwin' ? 'Cmd+Shift+.' : 'Ctrl+Shift+.'})"></button>
-                        <button data-action="source" title="${msg.toggleSourceMode} (${process.platform === 'darwin' ? 'Cmd' : 'Ctrl'}+.)"></button>
-                    </div>
-                </div>
-            </div>
-            <div class="editor-wrapper" id="editorWrapper">
-                <div class="search-replace-box" id="searchReplaceBox" style="display: none;">
-                    <div class="search-row">
-                        <input type="text" id="searchInput" placeholder="${msg.searchPlaceholder}" />
-                        <span class="search-count" id="searchCount">0/0</span>
-                        <button id="searchPrev" title="${msg.searchPrev}">▲</button>
-                        <button id="searchNext" title="${msg.searchNext}">▼</button>
-                        <button id="toggleReplace" title="${msg.toggleReplace}">⇅</button>
-                        <button id="closeSearch" title="${msg.closeSearch}">✕</button>
-                    </div>
-                    <div class="replace-row" id="replaceRow" style="display: none;">
-                        <input type="text" id="replaceInput" placeholder="${msg.replacePlaceholder}" />
-                        <button id="replaceOne" title="${msg.replace}">${msg.replace}</button>
-                        <button id="replaceAll" title="${msg.replaceAll}">${msg.replaceAll}</button>
-                    </div>
-                    <div class="search-options">
-                        <label><input type="checkbox" id="searchCaseSensitive" /> ${msg.caseSensitive}</label>
-                        <label><input type="checkbox" id="searchWholeWord" /> ${msg.wholeWord}</label>
-                        <label><input type="checkbox" id="searchRegex" /> ${msg.regex}</label>
-                    </div>
-                </div>
-                <div class="editor" id="editor" contenteditable="true" spellcheck="true"></div>
-                <textarea class="source-editor" id="sourceEditor" style="display: none;"></textarea>
-            </div>
-        </main>
-    </div>
+    ${generateEditorBodyHtml(msg, process.platform)}
 
     <script src="${turndownUri}"></script>
     <script src="${turndownGfmUri}"></script>

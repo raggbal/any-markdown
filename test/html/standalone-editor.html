@@ -235,7 +235,6 @@
     const sourceEditor = document.getElementById('sourceEditor');
     const outline = document.getElementById('outline');
     const wordCount = document.getElementById('wordCount');
-    const statusLeft = document.getElementById('statusLeft');
     const statusImageDir = document.getElementById('statusImageDir');
     const sidebar = document.getElementById('sidebar');
     const toolbar = document.getElementById('toolbar');
@@ -11930,13 +11929,11 @@
             sourceEditor.value = markdown;
             sourceEditor.style.display = 'block';
             editor.style.display = 'none';
-            statusLeft.textContent = i18n.sourceMode;
         } else {
             markdown = sourceEditor.value;
             renderFromMarkdown();
             sourceEditor.style.display = 'none';
             editor.style.display = 'block';
-            statusLeft.textContent = i18n.livePreviewMode;
         }
     }
 
@@ -12062,7 +12059,8 @@
             const pathEl = document.getElementById('imageDirPath');
             const sourceEl = document.getElementById('imageDirSource');
             if (pathEl && imageDirDisplayPath !== null) {
-                pathEl.textContent = '\u{1F4C1} ' + imageDirDisplayPath;
+                pathEl.textContent = imageDirDisplayPath;
+                pathEl.title = imageDirDisplayPath;
             }
             if (sourceEl && imageDirSource) {
                 const labels = {
@@ -12070,7 +12068,7 @@
                     settings: i18n.imageDirSourceSettings || 'Settings',
                     default: i18n.imageDirSourceDefault || 'Default'
                 };
-                sourceEl.textContent = '(' + (labels[imageDirSource] || imageDirSource) + ')';
+                sourceEl.textContent = labels[imageDirSource] || imageDirSource;
             }
         }
     }
