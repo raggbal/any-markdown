@@ -107,6 +107,14 @@ function generateEditorBodyHtml(messages, platform) {
                 <div class="editor" id="editor" contenteditable="true" spellcheck="true"></div>
                 <textarea class="source-editor" id="sourceEditor" style="display: none;"></textarea>
             </div>
+            <div class="side-panel" id="sidePanel">
+                <div class="side-panel-header">
+                    <span class="side-panel-filename" id="sidePanelFilename"></span>
+                    <button class="side-panel-close" id="sidePanelClose" title="Close">&times;</button>
+                </div>
+                <div class="side-panel-iframe-container" id="sidePanelIframeContainer"></div>
+            </div>
+            <div class="side-panel-overlay" id="sidePanelOverlay"></div>
         </main>
     </div>`;
 }

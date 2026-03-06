@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { getWebviewContent } from './webviewContent';
+import { getWebviewContent, getSidePanelHtml, getNonce } from './webviewContent';
 import { t, getWebviewMessages, initLocale } from './i18n/messages';
 
 // ============================================
@@ -411,6 +411,9 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
         // Remember the original line ending style to preserve on save
         const originalEol = document.eol;
 
+        // nonce を保持（サイドパネル iframe で再利用するため）
+        const webviewNonce = { value: getNonce() };
+
         const updateWebview = () => {
             try {
                 const config = vscode.workspace.getConfiguration('any-markdown');
@@ -426,7 +429,8 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
                         documentBaseUri: documentBaseUri,
                         webviewMessages: getWebviewMessages(),
                         enableDebugLogging: config.get<boolean>('enableDebugLogging', false)
-                    }
+                    },
+                    webviewNonce
                 );
             } catch (error) {
                 console.error('[Any MD] Error updating webview:', error);
@@ -697,23 +701,60 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
                     break;
 
                 case 'openLink':
-                    if (message.href.startsWith('http')) {
-                        vscode.env.openExternal(vscode.Uri.parse(message.href));
-                    } else if (message.href.startsWith('#')) {
-                        // Handle anchor links (scroll to heading in the same document)
+                case 'openLinkInTab': {
+                    const linkHref: string = message.href;
+                    const forceTab = message.type === 'openLinkInTab';
+                    if (linkHref.startsWith('http')) {
+                        vscode.env.openExternal(vscode.Uri.parse(linkHref));
+                    } else if (linkHref.startsWith('#')) {
                         webviewPanel.webview.postMessage({
                             type: 'scrollToAnchor',
-                            anchor: message.href.substring(1) // Remove the leading #
+                            anchor: linkHref.substring(1)
                         });
                     } else {
-                        // Handle internal links
-                        const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri);
-                        if (workspaceFolder) {
-                            const linkUri = vscode.Uri.joinPath(workspaceFolder.uri, message.href);
-                            vscode.commands.executeCommand('vscode.open', linkUri);
+                        const resolvedUri = linkHref.startsWith('/')
+                            ? vscode.Uri.file(linkHref)
+                            : vscode.Uri.joinPath(document.uri, '..', linkHref);
+                        const resolvedPath = resolvedUri.fsPath.toLowerCase();
+                        if (resolvedPath.endsWith('.md') || resolvedPath.endsWith('.markdown')) {
+                            const linkOpenMode = forceTab ? 'tab'
+                                : vscode.workspace.getConfiguration('any-markdown').get<string>('linkOpenMode', 'sidePanel');
+                            if (linkOpenMode === 'tab') {
+                                vscode.commands.executeCommand('vscode.openWith', resolvedUri, 'any-markdown.editor');
+                            } else {
+                                // sidePanel mode: generate iframe HTML and send to webview
+                                try {
+                                    const fileContent = await vscode.workspace.fs.readFile(resolvedUri);
+                                    const text = Buffer.from(fileContent).toString('utf8');
+                                    const fileName = resolvedUri.path.split('/').pop() || 'untitled.md';
+                                    const linkConfig = vscode.workspace.getConfiguration('any-markdown');
+                                    const sidePanelHtml = getSidePanelHtml(
+                                        webviewNonce.value,
+                                        text,
+                                        {
+                                            theme: linkConfig.get<string>('theme', 'github'),
+                                            fontSize: linkConfig.get<number>('fontSize', 16),
+                                            documentBaseUri: resolvedUri.with({ path: resolvedUri.path.replace(/\/[^/]+$/, '/') }).toString(),
+                                            webviewMessages: getWebviewMessages(),
+                                            enableDebugLogging: linkConfig.get<boolean>('enableDebugLogging', false)
+                                        }
+                                    );
+                                    webviewPanel.webview.postMessage({
+                                        type: 'openSidePanel',
+                                        sidePanelHtml: sidePanelHtml,
+                                        filePath: resolvedUri.fsPath,
+                                        fileName: fileName
+                                    });
+                                } catch (e) {
+                                    vscode.window.showErrorMessage(`Cannot open file: ${resolvedUri.fsPath}`);
+                                }
+                            }
+                        } else {
+                            vscode.commands.executeCommand('vscode.open', resolvedUri);
                         }
                     }
                     break;
+                }
 
                 case 'requestOutline':
                     const outline = this.generateOutline(document.getText());
@@ -739,6 +780,68 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
                     // Open the same file in VS Code's default text editor
                     await vscode.commands.executeCommand('vscode.openWith', document.uri, 'default');
                     break;
+
+                case 'saveSidePanelFile':
+                    try {
+                        const spUri = vscode.Uri.file(message.filePath);
+                        const spContent = Buffer.from(message.content, 'utf8');
+                        await vscode.workspace.fs.writeFile(spUri, spContent);
+                    } catch (e) {
+                        vscode.window.showErrorMessage(`Failed to save: ${message.filePath}`);
+                    }
+                    break;
+
+                case 'sidePanelOpenLink': {
+                    // Link clicked inside side panel iframe — open in same side panel
+                    const spLinkHref: string = message.href;
+                    const spFilePath: string = message.sidePanelFilePath;
+                    if (spLinkHref.startsWith('http')) {
+                        vscode.env.openExternal(vscode.Uri.parse(spLinkHref));
+                    } else if (spLinkHref.startsWith('#')) {
+                        // Scroll inside iframe — relay back to iframe
+                        webviewPanel.webview.postMessage({
+                            type: 'sidePanelMessage',
+                            data: { type: 'scrollToAnchor', anchor: spLinkHref.substring(1) }
+                        });
+                    } else {
+                        // Resolve relative to the side panel file's directory
+                        const spBaseUri = vscode.Uri.file(spFilePath);
+                        const spResolvedUri = spLinkHref.startsWith('/')
+                            ? vscode.Uri.file(spLinkHref)
+                            : vscode.Uri.joinPath(spBaseUri, '..', spLinkHref);
+                        const spResolvedPath = spResolvedUri.fsPath.toLowerCase();
+                        if (spResolvedPath.endsWith('.md') || spResolvedPath.endsWith('.markdown')) {
+                            try {
+                                const spFileContent = await vscode.workspace.fs.readFile(spResolvedUri);
+                                const spText = Buffer.from(spFileContent).toString('utf8');
+                                const spFileName = spResolvedUri.path.split('/').pop() || 'untitled.md';
+                                const spConfig = vscode.workspace.getConfiguration('any-markdown');
+                                const spHtml = getSidePanelHtml(
+                                    webviewNonce.value,
+                                    spText,
+                                    {
+                                        theme: spConfig.get<string>('theme', 'github'),
+                                        fontSize: spConfig.get<number>('fontSize', 16),
+                                        documentBaseUri: spResolvedUri.with({ path: spResolvedUri.path.replace(/\/[^/]+$/, '/') }).toString(),
+                                        webviewMessages: getWebviewMessages(),
+                                        enableDebugLogging: spConfig.get<boolean>('enableDebugLogging', false)
+                                    }
+                                );
+                                webviewPanel.webview.postMessage({
+                                    type: 'openSidePanel',
+                                    sidePanelHtml: spHtml,
+                                    filePath: spResolvedUri.fsPath,
+                                    fileName: spFileName
+                                });
+                            } catch (e) {
+                                vscode.window.showErrorMessage(`Cannot open file: ${spResolvedUri.fsPath}`);
+                            }
+                        } else {
+                            vscode.commands.executeCommand('vscode.open', spResolvedUri);
+                        }
+                    }
+                    break;
+                }
 
                 case 'sendToChat':
                     // Open text editor with selection based on line numbers from webview

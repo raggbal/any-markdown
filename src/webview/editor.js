@@ -2246,13 +2246,9 @@
             });
         });
 
-        // Handle link clicks
-        editor.querySelectorAll('a').forEach(a => {
-            a.addEventListener('click', e => {
-                e.preventDefault();
-                host.openLink(a.getAttribute('href'));
-            });
-        });
+        // Handle link clicks (delegated handler added once, not per-element)
+        // Individual <a> click handlers are unreliable in contenteditable
+        // See delegated handler below: editor 'click' for 'a' tags
 
         // Make table cells editable
         editor.querySelectorAll('th, td').forEach(cell => {
@@ -4008,6 +4004,24 @@
     });
 
     editor.addEventListener('click', function(e) {
+        // Delegated link click handler
+        // e.target can be a text node inside <a>, so walk up to find <a>
+        let target = e.target;
+        if (target.nodeType === 3) target = target.parentElement; // text node → parent element
+        const clickedLink = target ? (target.closest ? target.closest('a') : (target.tagName === 'A' ? target : null)) : null;
+        if (clickedLink && clickedLink.getAttribute('href')) {
+            e.preventDefault();
+            e.stopPropagation();
+            var linkHref = clickedLink.getAttribute('href');
+            logger.log('[Any MD] Link clicked:', linkHref, 'metaKey:', e.metaKey, 'ctrlKey:', e.ctrlKey);
+            if (e.metaKey || e.ctrlKey) {
+                host.openLinkInTab(linkHref);
+            } else {
+                host.openLink(linkHref);
+            }
+            return;
+        }
+
         const cell = e.target.closest ? e.target.closest('th, td') : null;
         if (cell && editor.contains(cell)) {
             activeTableCell = cell;
@@ -12842,6 +12856,113 @@
                     }
                 }
             }
+        } else if (message.type === 'openSidePanel') {
+            openSidePanel(message.sidePanelHtml, message.filePath, message.fileName);
+        } else if (message.type === 'sidePanelMessage') {
+            // Relay message from VSCode to iframe
+            if (sidePanelIframe && sidePanelIframe.contentWindow) {
+                sidePanelIframe.contentWindow.postMessage(message.data, '*');
+            }
+        }
+    });
+
+    // ========== Side Panel (iframe) ==========
+    var sidePanel = document.getElementById('sidePanel');
+    var sidePanelFilename = document.getElementById('sidePanelFilename');
+    var sidePanelClose = document.getElementById('sidePanelClose');
+    var sidePanelOverlay = document.getElementById('sidePanelOverlay');
+    var sidePanelIframeContainer = document.getElementById('sidePanelIframeContainer');
+    var sidePanelIframe = null;
+    var sidePanelFilePath = null;
+    var sidePanelBlobUrl = null;
+
+    function openSidePanel(html, filePath, fileName) {
+        // Close existing panel if open
+        if (sidePanelIframe) {
+            closeSidePanelImmediate();
+        }
+        sidePanelFilePath = filePath;
+        sidePanelFilename.textContent = fileName;
+
+        // Create blob URL and iframe
+        var blob = new Blob([html], { type: 'text/html' });
+        sidePanelBlobUrl = URL.createObjectURL(blob);
+
+        sidePanelIframe = document.createElement('iframe');
+        sidePanelIframe.src = sidePanelBlobUrl;
+        sidePanelIframe.style.width = '100%';
+        sidePanelIframe.style.height = '100%';
+        sidePanelIframe.style.border = 'none';
+        sidePanelIframe.setAttribute('sandbox', 'allow-scripts allow-same-origin');
+        sidePanelIframeContainer.innerHTML = '';
+        sidePanelIframeContainer.appendChild(sidePanelIframe);
+
+        // Show panel with animation
+        sidePanel.style.display = 'flex';
+        sidePanelOverlay.style.display = 'block';
+        requestAnimationFrame(function() {
+            sidePanel.classList.add('open');
+            sidePanelOverlay.classList.add('open');
+        });
+    }
+
+    function closeSidePanel() {
+        sidePanel.classList.remove('open');
+        sidePanelOverlay.classList.remove('open');
+        setTimeout(function() {
+            closeSidePanelImmediate();
+        }, 200);
+    }
+
+    function closeSidePanelImmediate() {
+        sidePanel.style.display = 'none';
+        sidePanelOverlay.style.display = 'none';
+        if (sidePanelIframe) {
+            sidePanelIframe.remove();
+            sidePanelIframe = null;
+        }
+        if (sidePanelBlobUrl) {
+            URL.revokeObjectURL(sidePanelBlobUrl);
+            sidePanelBlobUrl = null;
+        }
+        sidePanelFilePath = null;
+    }
+
+    // Listen for messages from iframe (side panel)
+    window.addEventListener('message', function(e) {
+        if (!e.data || e.data.source !== 'sidePanel') return;
+        var msg = e.data;
+        if (msg.type === 'edit') {
+            // iframe editor synced content — save to file
+            if (sidePanelFilePath) {
+                host.saveSidePanelFile(sidePanelFilePath, msg.content);
+            }
+        } else if (msg.type === 'save') {
+            // Explicit save from iframe — save immediately
+            if (sidePanelFilePath && sidePanelIframe && sidePanelIframe.contentWindow) {
+                // iframe will send edit with latest content
+            }
+        } else if (msg.type === 'openLink') {
+            // Link clicked in side panel — relay to VSCode with side panel file path for resolution
+            if (sidePanelFilePath) {
+                host.sidePanelOpenLink(msg.href, sidePanelFilePath);
+            }
+        } else if (msg.type === 'openLinkInTab') {
+            host.openLinkInTab(msg.href);
+        }
+    });
+
+    // Side panel close handlers
+    if (sidePanelClose) {
+        sidePanelClose.addEventListener('click', closeSidePanel);
+    }
+    if (sidePanelOverlay) {
+        sidePanelOverlay.addEventListener('click', closeSidePanel);
+    }
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && sidePanel && sidePanel.classList.contains('open')) {
+            closeSidePanel();
+            e.preventDefault();
         }
     });
 

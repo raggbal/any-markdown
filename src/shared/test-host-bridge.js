@@ -38,6 +38,9 @@
         openLink: function(href) {
             window.__testApi.messages.push({ type: 'openLink', href: href });
         },
+        openLinkInTab: function(href) {
+            window.__testApi.messages.push({ type: 'openLinkInTab', href: href });
+        },
         requestInsertLink: function(text) {
             window.__testApi.messages.push({ type: 'insertLink', text: text });
         },
@@ -58,6 +61,12 @@
         },
         sendToChat: function(startLine, endLine, selectedMarkdown) {
             window.__testApi.messages.push({ type: 'sendToChat', startLine: startLine, endLine: endLine, selectedMarkdown: selectedMarkdown });
+        },
+        saveSidePanelFile: function(filePath, content) {
+            window.__testApi.messages.push({ type: 'saveSidePanelFile', filePath: filePath, content: content });
+        },
+        sidePanelOpenLink: function(href, sidePanelFilePath) {
+            window.__testApi.messages.push({ type: 'sidePanelOpenLink', href: href, sidePanelFilePath: sidePanelFilePath });
         },
 
         // ホストからのメッセージ受信

@@ -31,6 +31,9 @@
         openLink: function(href) {
             api.postMessage({ type: 'openLink', href: href });
         },
+        openLinkInTab: function(href) {
+            api.postMessage({ type: 'openLinkInTab', href: href });
+        },
         requestInsertLink: function(text) {
             api.postMessage({ type: 'insertLink', text: text });
         },
@@ -51,6 +54,12 @@
         },
         sendToChat: function(startLine, endLine, selectedMarkdown) {
             api.postMessage({ type: 'sendToChat', startLine: startLine, endLine: endLine, selectedMarkdown: selectedMarkdown });
+        },
+        saveSidePanelFile: function(filePath, content) {
+            api.postMessage({ type: 'saveSidePanelFile', filePath: filePath, content: content });
+        },
+        sidePanelOpenLink: function(href, sidePanelFilePath) {
+            api.postMessage({ type: 'sidePanelOpenLink', href: href, sidePanelFilePath: sidePanelFilePath });
         },
 
         // ホストからのメッセージ受信

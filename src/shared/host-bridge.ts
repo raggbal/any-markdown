@@ -18,6 +18,7 @@ export interface HostBridge {
 
     // ホスト側 UI が必要な操作
     openLink(href: string): void;
+    openLinkInTab(href: string): void;
     requestInsertLink(text: string): void;
     requestInsertImage(): void;
     requestSetImageDir(): void;
@@ -25,6 +26,8 @@ export interface HostBridge {
     readAndInsertImage(filePath: string): void;
     openInTextEditor(): void;
     sendToChat(startLine: number, endLine: number, selectedMarkdown: string): void;
+    saveSidePanelFile(filePath: string, content: string): void;
+    sidePanelOpenLink(href: string, sidePanelFilePath: string): void;
 
     // ホストからのメッセージ受信
     onMessage(handler: (message: HostMessage) => void): void;
@@ -42,7 +45,8 @@ export type HostMessage =
     | { type: 'externalChangeDetected'; message: string }
     | { type: 'scrollToAnchor'; anchor: string }
     | { type: 'imageDirInfo'; fileImageDir: string; defaultImageDir: string }
-    | { type: 'imageDirStatus'; displayPath: string; source: 'file' | 'settings' | 'default' };
+    | { type: 'imageDirStatus'; displayPath: string; source: 'file' | 'settings' | 'default' }
+    | { type: 'openSidePanel'; content: string; filePath: string; fileName: string };
 
 /** window にグローバルとして注入される */
 declare global {

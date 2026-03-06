@@ -2,7 +2,7 @@
   "name": "any-markdown",
   "displayName": "Any Markdown Editor",
   "description": "A WYSIWYG markdown editor for VS Code with seamless live preview",
-  "version": "0.195.393",
+  "version": "0.195.397",
   "publisher": "imaken",
   "icon": "media/icon.png",
   "license": "MIT",
@@ -154,6 +154,15 @@
           ],
           "default": "simple",
           "description": "Toolbar display mode. 'full' shows all buttons. 'simple' shows only undo/redo and utility buttons (use Cmd+/ for other operations). / ツールバー表示モード。'full'は全ボタン表示。'simple'はundo/redoとユーティリティのみ（他はCmd+/で操作）。"
+        },
+        "any-markdown.linkOpenMode": {
+          "type": "string",
+          "enum": [
+            "sidePanel",
+            "tab"
+          ],
+          "default": "sidePanel",
+          "description": "How to open linked Markdown files. 'sidePanel' opens in a Notion-style side peek panel. 'tab' opens in a new editor tab. / リンク先Markdownの開き方。'sidePanel'はNotion風サイドパネル。'tab'は新タブで開く。"
         },
         "any-markdown.enableDebugLogging": {
           "type": "boolean",

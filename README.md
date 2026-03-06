@@ -64,6 +64,7 @@ If you prefer the previous full toolbar with all formatting buttons, change the 
 - Horizontal rules
 - Links and Images (drag & drop, paste support)
 - Smart link creation — select text and paste a URL to create `[selected text](URL)`
+- **Notion-style side panel** — Click a `.md` link to open it in a side peek panel with full WYSIWYG editing. Cmd+Click to open in a new tab instead.
 - Mermaid diagrams
 - KaTeX math equations
 - YAML Front Matter

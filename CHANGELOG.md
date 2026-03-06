@@ -5,6 +5,14 @@ All notable changes to the "Any Markdown Editor" extension will be documented in
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.195.396] - 2026-03-06
+
+### Added
+- **Notion-style side panel** — Clicking a `.md` link opens a fully functional side panel with complete WYSIWYG editing (undo/redo, code blocks, Mermaid, Math, all keyboard shortcuts). Powered by iframe-based architecture for full editor isolation.
+- **Link open mode setting** — `any-markdown.linkOpenMode`: `"sidePanel"` (default) for Notion-style peek, `"tab"` for new editor tab.
+- **Cmd+Click always opens in new tab** — Hold Cmd (Mac) or Ctrl (Windows/Linux) while clicking a link to always open in a new tab, regardless of settings.
+- **Side panel link navigation** — Links clicked inside the side panel navigate within the same panel.
+
 ## [0.195.393] - 2026-03-05
 
 ### Changed
