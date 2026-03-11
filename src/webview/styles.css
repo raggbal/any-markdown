@@ -1055,6 +1055,10 @@ body {
     display: flex;
     transform: translateX(0);
 }
+.side-panel.expanded {
+    width: 95%;
+    max-width: 95%;
+}
 .side-panel-header {
     display: flex;
     align-items: center;
@@ -1070,6 +1074,8 @@ body {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    flex: 1;
+    min-width: 0;
 }
 .side-panel-close {
     background: none;
@@ -1085,6 +1091,114 @@ body {
 .side-panel-close:hover {
     opacity: 1;
     background: var(--hover-bg, rgba(128,128,128,0.15));
+}
+/* Side panel body: TOC + iframe horizontal layout */
+.side-panel-body {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+/* Side panel TOC navigation */
+.side-panel-toc {
+    width: 180px;
+    min-width: 140px;
+    flex-shrink: 0;
+    overflow-y: auto;
+    border-right: 1px solid var(--border-color);
+    padding: 8px 0;
+    display: none;
+}
+.side-panel-toc.visible {
+    display: block;
+}
+.side-panel-toc-item {
+    display: block;
+    padding: 4px 12px;
+    color: var(--text-color);
+    font-size: 12px;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    border-radius: 3px;
+    margin: 1px 4px;
+}
+.side-panel-toc-item:hover {
+    background: var(--selection-bg);
+}
+.side-panel-toc-item.active {
+    background: var(--selection-bg);
+    font-weight: 600;
+}
+.side-panel-toc-item[data-level="1"] {
+    padding-left: 12px;
+    font-weight: 600;
+    font-size: 13px;
+}
+.side-panel-toc-item[data-level="2"] {
+    padding-left: 24px;
+}
+/* Side panel TOC toggle button */
+.side-panel-toc-toggle {
+    background: none;
+    border: none;
+    color: var(--text-color);
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 4px;
+    line-height: 1;
+    opacity: 0.6;
+    margin-left: auto;
+    margin-right: 4px;
+    display: flex;
+    align-items: center;
+}
+.side-panel-toc-toggle:hover {
+    opacity: 1;
+    background: var(--hover-bg, rgba(128,128,128,0.15));
+}
+.side-panel-toc-toggle.active {
+    opacity: 1;
+    background: var(--selection-bg);
+}
+/* Side panel expand button */
+.side-panel-open-tab {
+    background: none;
+    border: none;
+    color: var(--text-color);
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 4px;
+    line-height: 1;
+    opacity: 0.6;
+    margin-right: 4px;
+    display: flex;
+    align-items: center;
+}
+.side-panel-open-tab:hover {
+    opacity: 1;
+    background: var(--hover-bg, rgba(128,128,128,0.15));
+}
+.side-panel-expand {
+    background: none;
+    border: none;
+    color: var(--text-color);
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 4px;
+    line-height: 1;
+    opacity: 0.6;
+    margin-right: 4px;
+    display: flex;
+    align-items: center;
+}
+.side-panel-expand:hover {
+    opacity: 1;
+    background: var(--hover-bg, rgba(128,128,128,0.15));
+}
+.side-panel-expand.active {
+    opacity: 1;
+    background: var(--selection-bg);
 }
 .side-panel-iframe-container {
     flex: 1;

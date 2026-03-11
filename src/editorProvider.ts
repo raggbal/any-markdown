@@ -350,6 +350,28 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
         this.activeWebviewPanel?.webview.postMessage({ type: 'toggleSourceMode' });
     }
 
+    /**
+     * Extract h1/h2 headings from markdown for side panel TOC
+     */
+    private extractToc(markdown: string): Array<{level: number, text: string, anchor: string}> {
+        const lines = markdown.split('\n');
+        const toc: Array<{level: number, text: string, anchor: string}> = [];
+        let inCodeBlock = false;
+        for (const line of lines) {
+            if (line.startsWith('```')) { inCodeBlock = !inCodeBlock; continue; }
+            if (inCodeBlock) continue;
+            const match = line.match(/^(#{1,2})\s+(.+)$/);
+            if (match) {
+                const text = match[2].trim();
+                const anchor = text.toLowerCase()
+                    .replace(/[^\w\s\u3000-\u9fff\u{20000}-\u{2fa1f}\-]/gu, '')
+                    .replace(/\s+/g, '-');
+                toc.push({ level: match[1].length, text, anchor });
+            }
+        }
+        return toc;
+    }
+
     public async resolveCustomTextEditor(
         document: vscode.TextDocument,
         webviewPanel: vscode.WebviewPanel,
@@ -743,7 +765,8 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
                                         type: 'openSidePanel',
                                         sidePanelHtml: sidePanelHtml,
                                         filePath: resolvedUri.fsPath,
-                                        fileName: fileName
+                                        fileName: fileName,
+                                        toc: this.extractToc(text)
                                     });
                                 } catch (e) {
                                     vscode.window.showErrorMessage(`Cannot open file: ${resolvedUri.fsPath}`);
@@ -831,7 +854,8 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
                                     type: 'openSidePanel',
                                     sidePanelHtml: spHtml,
                                     filePath: spResolvedUri.fsPath,
-                                    fileName: spFileName
+                                    fileName: spFileName,
+                                    toc: this.extractToc(spText)
                                 });
                             } catch (e) {
                                 vscode.window.showErrorMessage(`Cannot open file: ${spResolvedUri.fsPath}`);

@@ -12857,7 +12857,7 @@
                 }
             }
         } else if (message.type === 'openSidePanel') {
-            openSidePanel(message.sidePanelHtml, message.filePath, message.fileName);
+            openSidePanel(message.sidePanelHtml, message.filePath, message.fileName, message.toc);
         } else if (message.type === 'sidePanelMessage') {
             // Relay message from VSCode to iframe
             if (sidePanelIframe && sidePanelIframe.contentWindow) {
@@ -12872,14 +12872,24 @@
     var sidePanelClose = document.getElementById('sidePanelClose');
     var sidePanelOverlay = document.getElementById('sidePanelOverlay');
     var sidePanelIframeContainer = document.getElementById('sidePanelIframeContainer');
+    var sidePanelToc = document.getElementById('sidePanelToc');
+    var sidePanelTocToggle = document.getElementById('sidePanelTocToggle');
     var sidePanelIframe = null;
     var sidePanelFilePath = null;
     var sidePanelBlobUrl = null;
+    var sidePanelTocVisible = true;
+    var sidePanelExpanded = false;
+    var sidebarWasOpenBeforeSidePanel = false;
 
-    function openSidePanel(html, filePath, fileName) {
+    function openSidePanel(html, filePath, fileName, toc) {
         // Close existing panel if open
         if (sidePanelIframe) {
             closeSidePanelImmediate();
+        }
+        // Close sidebar (outline) and remember its state
+        sidebarWasOpenBeforeSidePanel = !sidebar.classList.contains('hidden');
+        if (sidebarWasOpenBeforeSidePanel) {
+            closeSidebar();
         }
         sidePanelFilePath = filePath;
         sidePanelFilename.textContent = fileName;
@@ -12897,6 +12907,9 @@
         sidePanelIframeContainer.innerHTML = '';
         sidePanelIframeContainer.appendChild(sidePanelIframe);
 
+        // Render TOC
+        renderSidePanelToc(toc);
+
         // Show panel with animation
         sidePanel.style.display = 'flex';
         sidePanelOverlay.style.display = 'block';
@@ -12904,6 +12917,67 @@
             sidePanel.classList.add('open');
             sidePanelOverlay.classList.add('open');
         });
+    }
+
+    function renderSidePanelToc(toc) {
+        if (!sidePanelToc) return;
+        if (toc && toc.length > 0) {
+            sidePanelToc.innerHTML = toc.map(function(item) {
+                return '<a class="side-panel-toc-item" data-level="' + item.level +
+                    '" data-anchor="' + escapeHtml(item.anchor) + '" title="' + escapeHtml(item.text) + '">' +
+                    escapeHtml(item.text) + '</a>';
+            }).join('');
+            bindSidePanelTocClicks();
+            // Show TOC if it was previously visible or if this is the first open with content
+            if (sidePanelTocVisible) {
+                sidePanelToc.classList.add('visible');
+                if (sidePanelTocToggle) sidePanelTocToggle.classList.add('active');
+            }
+        } else {
+            sidePanelToc.innerHTML = '';
+            sidePanelToc.classList.remove('visible');
+            if (sidePanelTocToggle) sidePanelTocToggle.classList.remove('active');
+        }
+    }
+
+    function bindSidePanelTocClicks() {
+        if (!sidePanelToc) return;
+        sidePanelToc.querySelectorAll('.side-panel-toc-item').forEach(function(item) {
+            item.addEventListener('click', function() {
+                var anchor = item.dataset.anchor;
+                if (sidePanelIframe && sidePanelIframe.contentWindow) {
+                    sidePanelIframe.contentWindow.postMessage(
+                        { type: 'scrollToAnchor', anchor: anchor }, '*'
+                    );
+                }
+                // Update active state
+                sidePanelToc.querySelectorAll('.side-panel-toc-item').forEach(function(i) {
+                    i.classList.remove('active');
+                });
+                item.classList.add('active');
+            });
+        });
+    }
+
+    function updateSidePanelTocFromMarkdown(markdown) {
+        if (!sidePanelToc) return;
+        var lines = markdown.split('\n');
+        var toc = [];
+        var inCodeBlock = false;
+        for (var i = 0; i < lines.length; i++) {
+            var line = lines[i];
+            if (line.startsWith('```')) { inCodeBlock = !inCodeBlock; continue; }
+            if (inCodeBlock) continue;
+            var match = line.match(/^(#{1,2})\s+(.+)$/);
+            if (match) {
+                var text = match[2].trim();
+                var anchor = text.toLowerCase()
+                    .replace(/[^\w\s\u3000-\u9fff\u{20000}-\u{2fa1f}\-]/gu, '')
+                    .replace(/\s+/g, '-');
+                toc.push({ level: match[1].length, text: text, anchor: anchor });
+            }
+        }
+        renderSidePanelToc(toc);
     }
 
     function closeSidePanel() {
@@ -12917,6 +12991,13 @@
     function closeSidePanelImmediate() {
         sidePanel.style.display = 'none';
         sidePanelOverlay.style.display = 'none';
+        // Reset expanded state
+        if (sidePanelExpanded) {
+            sidePanel.classList.remove('expanded');
+            sidePanelExpanded = false;
+            var expandBtn = document.getElementById('sidePanelExpand');
+            if (expandBtn) expandBtn.classList.remove('active');
+        }
         if (sidePanelIframe) {
             sidePanelIframe.remove();
             sidePanelIframe = null;
@@ -12926,6 +13007,54 @@
             sidePanelBlobUrl = null;
         }
         sidePanelFilePath = null;
+        // Restore sidebar if it was open before
+        if (sidebarWasOpenBeforeSidePanel) {
+            openSidebar();
+            sidebarWasOpenBeforeSidePanel = false;
+        }
+    }
+
+    // Side panel expand toggle button
+    // Side panel open in new tab button
+    var sidePanelOpenTabBtn = document.getElementById('sidePanelOpenTab');
+    if (sidePanelOpenTabBtn) {
+        sidePanelOpenTabBtn.addEventListener('click', function() {
+            if (sidePanelFilePath) {
+                host.openLinkInTab(sidePanelFilePath);
+            }
+        });
+    }
+
+    var sidePanelExpandBtn = document.getElementById('sidePanelExpand');
+    if (sidePanelExpandBtn) {
+        sidePanelExpandBtn.addEventListener('click', function() {
+            sidePanelExpanded = !sidePanelExpanded;
+            if (sidePanelExpanded) {
+                sidePanel.classList.add('expanded');
+                sidePanelExpandBtn.classList.add('active');
+            } else {
+                sidePanel.classList.remove('expanded');
+                sidePanelExpandBtn.classList.remove('active');
+            }
+        });
+    }
+
+    // Side panel TOC toggle button
+    if (sidePanelTocToggle) {
+        sidePanelTocToggle.addEventListener('click', function() {
+            if (!sidePanelToc) return;
+            sidePanelTocVisible = !sidePanelTocVisible;
+            if (sidePanelTocVisible && sidePanelToc.children.length > 0) {
+                sidePanelToc.classList.add('visible');
+                sidePanelTocToggle.classList.add('active');
+            } else {
+                sidePanelToc.classList.remove('visible');
+                sidePanelTocToggle.classList.remove('active');
+                if (sidePanelToc.children.length === 0) {
+                    sidePanelTocVisible = false;
+                }
+            }
+        });
     }
 
     // Listen for messages from iframe (side panel)
@@ -12936,6 +13065,8 @@
             // iframe editor synced content — save to file
             if (sidePanelFilePath) {
                 host.saveSidePanelFile(sidePanelFilePath, msg.content);
+                // Update TOC when content changes
+                updateSidePanelTocFromMarkdown(msg.content);
             }
         } else if (msg.type === 'save') {
             // Explicit save from iframe — save immediately

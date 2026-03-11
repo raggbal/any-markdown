@@ -188,6 +188,9 @@
         openLink: function(href) {
             window.__testApi.messages.push({ type: 'openLink', href: href });
         },
+        openLinkInTab: function(href) {
+            window.__testApi.messages.push({ type: 'openLinkInTab', href: href });
+        },
         requestInsertLink: function(text) {
             window.__testApi.messages.push({ type: 'insertLink', text: text });
         },
@@ -208,6 +211,12 @@
         },
         sendToChat: function(startLine, endLine, selectedMarkdown) {
             window.__testApi.messages.push({ type: 'sendToChat', startLine: startLine, endLine: endLine, selectedMarkdown: selectedMarkdown });
+        },
+        saveSidePanelFile: function(filePath, content) {
+            window.__testApi.messages.push({ type: 'saveSidePanelFile', filePath: filePath, content: content });
+        },
+        sidePanelOpenLink: function(href, sidePanelFilePath) {
+            window.__testApi.messages.push({ type: 'sidePanelOpenLink', href: href, sidePanelFilePath: sidePanelFilePath });
         },
 
         // ホストからのメッセージ受信
@@ -2467,13 +2476,9 @@
             });
         });
 
-        // Handle link clicks
-        editor.querySelectorAll('a').forEach(a => {
-            a.addEventListener('click', e => {
-                e.preventDefault();
-                host.openLink(a.getAttribute('href'));
-            });
-        });
+        // Handle link clicks (delegated handler added once, not per-element)
+        // Individual <a> click handlers are unreliable in contenteditable
+        // See delegated handler below: editor 'click' for 'a' tags
 
         // Make table cells editable
         editor.querySelectorAll('th, td').forEach(cell => {
@@ -4229,6 +4234,24 @@
     });
 
     editor.addEventListener('click', function(e) {
+        // Delegated link click handler
+        // e.target can be a text node inside <a>, so walk up to find <a>
+        let target = e.target;
+        if (target.nodeType === 3) target = target.parentElement; // text node → parent element
+        const clickedLink = target ? (target.closest ? target.closest('a') : (target.tagName === 'A' ? target : null)) : null;
+        if (clickedLink && clickedLink.getAttribute('href')) {
+            e.preventDefault();
+            e.stopPropagation();
+            var linkHref = clickedLink.getAttribute('href');
+            logger.log('[Any MD] Link clicked:', linkHref, 'metaKey:', e.metaKey, 'ctrlKey:', e.ctrlKey);
+            if (e.metaKey || e.ctrlKey) {
+                host.openLinkInTab(linkHref);
+            } else {
+                host.openLink(linkHref);
+            }
+            return;
+        }
+
         const cell = e.target.closest ? e.target.closest('th, td') : null;
         if (cell && editor.contains(cell)) {
             activeTableCell = cell;
@@ -13063,6 +13086,244 @@
                     }
                 }
             }
+        } else if (message.type === 'openSidePanel') {
+            openSidePanel(message.sidePanelHtml, message.filePath, message.fileName, message.toc);
+        } else if (message.type === 'sidePanelMessage') {
+            // Relay message from VSCode to iframe
+            if (sidePanelIframe && sidePanelIframe.contentWindow) {
+                sidePanelIframe.contentWindow.postMessage(message.data, '*');
+            }
+        }
+    });
+
+    // ========== Side Panel (iframe) ==========
+    var sidePanel = document.getElementById('sidePanel');
+    var sidePanelFilename = document.getElementById('sidePanelFilename');
+    var sidePanelClose = document.getElementById('sidePanelClose');
+    var sidePanelOverlay = document.getElementById('sidePanelOverlay');
+    var sidePanelIframeContainer = document.getElementById('sidePanelIframeContainer');
+    var sidePanelToc = document.getElementById('sidePanelToc');
+    var sidePanelTocToggle = document.getElementById('sidePanelTocToggle');
+    var sidePanelIframe = null;
+    var sidePanelFilePath = null;
+    var sidePanelBlobUrl = null;
+    var sidePanelTocVisible = true;
+    var sidePanelExpanded = false;
+    var sidebarWasOpenBeforeSidePanel = false;
+
+    function openSidePanel(html, filePath, fileName, toc) {
+        // Close existing panel if open
+        if (sidePanelIframe) {
+            closeSidePanelImmediate();
+        }
+        // Close sidebar (outline) and remember its state
+        sidebarWasOpenBeforeSidePanel = !sidebar.classList.contains('hidden');
+        if (sidebarWasOpenBeforeSidePanel) {
+            closeSidebar();
+        }
+        sidePanelFilePath = filePath;
+        sidePanelFilename.textContent = fileName;
+
+        // Create blob URL and iframe
+        var blob = new Blob([html], { type: 'text/html' });
+        sidePanelBlobUrl = URL.createObjectURL(blob);
+
+        sidePanelIframe = document.createElement('iframe');
+        sidePanelIframe.src = sidePanelBlobUrl;
+        sidePanelIframe.style.width = '100%';
+        sidePanelIframe.style.height = '100%';
+        sidePanelIframe.style.border = 'none';
+        sidePanelIframe.setAttribute('sandbox', 'allow-scripts allow-same-origin');
+        sidePanelIframeContainer.innerHTML = '';
+        sidePanelIframeContainer.appendChild(sidePanelIframe);
+
+        // Render TOC
+        renderSidePanelToc(toc);
+
+        // Show panel with animation
+        sidePanel.style.display = 'flex';
+        sidePanelOverlay.style.display = 'block';
+        requestAnimationFrame(function() {
+            sidePanel.classList.add('open');
+            sidePanelOverlay.classList.add('open');
+        });
+    }
+
+    function renderSidePanelToc(toc) {
+        if (!sidePanelToc) return;
+        if (toc && toc.length > 0) {
+            sidePanelToc.innerHTML = toc.map(function(item) {
+                return '<a class="side-panel-toc-item" data-level="' + item.level +
+                    '" data-anchor="' + escapeHtml(item.anchor) + '" title="' + escapeHtml(item.text) + '">' +
+                    escapeHtml(item.text) + '</a>';
+            }).join('');
+            bindSidePanelTocClicks();
+            // Show TOC if it was previously visible or if this is the first open with content
+            if (sidePanelTocVisible) {
+                sidePanelToc.classList.add('visible');
+                if (sidePanelTocToggle) sidePanelTocToggle.classList.add('active');
+            }
+        } else {
+            sidePanelToc.innerHTML = '';
+            sidePanelToc.classList.remove('visible');
+            if (sidePanelTocToggle) sidePanelTocToggle.classList.remove('active');
+        }
+    }
+
+    function bindSidePanelTocClicks() {
+        if (!sidePanelToc) return;
+        sidePanelToc.querySelectorAll('.side-panel-toc-item').forEach(function(item) {
+            item.addEventListener('click', function() {
+                var anchor = item.dataset.anchor;
+                if (sidePanelIframe && sidePanelIframe.contentWindow) {
+                    sidePanelIframe.contentWindow.postMessage(
+                        { type: 'scrollToAnchor', anchor: anchor }, '*'
+                    );
+                }
+                // Update active state
+                sidePanelToc.querySelectorAll('.side-panel-toc-item').forEach(function(i) {
+                    i.classList.remove('active');
+                });
+                item.classList.add('active');
+            });
+        });
+    }
+
+    function updateSidePanelTocFromMarkdown(markdown) {
+        if (!sidePanelToc) return;
+        var lines = markdown.split('\n');
+        var toc = [];
+        var inCodeBlock = false;
+        for (var i = 0; i < lines.length; i++) {
+            var line = lines[i];
+            if (line.startsWith('```')) { inCodeBlock = !inCodeBlock; continue; }
+            if (inCodeBlock) continue;
+            var match = line.match(/^(#{1,2})\s+(.+)$/);
+            if (match) {
+                var text = match[2].trim();
+                var anchor = text.toLowerCase()
+                    .replace(/[^\w\s\u3000-\u9fff\u{20000}-\u{2fa1f}\-]/gu, '')
+                    .replace(/\s+/g, '-');
+                toc.push({ level: match[1].length, text: text, anchor: anchor });
+            }
+        }
+        renderSidePanelToc(toc);
+    }
+
+    function closeSidePanel() {
+        sidePanel.classList.remove('open');
+        sidePanelOverlay.classList.remove('open');
+        setTimeout(function() {
+            closeSidePanelImmediate();
+        }, 200);
+    }
+
+    function closeSidePanelImmediate() {
+        sidePanel.style.display = 'none';
+        sidePanelOverlay.style.display = 'none';
+        // Reset expanded state
+        if (sidePanelExpanded) {
+            sidePanel.classList.remove('expanded');
+            sidePanelExpanded = false;
+            var expandBtn = document.getElementById('sidePanelExpand');
+            if (expandBtn) expandBtn.classList.remove('active');
+        }
+        if (sidePanelIframe) {
+            sidePanelIframe.remove();
+            sidePanelIframe = null;
+        }
+        if (sidePanelBlobUrl) {
+            URL.revokeObjectURL(sidePanelBlobUrl);
+            sidePanelBlobUrl = null;
+        }
+        sidePanelFilePath = null;
+        // Restore sidebar if it was open before
+        if (sidebarWasOpenBeforeSidePanel) {
+            openSidebar();
+            sidebarWasOpenBeforeSidePanel = false;
+        }
+    }
+
+    // Side panel expand toggle button
+    // Side panel open in new tab button
+    var sidePanelOpenTabBtn = document.getElementById('sidePanelOpenTab');
+    if (sidePanelOpenTabBtn) {
+        sidePanelOpenTabBtn.addEventListener('click', function() {
+            if (sidePanelFilePath) {
+                host.openLinkInTab(sidePanelFilePath);
+            }
+        });
+    }
+
+    var sidePanelExpandBtn = document.getElementById('sidePanelExpand');
+    if (sidePanelExpandBtn) {
+        sidePanelExpandBtn.addEventListener('click', function() {
+            sidePanelExpanded = !sidePanelExpanded;
+            if (sidePanelExpanded) {
+                sidePanel.classList.add('expanded');
+                sidePanelExpandBtn.classList.add('active');
+            } else {
+                sidePanel.classList.remove('expanded');
+                sidePanelExpandBtn.classList.remove('active');
+            }
+        });
+    }
+
+    // Side panel TOC toggle button
+    if (sidePanelTocToggle) {
+        sidePanelTocToggle.addEventListener('click', function() {
+            if (!sidePanelToc) return;
+            sidePanelTocVisible = !sidePanelTocVisible;
+            if (sidePanelTocVisible && sidePanelToc.children.length > 0) {
+                sidePanelToc.classList.add('visible');
+                sidePanelTocToggle.classList.add('active');
+            } else {
+                sidePanelToc.classList.remove('visible');
+                sidePanelTocToggle.classList.remove('active');
+                if (sidePanelToc.children.length === 0) {
+                    sidePanelTocVisible = false;
+                }
+            }
+        });
+    }
+
+    // Listen for messages from iframe (side panel)
+    window.addEventListener('message', function(e) {
+        if (!e.data || e.data.source !== 'sidePanel') return;
+        var msg = e.data;
+        if (msg.type === 'edit') {
+            // iframe editor synced content — save to file
+            if (sidePanelFilePath) {
+                host.saveSidePanelFile(sidePanelFilePath, msg.content);
+                // Update TOC when content changes
+                updateSidePanelTocFromMarkdown(msg.content);
+            }
+        } else if (msg.type === 'save') {
+            // Explicit save from iframe — save immediately
+            if (sidePanelFilePath && sidePanelIframe && sidePanelIframe.contentWindow) {
+                // iframe will send edit with latest content
+            }
+        } else if (msg.type === 'openLink') {
+            // Link clicked in side panel — relay to VSCode with side panel file path for resolution
+            if (sidePanelFilePath) {
+                host.sidePanelOpenLink(msg.href, sidePanelFilePath);
+            }
+        } else if (msg.type === 'openLinkInTab') {
+            host.openLinkInTab(msg.href);
+        }
+    });
+
+    // Side panel close handlers
+    if (sidePanelClose) {
+        sidePanelClose.addEventListener('click', closeSidePanel);
+    }
+    if (sidePanelOverlay) {
+        sidePanelOverlay.addEventListener('click', closeSidePanel);
+    }
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && sidePanel && sidePanel.classList.contains('open')) {
+            closeSidePanel();
+            e.preventDefault();
         }
     });
 
