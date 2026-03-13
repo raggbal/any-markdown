@@ -71,6 +71,18 @@
         notifySidePanelClosed: function() {
             window.__testApi.messages.push({ type: 'sidePanelClosed' });
         },
+        searchFiles: function(query) {
+            window.__testApi.messages.push({ type: 'searchFiles', query: query });
+        },
+        createPageAtPath: function(relativePath) {
+            window.__testApi.messages.push({ type: 'createPageAtPath', relativePath: relativePath });
+        },
+        createPageAuto: function() {
+            window.__testApi.messages.push({ type: 'createPageAuto' });
+        },
+        updatePageH1: function(relativePath, h1Text) {
+            window.__testApi.messages.push({ type: 'updatePageH1', relativePath: relativePath, h1Text: h1Text });
+        },
 
         // ホストからのメッセージ受信
         onMessage: function(handler) {

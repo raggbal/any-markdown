@@ -64,6 +64,18 @@
         notifySidePanelClosed: function() {
             api.postMessage({ type: 'sidePanelClosed' });
         },
+        searchFiles: function(query) {
+            api.postMessage({ type: 'searchFiles', query: query });
+        },
+        createPageAtPath: function(relativePath) {
+            api.postMessage({ type: 'createPageAtPath', relativePath: relativePath });
+        },
+        createPageAuto: function() {
+            api.postMessage({ type: 'createPageAuto' });
+        },
+        updatePageH1: function(relativePath, h1Text) {
+            api.postMessage({ type: 'updatePageH1', relativePath: relativePath, h1Text: h1Text });
+        },
 
         // ホストからのメッセージ受信
         onMessage: function(handler) {

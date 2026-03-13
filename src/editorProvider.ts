@@ -1079,6 +1079,107 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
                         defaultImageDir: defaultImageDir
                     });
                     break;
+
+                case 'searchFiles': {
+                    const query: string = message.query || '';
+                    if (query.length < 1) {
+                        webviewPanel.webview.postMessage({
+                            type: 'fileSearchResults',
+                            results: [],
+                            query: query
+                        });
+                        break;
+                    }
+                    const docDir = path.dirname(document.uri.fsPath);
+                    const wsFolder = vscode.workspace.getWorkspaceFolder(document.uri);
+                    const searchBase = wsFolder ? wsFolder.uri : vscode.Uri.file(docDir);
+                    try {
+                        const files = await vscode.workspace.findFiles(
+                            new vscode.RelativePattern(searchBase, '**/*.md'),
+                            '**/node_modules/**',
+                            50
+                        );
+                        const relativePaths = files
+                            .map(f => path.relative(docDir, f.fsPath))
+                            .filter(p => p.toLowerCase().includes(query.toLowerCase()))
+                            .sort((a, b) => a.length - b.length)
+                            .slice(0, 10);
+                        webviewPanel.webview.postMessage({
+                            type: 'fileSearchResults',
+                            results: relativePaths,
+                            query: query
+                        });
+                    } catch {
+                        webviewPanel.webview.postMessage({
+                            type: 'fileSearchResults',
+                            results: [],
+                            query: query
+                        });
+                    }
+                    break;
+                }
+
+                case 'createPageAtPath': {
+                    const relativePath: string = message.relativePath || '';
+                    if (!relativePath) break;
+                    const docDir2 = path.dirname(document.uri.fsPath);
+                    let targetPath = relativePath;
+                    if (!targetPath.endsWith('.md')) {
+                        targetPath += '.md';
+                    }
+                    const absPath = path.resolve(docDir2, targetPath);
+                    try {
+                        // Create intermediate directories
+                        const targetDir = path.dirname(absPath);
+                        if (!fs.existsSync(targetDir)) {
+                            fs.mkdirSync(targetDir, { recursive: true });
+                        }
+                        // Only create if not exists
+                        if (!fs.existsSync(absPath)) {
+                            fs.writeFileSync(absPath, '', 'utf8');
+                        }
+                        webviewPanel.webview.postMessage({
+                            type: 'pageCreatedAtPath',
+                            relativePath: path.relative(docDir2, absPath)
+                        });
+                    } catch (e: any) {
+                        vscode.window.showErrorMessage(`Failed to create page: ${e.message}`);
+                    }
+                    break;
+                }
+
+                case 'createPageAuto': {
+                    const docDir3 = path.dirname(document.uri.fsPath);
+                    const pagesDir = path.join(docDir3, 'pages');
+                    if (!fs.existsSync(pagesDir)) {
+                        fs.mkdirSync(pagesDir, { recursive: true });
+                    }
+                    const fileName = generateUniqueFileName(pagesDir, 'md');
+                    const absPath2 = path.join(pagesDir, fileName);
+                    fs.writeFileSync(absPath2, '', 'utf8');
+                    const relPath = path.relative(docDir3, absPath2);
+                    webviewPanel.webview.postMessage({
+                        type: 'pageCreatedAtPath',
+                        relativePath: relPath
+                    });
+                    break;
+                }
+
+                case 'updatePageH1': {
+                    const h1RelPath: string = message.relativePath || '';
+                    const h1Text: string = message.h1Text || '';
+                    if (!h1RelPath || !h1Text) break;
+                    const docDir4 = path.dirname(document.uri.fsPath);
+                    const h1AbsPath = path.resolve(docDir4, h1RelPath);
+                    try {
+                        if (fs.existsSync(h1AbsPath)) {
+                            fs.writeFileSync(h1AbsPath, `# ${h1Text}\n`, 'utf8');
+                        }
+                    } catch (e: any) {
+                        // Silent fail — file may have been deleted
+                    }
+                    break;
+                }
             }
         });
 

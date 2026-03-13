@@ -92,9 +92,17 @@ export const webviewMessages = {
   imageDirSourceDefault: 'by デフォルト',
   // Command palette
   commandPaletteFilter: '入力して絞り込み...',
+  commandPalettePage: 'ページ',
   commandPaletteInline: 'インライン',
   commandPaletteHeadings: '見出し',
   commandPaletteLists: 'リスト',
   commandPaletteBlocks: 'ブロック',
   commandPaletteInsert: '挿入',
+  // Action Panel
+  addPage: 'ページ挿入 (Ctrl+N)',
+  addPageAuto: 'ページ追加',
+  addPageAtPath: 'パス指定でページ追加',
+  addPageAtPathTitle: 'パスを入力 (.md)',
+  confirmLinkName: 'リンク名',
+  actionPanelConfirm: '確定',
 };

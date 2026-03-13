@@ -1033,6 +1033,85 @@ body {
     white-space: nowrap;
 }
 
+/* Action Panel (Page Add) */
+.action-panel {
+    position: fixed;
+    z-index: 10000;
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    width: 300px;
+    max-height: 400px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+.action-panel-title {
+    padding: 8px 12px 4px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--text-color);
+    opacity: 0.5;
+    letter-spacing: 0.5px;
+}
+.action-panel-list {
+    padding: 4px 0;
+}
+.action-panel-item {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    cursor: pointer;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text-color);
+}
+.action-panel-item.selected {
+    background: var(--selection-bg);
+}
+.action-panel-icon {
+    flex-shrink: 0;
+    width: 20px;
+    text-align: center;
+}
+.action-panel-input {
+    margin: 4px 8px 8px;
+    padding: 6px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--bg-color);
+    color: var(--text-color);
+    font-size: 13px;
+    outline: none;
+    box-sizing: border-box;
+}
+.action-panel-input:focus {
+    border-color: var(--link-color);
+}
+.action-panel-results {
+    overflow-y: auto;
+    max-height: 200px;
+    padding: 0 0 4px;
+}
+.action-panel-result-item {
+    padding: 6px 12px;
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--text-color);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.action-panel-result-item.selected {
+    background: var(--selection-bg);
+}
+.action-panel-confirm-btn {
+    margin-top: 4px;
+    border-top: 1px solid var(--border-color);
+}
+
 /* Side Panel (Notion-style peek overlay) */
 .side-panel {
     position: absolute;

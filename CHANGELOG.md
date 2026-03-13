@@ -5,6 +5,18 @@ All notable changes to the "Any Markdown Editor" extension will be documented in
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.195.409] - 2026-03-13
+
+### Added
+- **Action Panel (Add Page)** — Cmd+N or command palette "Add Page" to quickly create and link new Markdown pages. Two modes: auto-create in pages/ folder, or specify a path with autocomplete.
+
+### Fixed
+- **Action Panel hover/keyboard conflict** — Mouse hover and keyboard arrow keys now share a single active selection instead of showing two highlights.
+- **Action Panel click support** — Menu items, path input confirm, and link name confirm now work with mouse click (not just Enter).
+- **Action Panel IME support** — IME composition Enter no longer prematurely confirms link name input.
+- **New page h1** — New files use the link name as h1 heading (not the filename). Existing files are not modified.
+- **Japanese localization** — Action panel menu items properly localized.
+
 ## [0.195.402] - 2026-03-13
 
 ### Fixed

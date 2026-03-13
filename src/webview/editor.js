@@ -11292,12 +11292,17 @@
                 setCursorToEnd(p);
                 syncMarkdown();
                 break;
+            case 'addPage':
+                openActionPanel();
+                break;
         }
     }
 
     // ========== COMMAND PALETTE ==========
 
     var COMMAND_PALETTE_ITEMS = [
+        // Group: Page
+        { group: 'page', action: 'addPage', i18nKey: 'addPage', icon: 'addPage' },
         // Group: Inline
         { group: 'inline', action: 'bold',          i18nKey: 'bold',          icon: 'bold' },
         { group: 'inline', action: 'italic',        i18nKey: 'italic',        icon: 'italic' },
@@ -11321,12 +11326,13 @@
         { group: 'blocks', action: 'mermaid',  i18nKey: 'mermaidBlock',   icon: 'mermaid' },
         { group: 'blocks', action: 'math',     i18nKey: 'mathBlock',      icon: 'math' },
         // Group: Insert
-        { group: 'insert', action: 'link',  i18nKey: 'insertLink',  icon: 'link' },
-        { group: 'insert', action: 'image', i18nKey: 'insertImage', icon: 'image' },
-        { group: 'insert', action: 'table', i18nKey: 'insertTable', icon: 'table' },
+        { group: 'insert', action: 'link',    i18nKey: 'insertLink',  icon: 'link' },
+        { group: 'insert', action: 'image',   i18nKey: 'insertImage', icon: 'image' },
+        { group: 'insert', action: 'table',   i18nKey: 'insertTable', icon: 'table' },
     ];
 
     var COMMAND_PALETTE_GROUPS = {
+        page:     function() { return i18n.commandPalettePage     || 'Page'; },
         inline:   function() { return i18n.commandPaletteInline   || 'Inline'; },
         headings: function() { return i18n.commandPaletteHeadings  || 'Headings'; },
         lists:    function() { return i18n.commandPaletteLists     || 'Lists'; },
@@ -11651,6 +11657,436 @@
 
         // Dispatch via shared function (same as toolbar)
         dispatchToolbarAction(action);
+    }
+
+    // ========== ACTION PANEL (Page Add) ==========
+
+    var actionPanel = null;
+    var actionPanelVisible = false;
+    var actionPanelSavedRange = null;
+    var actionPanelState = { step: 'menu', selectedIndex: 0, pendingPath: '' };
+    var actionPanelSearchTimer = null;
+    var actionPanelSearchResults = [];
+    var actionPanelSelectedResultIndex = -1;
+
+    var ACTION_PANEL_MENU_ITEMS = [
+        { id: 'addPageAuto', label: i18n.addPageAuto || 'Add Page', icon: '📄' },
+        { id: 'addPageAtPath', label: i18n.addPageAtPath || 'Add Page at Path', icon: '📂' }
+    ];
+
+    function createActionPanel() {
+        if (actionPanel) return;
+        actionPanel = document.createElement('div');
+        actionPanel.className = 'action-panel';
+        actionPanel.style.display = 'none';
+        document.body.appendChild(actionPanel);
+    }
+
+    function renderActionPanelMenu() {
+        actionPanel.innerHTML = '';
+        var title = document.createElement('div');
+        title.className = 'action-panel-title';
+        title.textContent = i18n.addPage || 'Add Page';
+        actionPanel.appendChild(title);
+
+        var list = document.createElement('div');
+        list.className = 'action-panel-list';
+        for (var i = 0; i < ACTION_PANEL_MENU_ITEMS.length; i++) {
+            var item = ACTION_PANEL_MENU_ITEMS[i];
+            var div = document.createElement('div');
+            div.className = 'action-panel-item';
+            if (i === actionPanelState.selectedIndex) div.classList.add('selected');
+            div.dataset.index = i;
+            div.innerHTML = '<span class="action-panel-icon">' + item.icon + '</span><span>' + item.label + '</span>';
+            div.addEventListener('click', (function(idx) {
+                return function() { executeActionPanelMenuItem(idx); };
+            })(i));
+            div.addEventListener('mousemove', (function(idx) {
+                return function() {
+                    if (actionPanelState.selectedIndex !== idx) {
+                        actionPanelState.selectedIndex = idx;
+                        renderActionPanelMenuHighlight(list);
+                    }
+                };
+            })(i));
+            list.appendChild(div);
+        }
+        actionPanel.appendChild(list);
+    }
+
+    function renderActionPanelMenuHighlight(list) {
+        var items = list.querySelectorAll('.action-panel-item');
+        for (var i = 0; i < items.length; i++) {
+            if (i === actionPanelState.selectedIndex) {
+                items[i].classList.add('selected');
+            } else {
+                items[i].classList.remove('selected');
+            }
+        }
+    }
+
+    function renderActionPanelPathInput() {
+        actionPanel.innerHTML = '';
+        var title = document.createElement('div');
+        title.className = 'action-panel-title';
+        title.textContent = i18n.addPageAtPathTitle || 'Enter path (.md)';
+        actionPanel.appendChild(title);
+
+        var input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'action-panel-input';
+        input.placeholder = 'docs/page.md';
+        actionPanel.appendChild(input);
+
+        var resultsList = document.createElement('div');
+        resultsList.className = 'action-panel-results';
+        actionPanel.appendChild(resultsList);
+
+        actionPanelSearchResults = [];
+        actionPanelSelectedResultIndex = -1;
+
+        input.addEventListener('input', function() {
+            var query = input.value.trim();
+            if (actionPanelSearchTimer) clearTimeout(actionPanelSearchTimer);
+            if (query.length < 1) {
+                resultsList.innerHTML = '';
+                actionPanelSearchResults = [];
+                actionPanelSelectedResultIndex = -1;
+                return;
+            }
+            actionPanelSearchTimer = setTimeout(function() {
+                host.searchFiles(query);
+            }, 300);
+        });
+
+        var isComposing2 = false;
+        input.addEventListener('compositionstart', function() { isComposing2 = true; });
+        input.addEventListener('compositionend', function() { isComposing2 = false; });
+
+        input.addEventListener('keydown', function(e) {
+            if (isComposing2) return;
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                if (actionPanelSearchResults.length > 0) {
+                    actionPanelSelectedResultIndex = (actionPanelSelectedResultIndex + 1) % actionPanelSearchResults.length;
+                    updateActionPanelResultsHighlight(resultsList);
+                }
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (actionPanelSearchResults.length > 0) {
+                    actionPanelSelectedResultIndex = (actionPanelSelectedResultIndex - 1 + actionPanelSearchResults.length) % actionPanelSearchResults.length;
+                    updateActionPanelResultsHighlight(resultsList);
+                }
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                confirmPathInput(input);
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                actionPanelState.step = 'menu';
+                actionPanelState.selectedIndex = 0;
+                renderActionPanelMenu();
+            }
+        });
+
+        // Confirm button for path input
+        var confirmBtn2 = document.createElement('div');
+        confirmBtn2.className = 'action-panel-item action-panel-confirm-btn';
+        confirmBtn2.innerHTML = '<span class="action-panel-icon">✓</span><span>' + (i18n.actionPanelConfirm || 'OK') + '</span>';
+        confirmBtn2.addEventListener('click', function() {
+            confirmPathInput(input);
+        });
+        actionPanel.appendChild(confirmBtn2);
+
+        requestAnimationFrame(function() { input.focus(); });
+    }
+
+    function confirmPathInput(input) {
+        var selectedPath;
+        if (actionPanelSelectedResultIndex >= 0 && actionPanelSelectedResultIndex < actionPanelSearchResults.length) {
+            selectedPath = actionPanelSearchResults[actionPanelSelectedResultIndex];
+        } else {
+            selectedPath = input.value.trim();
+        }
+        if (selectedPath) {
+            if (!selectedPath.endsWith('.md')) selectedPath += '.md';
+            actionPanelState.pendingPath = selectedPath;
+            var isExisting = actionPanelSearchResults.indexOf(selectedPath) >= 0;
+            if (isExisting) {
+                showActionPanelLinkName(selectedPath, true);
+            } else {
+                host.createPageAtPath(selectedPath);
+            }
+        }
+    }
+
+    function updateActionPanelResultsHighlight(container) {
+        var items = container.querySelectorAll('.action-panel-result-item');
+        for (var i = 0; i < items.length; i++) {
+            if (i === actionPanelSelectedResultIndex) {
+                items[i].classList.add('selected');
+                items[i].scrollIntoView({ block: 'nearest' });
+            } else {
+                items[i].classList.remove('selected');
+            }
+        }
+    }
+
+    function handleFileSearchResults(results, query) {
+        if (!actionPanelVisible || actionPanelState.step !== 'pathInput') return;
+        actionPanelSearchResults = results;
+        actionPanelSelectedResultIndex = -1;
+        var resultsList = actionPanel.querySelector('.action-panel-results');
+        if (!resultsList) return;
+        resultsList.innerHTML = '';
+        for (var i = 0; i < results.length; i++) {
+            var div = document.createElement('div');
+            div.className = 'action-panel-result-item';
+            div.textContent = results[i];
+            div.dataset.index = i;
+            div.addEventListener('click', (function(idx) {
+                return function() {
+                    var path = actionPanelSearchResults[idx];
+                    actionPanelState.pendingPath = path;
+                    showActionPanelLinkName(path, true);
+                };
+            })(i));
+            div.addEventListener('mousemove', (function(idx) {
+                return function() {
+                    if (actionPanelSelectedResultIndex !== idx) {
+                        actionPanelSelectedResultIndex = idx;
+                        updateActionPanelResultsHighlight(resultsList);
+                    }
+                };
+            })(i));
+            resultsList.appendChild(div);
+        }
+        // Also relay to side panel iframe if open
+        if (sidePanelIframe && sidePanelIframe.contentWindow) {
+            sidePanelIframe.contentWindow.postMessage({
+                type: 'fileSearchResults', results: results, query: query
+            }, '*');
+        }
+    }
+
+    function showActionPanelLinkName(filePath, isExistingFile) {
+        actionPanelState.step = 'linkName';
+        actionPanelState.isExistingFile = !!isExistingFile;
+        actionPanel.innerHTML = '';
+        var title = document.createElement('div');
+        title.className = 'action-panel-title';
+        title.textContent = i18n.confirmLinkName || 'Link name';
+        actionPanel.appendChild(title);
+
+        var input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'action-panel-input';
+        input.value = filePath;
+        actionPanel.appendChild(input);
+
+        var confirmBtn = document.createElement('div');
+        confirmBtn.className = 'action-panel-item action-panel-confirm-btn';
+        confirmBtn.innerHTML = '<span class="action-panel-icon">✓</span><span>' + (i18n.actionPanelConfirm || 'OK') + '</span>';
+        confirmBtn.addEventListener('click', function() {
+            var linkName = input.value.trim() || filePath;
+            finalizeAddPage(filePath, linkName);
+        });
+        actionPanel.appendChild(confirmBtn);
+
+        var isComposing = false;
+        input.addEventListener('compositionstart', function() { isComposing = true; });
+        input.addEventListener('compositionend', function() { isComposing = false; });
+
+        input.addEventListener('keydown', function(e) {
+            if (isComposing) return;
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                var linkName = input.value.trim() || filePath;
+                finalizeAddPage(filePath, linkName);
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                actionPanelState.step = 'menu';
+                actionPanelState.selectedIndex = 0;
+                renderActionPanelMenu();
+            }
+        });
+
+        requestAnimationFrame(function() {
+            input.focus();
+            input.select();
+        });
+    }
+
+    function finalizeAddPage(filePath, linkName) {
+        var isExistingFile = actionPanelState.isExistingFile;
+        closeActionPanel();
+
+        // Restore cursor and insert link
+        editor.focus({ preventScroll: true });
+        if (actionPanelSavedRange) {
+            var sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(actionPanelSavedRange);
+            actionPanelSavedRange = null;
+        }
+
+        undoManager.saveSnapshot();
+        markAsEdited();
+
+        // Insert markdown link as HTML <a> element
+        var a = document.createElement('a');
+        a.href = filePath;
+        a.textContent = linkName;
+        var sel2 = window.getSelection();
+        if (sel2 && sel2.rangeCount) {
+            var range = sel2.getRangeAt(0);
+            range.deleteContents();
+            range.insertNode(a);
+            range.setStartAfter(a);
+            range.setEndAfter(a);
+            sel2.removeAllRanges();
+            sel2.addRange(range);
+        } else {
+            editor.appendChild(a);
+        }
+        syncMarkdown();
+
+        // Update h1 in the newly created file if link name differs from path
+        if (!isExistingFile && linkName !== filePath) {
+            host.updatePageH1(filePath, linkName);
+        }
+    }
+
+    function executeActionPanelMenuItem(index) {
+        var item = ACTION_PANEL_MENU_ITEMS[index];
+        if (item.id === 'addPageAuto') {
+            host.createPageAuto();
+        } else if (item.id === 'addPageAtPath') {
+            actionPanelState.step = 'pathInput';
+            renderActionPanelPathInput();
+        }
+    }
+
+    function openActionPanel() {
+        if (isSourceMode) return;
+        createActionPanel();
+
+        // Save editor selection
+        var sel = window.getSelection();
+        if (sel && sel.rangeCount > 0) {
+            actionPanelSavedRange = sel.getRangeAt(0).cloneRange();
+        } else {
+            actionPanelSavedRange = null;
+        }
+
+        // Position near cursor
+        var anchorRect = null;
+        if (actionPanelSavedRange) {
+            var rects = actionPanelSavedRange.getClientRects();
+            if (rects.length > 0 && (rects[0].width > 0 || rects[0].height > 0)) {
+                anchorRect = rects[0];
+            }
+            if (!anchorRect) {
+                var node = actionPanelSavedRange.startContainer;
+                var el = node.nodeType === 3 ? node.parentElement : node;
+                if (el && el.getBoundingClientRect) {
+                    var elRect = el.getBoundingClientRect();
+                    if (elRect.height > 0) anchorRect = elRect;
+                }
+            }
+        }
+        if (!anchorRect) {
+            anchorRect = toolbar.getBoundingClientRect();
+        }
+
+        var panelHeight = 200;
+        var panelWidth = 300;
+        var top, left;
+        if (anchorRect.bottom + panelHeight + 4 <= window.innerHeight) {
+            top = anchorRect.bottom + 4;
+        } else {
+            top = anchorRect.top - panelHeight - 4;
+            if (top < 0) top = 4;
+        }
+        left = anchorRect.left;
+        if (left + panelWidth > window.innerWidth) left = window.innerWidth - panelWidth - 8;
+        if (left < 4) left = 4;
+
+        actionPanel.style.top = top + 'px';
+        actionPanel.style.left = left + 'px';
+        actionPanel.style.display = 'flex';
+        actionPanelVisible = true;
+
+        actionPanelState = { step: 'menu', selectedIndex: 0, pendingPath: '' };
+        renderActionPanelMenu();
+
+        // Close on outside click
+        setTimeout(function() {
+            document.addEventListener('click', actionPanelOutsideClickHandler);
+        }, 0);
+    }
+
+    function closeActionPanel() {
+        if (!actionPanel || !actionPanelVisible) return;
+        actionPanel.style.display = 'none';
+        actionPanelVisible = false;
+        document.removeEventListener('click', actionPanelOutsideClickHandler);
+        if (actionPanelSearchTimer) { clearTimeout(actionPanelSearchTimer); actionPanelSearchTimer = null; }
+
+        editor.focus({ preventScroll: true });
+        if (actionPanelSavedRange) {
+            var sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(actionPanelSavedRange);
+            actionPanelSavedRange = null;
+        }
+    }
+
+    function actionPanelOutsideClickHandler(e) {
+        if (!actionPanel) return;
+        // Check if click target is inside the panel OR was inside before re-render
+        if (actionPanel.contains(e.target)) return;
+        // Also check if click was on the panel area (for re-rendered elements)
+        var rect = actionPanel.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0 &&
+            e.clientX >= rect.left && e.clientX <= rect.right &&
+            e.clientY >= rect.top && e.clientY <= rect.bottom) {
+            return;
+        }
+        closeActionPanel();
+    }
+
+    // Handle keyboard in action panel menu step
+    document.addEventListener('keydown', function(e) {
+        if (!actionPanelVisible) return;
+        if (actionPanelState.step === 'menu') {
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                actionPanelState.selectedIndex = (actionPanelState.selectedIndex + 1) % ACTION_PANEL_MENU_ITEMS.length;
+                renderActionPanelMenu();
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                actionPanelState.selectedIndex = (actionPanelState.selectedIndex - 1 + ACTION_PANEL_MENU_ITEMS.length) % ACTION_PANEL_MENU_ITEMS.length;
+                renderActionPanelMenu();
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                executeActionPanelMenuItem(actionPanelState.selectedIndex);
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                closeActionPanel();
+            }
+        }
+    }, true);
+
+    // Handle pageCreatedAtPath response from host
+    function handlePageCreatedAtPath(relativePath) {
+        if (!actionPanelVisible) return;
+        showActionPanelLinkName(relativePath, false);
+        // Also relay to side panel iframe if open
+        if (sidePanelIframe && sidePanelIframe.contentWindow) {
+            sidePanelIframe.contentWindow.postMessage({
+                type: 'pageCreatedAtPath', relativePath: relativePath
+            }, '*');
+        }
     }
 
     // ========== UTILITIES ==========
@@ -12059,6 +12495,18 @@
                 closeCommandPalette();
             } else {
                 openCommandPalette();
+            }
+            return;
+        }
+
+        // Add Page (Ctrl+N / Cmd+N)
+        if (isMod && !e.shiftKey && e.key === 'n') {
+            e.preventDefault();
+            e.stopPropagation();
+            if (actionPanelVisible) {
+                closeActionPanel();
+            } else {
+                openActionPanel();
             }
             return;
         }
@@ -12819,6 +13267,10 @@
             }
             syncMarkdown();
             editor.focus();
+        } else if (message.type === 'fileSearchResults') {
+            handleFileSearchResults(message.results, message.query);
+        } else if (message.type === 'pageCreatedAtPath') {
+            handlePageCreatedAtPath(message.relativePath);
         } else if (message.type === 'externalChangeDetected') {
             // Show toast notification for external change
             showExternalChangeToast(message.message);
@@ -13082,6 +13534,14 @@
             }
         } else if (msg.type === 'openLinkInTab') {
             host.openLinkInTab(msg.href);
+        } else if (msg.type === 'searchFiles') {
+            host.searchFiles(msg.query);
+        } else if (msg.type === 'createPageAtPath') {
+            host.createPageAtPath(msg.relativePath);
+        } else if (msg.type === 'createPageAuto') {
+            host.createPageAuto();
+        } else if (msg.type === 'updatePageH1') {
+            host.updatePageH1(msg.relativePath, msg.h1Text);
         }
     });
 

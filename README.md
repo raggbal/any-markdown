@@ -24,6 +24,12 @@ lists, tables, code blocks, and everything else!And when you want to request AI 
 
 You can now press `Cmd+/` (macOS) or `Ctrl+/` (Windows/Linux) to open the **Action Palette** — a floating command menu that gives you quick access to all formatting and insertion actions (headings, lists, code blocks, Mermaid diagrams, math blocks, tables, etc.).
 
+### Add Page (Cmd+N)
+
+Press `Cmd+N` (macOS) or `Ctrl+N` (Windows/Linux) to open the **Add Page** panel. Two options:
+- **Add Page** — Creates a new `.md` file in a `pages/` subfolder with an auto-generated timestamp filename and inserts a link at the cursor.
+- **Add Page at Path** — Type a path with autocomplete suggestions from your workspace. Select an existing file or create a new one, then confirm the link name.
+
 ### Toolbar Mode: Simple is now the default
 
 With the Action Palette available, the toolbar has been simplified by default. The new `simple` mode shows only essential buttons (outline, undo/redo, open in text editor, source mode toggle) for a cleaner editing experience.
@@ -167,6 +173,7 @@ These shortcuts are active when the Any Markdown editor is focused:
 | Shortcut | Action |
 | --- | --- |
 | `Cmd+/` / `Ctrl+/` | Open Action Palette |
+| `Cmd+N` / `Ctrl+N` | Add Page (create & link a new .md file) |
 | `Cmd+.` / `Ctrl+.` | Toggle Source Mode |
 | `Cmd+Shift+.` / `Ctrl+Shift+.` | Open in Text Editor |
 | `Ctrl/Cmd + S` | Save |

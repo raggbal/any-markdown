@@ -92,9 +92,17 @@ export const webviewMessages = {
   imageDirSourceDefault: 'by default',
   // Command palette
   commandPaletteFilter: 'Type to filter...',
+  commandPalettePage: 'Page',
   commandPaletteInline: 'Inline',
   commandPaletteHeadings: 'Headings',
   commandPaletteLists: 'Lists',
   commandPaletteBlocks: 'Blocks',
   commandPaletteInsert: 'Insert',
+  // Action Panel
+  addPage: 'Add Page (Ctrl+N)',
+  addPageAuto: 'Add Page',
+  addPageAtPath: 'Add Page at Path',
+  addPageAtPathTitle: 'Enter path (.md)',
+  confirmLinkName: 'Link name',
+  actionPanelConfirm: 'Confirm',
 };

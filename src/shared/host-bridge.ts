@@ -30,6 +30,12 @@ export interface HostBridge {
     sidePanelOpenLink(href: string, sidePanelFilePath: string): void;
     notifySidePanelClosed(): void;
 
+    // ページ追加 (Action Panel)
+    searchFiles(query: string): void;
+    createPageAtPath(relativePath: string): void;
+    createPageAuto(): void;
+    updatePageH1(relativePath: string, h1Text: string): void;
+
     // ホストからのメッセージ受信
     onMessage(handler: (message: HostMessage) => void): void;
 }
@@ -47,7 +53,9 @@ export type HostMessage =
     | { type: 'scrollToAnchor'; anchor: string }
     | { type: 'imageDirInfo'; fileImageDir: string; defaultImageDir: string }
     | { type: 'imageDirStatus'; displayPath: string; source: 'file' | 'settings' | 'default' }
-    | { type: 'openSidePanel'; content: string; filePath: string; fileName: string };
+    | { type: 'openSidePanel'; content: string; filePath: string; fileName: string }
+    | { type: 'fileSearchResults'; results: string[]; query: string }
+    | { type: 'pageCreatedAtPath'; relativePath: string };
 
 /** window にグローバルとして注入される */
 declare global {

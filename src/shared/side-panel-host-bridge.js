@@ -61,6 +61,19 @@
             // サイドパネル自体なので不要
         },
 
+        searchFiles: function(query) {
+            post({ type: 'searchFiles', query: query });
+        },
+        createPageAtPath: function(relativePath) {
+            post({ type: 'createPageAtPath', relativePath: relativePath });
+        },
+        createPageAuto: function() {
+            post({ type: 'createPageAuto' });
+        },
+        updatePageH1: function(relativePath, h1Text) {
+            post({ type: 'updatePageH1', relativePath: relativePath, h1Text: h1Text });
+        },
+
         // ホストからのメッセージ受信
         onMessage: function(handler) {
             window.addEventListener('message', function(e) {
