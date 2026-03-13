@@ -5,6 +5,16 @@ All notable changes to the "Any Markdown Editor" extension will be documented in
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.195.402] - 2026-03-13
+
+### Fixed
+- **Side panel overwrites external changes** — Fixed a bug where the side panel would overwrite external file modifications (e.g., from Claude Code) with stale content, even when the user hadn't edited in the side panel.
+
+## [0.195.401] - 2026-03-13
+
+### Fixed
+- **Side panel external change detection** — Files opened in the side panel now reflect external changes in real-time, matching the main editor's behavior.
+
 ## [0.195.396] - 2026-03-06
 
 ### Added

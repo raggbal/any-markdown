@@ -61,6 +61,9 @@
         sidePanelOpenLink: function(href, sidePanelFilePath) {
             api.postMessage({ type: 'sidePanelOpenLink', href: href, sidePanelFilePath: sidePanelFilePath });
         },
+        notifySidePanelClosed: function() {
+            api.postMessage({ type: 'sidePanelClosed' });
+        },
 
         // ホストからのメッセージ受信
         onMessage: function(handler) {

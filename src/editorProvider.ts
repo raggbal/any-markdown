@@ -609,6 +609,94 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
             }
         });
 
+        // Side panel document — uses TextDocument buffer (same architecture as main editor)
+        let sidePanelDocument: vscode.TextDocument | undefined;
+        let sidePanelFileWatcher: vscode.FileSystemWatcher | undefined;
+        let sidePanelFileChangeSubscription: vscode.Disposable | undefined;
+        let sidePanelDocChangeSubscription: vscode.Disposable | undefined;
+        let sidePanelWatchedPath: string | undefined;
+        let isApplyingSidePanelEdit = false;
+
+        const setupSidePanelFileWatcher = async (filePath: string) => {
+            disposeSidePanelFileWatcher();
+            sidePanelWatchedPath = filePath;
+            const fileUri = vscode.Uri.file(filePath);
+
+            // Open as TextDocument — creates an in-memory buffer (does not open a visible tab)
+            sidePanelDocument = await vscode.workspace.openTextDocument(fileUri);
+
+            // Watch for external file changes → sync TextDocument (same pattern as main editor)
+            sidePanelFileWatcher = vscode.workspace.createFileSystemWatcher(
+                new vscode.RelativePattern(vscode.Uri.joinPath(fileUri, '..'), path.basename(filePath))
+            );
+            sidePanelFileChangeSubscription = sidePanelFileWatcher.onDidChange(async (uri) => {
+                if (uri.fsPath !== filePath) return;
+                console.log('[Any MD][SP-FSW] FileSystemWatcher fired, isApplyingSidePanelEdit=', isApplyingSidePanelEdit);
+                if (isApplyingSidePanelEdit) { console.log('[Any MD][SP-FSW] SKIPPED (isApplyingSidePanelEdit)'); return; }
+                setTimeout(async () => {
+                    try {
+                        if (!sidePanelDocument) { console.log('[Any MD][SP-FSW] SKIPPED (no sidePanelDocument)'); return; }
+                        const fileContent = await vscode.workspace.fs.readFile(uri);
+                        const newContent = new TextDecoder().decode(fileContent);
+                        const currentContent = sidePanelDocument.getText();
+                        console.log('[Any MD][SP-FSW] disk len=', newContent.length, 'doc len=', currentContent.length, 'same=', newContent === currentContent);
+                        if (newContent !== currentContent) {
+                            // Sync TextDocument with disk
+                            isApplyingSidePanelEdit = true;
+                            const fullRange = new vscode.Range(
+                                sidePanelDocument.positionAt(0),
+                                sidePanelDocument.positionAt(currentContent.length)
+                            );
+                            const edit = new vscode.WorkspaceEdit();
+                            edit.replace(sidePanelDocument.uri, fullRange, newContent);
+                            const editResult = await vscode.workspace.applyEdit(edit);
+                            console.log('[Any MD][SP-FSW] applyEdit result=', editResult);
+                            isApplyingSidePanelEdit = false;
+                            // Save to clear dirty state — file on disk is already up to date
+                            await sidePanelDocument.save();
+                            console.log('[Any MD][SP-FSW] Relaying update to iframe, content len=', newContent.length);
+                            // Relay to iframe — onDidChangeTextDocument is skipped during isApplyingSidePanelEdit
+                            webviewPanel.webview.postMessage({
+                                type: 'sidePanelMessage',
+                                data: { type: 'update', content: newContent }
+                            });
+                        }
+                    } catch (error) {
+                        isApplyingSidePanelEdit = false;
+                        console.error('[Any MD][SP-FSW] Error:', error);
+                    }
+                }, 100);
+            });
+
+            // Watch TextDocument changes → relay to iframe (both external and own edits trigger this)
+            sidePanelDocChangeSubscription = vscode.workspace.onDidChangeTextDocument(e => {
+                if (!sidePanelDocument) return;
+                if (e.document.uri.toString() !== sidePanelDocument.uri.toString()) return;
+                if (e.contentChanges.length === 0) return;
+                console.log('[Any MD][SP-DocChange] onDidChangeTextDocument fired, isApplyingSidePanelEdit=', isApplyingSidePanelEdit, 'changes=', e.contentChanges.length);
+                // Skip our own edits — already reflected in the iframe
+                if (isApplyingSidePanelEdit) { console.log('[Any MD][SP-DocChange] SKIPPED (isApplyingSidePanelEdit)'); return; }
+                // External change: send update to iframe
+                const content = e.document.getText();
+                console.log('[Any MD][SP-DocChange] Relaying update to iframe, content len=', content.length);
+                webviewPanel.webview.postMessage({
+                    type: 'sidePanelMessage',
+                    data: { type: 'update', content: content }
+                });
+            });
+        };
+
+        const disposeSidePanelFileWatcher = () => {
+            sidePanelDocChangeSubscription?.dispose();
+            sidePanelDocChangeSubscription = undefined;
+            sidePanelFileChangeSubscription?.dispose();
+            sidePanelFileChangeSubscription = undefined;
+            sidePanelFileWatcher?.dispose();
+            sidePanelFileWatcher = undefined;
+            sidePanelDocument = undefined;
+            sidePanelWatchedPath = undefined;
+        };
+
         // Listen for configuration changes
         const changeConfigSubscription = vscode.workspace.onDidChangeConfiguration(e => {
             if (e.affectsConfiguration('any-markdown')) {
@@ -768,6 +856,7 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
                                         fileName: fileName,
                                         toc: this.extractToc(text)
                                     });
+                                    await setupSidePanelFileWatcher(resolvedUri.fsPath);
                                 } catch (e) {
                                     vscode.window.showErrorMessage(`Cannot open file: ${resolvedUri.fsPath}`);
                                 }
@@ -806,12 +895,42 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
 
                 case 'saveSidePanelFile':
                     try {
-                        const spUri = vscode.Uri.file(message.filePath);
-                        const spContent = Buffer.from(message.content, 'utf8');
-                        await vscode.workspace.fs.writeFile(spUri, spContent);
+                        console.log('[Any MD][SP-Save] saveSidePanelFile called, hasDoc=', !!sidePanelDocument, 'pathMatch=', sidePanelDocument?.uri.fsPath === message.filePath);
+                        if (sidePanelDocument && sidePanelDocument.uri.fsPath === message.filePath) {
+                            // Use TextDocument buffer (same architecture as main editor)
+                            const normalize = (s: string) => s.replace(/\r\n/g, '\n');
+                            const msgNorm = normalize(message.content);
+                            const docNorm = normalize(sidePanelDocument.getText());
+                            console.log('[Any MD][SP-Save] msg len=', msgNorm.length, 'doc len=', docNorm.length, 'same=', msgNorm === docNorm);
+                            if (msgNorm === docNorm) { console.log('[Any MD][SP-Save] SKIPPED (same content)'); break; }
+                            isApplyingSidePanelEdit = true;
+                            const spEdit = new vscode.WorkspaceEdit();
+                            spEdit.replace(
+                                sidePanelDocument.uri,
+                                new vscode.Range(0, 0, sidePanelDocument.lineCount, 0),
+                                message.content
+                            );
+                            const spEditResult = await vscode.workspace.applyEdit(spEdit);
+                            console.log('[Any MD][SP-Save] applyEdit result=', spEditResult);
+                            isApplyingSidePanelEdit = false;
+                            await sidePanelDocument.save();
+                            console.log('[Any MD][SP-Save] save() completed');
+                        } else {
+                            console.log('[Any MD][SP-Save] Fallback: direct file write');
+                            // Fallback: direct file write (side panel document not yet opened)
+                            const spUri = vscode.Uri.file(message.filePath);
+                            const spContent = Buffer.from(message.content, 'utf8');
+                            await vscode.workspace.fs.writeFile(spUri, spContent);
+                        }
                     } catch (e) {
-                        vscode.window.showErrorMessage(`Failed to save: ${message.filePath}`);
+                        isApplyingSidePanelEdit = false;
+                        console.error('[Any MD][SP-Save] Error:', e);
+                        vscode.window.showErrorMessage(`Failed to save: ${message.filePath} — ${e instanceof Error ? e.message : String(e)}`);
                     }
+                    break;
+
+                case 'sidePanelClosed':
+                    disposeSidePanelFileWatcher();
                     break;
 
                 case 'sidePanelOpenLink': {
@@ -857,6 +976,7 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
                                     fileName: spFileName,
                                     toc: this.extractToc(spText)
                                 });
+                                await setupSidePanelFileWatcher(spResolvedUri.fsPath);
                             } catch (e) {
                                 vscode.window.showErrorMessage(`Cannot open file: ${spResolvedUri.fsPath}`);
                             }
@@ -982,6 +1102,7 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
             changeConfigSubscription.dispose();
             fileChangeSubscription.dispose();
             fileWatcher.dispose();
+            disposeSidePanelFileWatcher();
         });
     }
 

@@ -13007,6 +13007,8 @@
             sidePanelBlobUrl = null;
         }
         sidePanelFilePath = null;
+        // Notify VSCode to dispose side panel file watcher
+        host.notifySidePanelClosed();
         // Restore sidebar if it was open before
         if (sidebarWasOpenBeforeSidePanel) {
             openSidebar();

@@ -68,6 +68,9 @@
         sidePanelOpenLink: function(href, sidePanelFilePath) {
             window.__testApi.messages.push({ type: 'sidePanelOpenLink', href: href, sidePanelFilePath: sidePanelFilePath });
         },
+        notifySidePanelClosed: function() {
+            window.__testApi.messages.push({ type: 'sidePanelClosed' });
+        },
 
         // ホストからのメッセージ受信
         onMessage: function(handler) {

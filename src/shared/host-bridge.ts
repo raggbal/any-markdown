@@ -28,6 +28,7 @@ export interface HostBridge {
     sendToChat(startLine: number, endLine: number, selectedMarkdown: string): void;
     saveSidePanelFile(filePath: string, content: string): void;
     sidePanelOpenLink(href: string, sidePanelFilePath: string): void;
+    notifySidePanelClosed(): void;
 
     // ホストからのメッセージ受信
     onMessage(handler: (message: HostMessage) => void): void;

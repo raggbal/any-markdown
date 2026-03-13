@@ -218,6 +218,9 @@
         sidePanelOpenLink: function(href, sidePanelFilePath) {
             window.__testApi.messages.push({ type: 'sidePanelOpenLink', href: href, sidePanelFilePath: sidePanelFilePath });
         },
+        notifySidePanelClosed: function() {
+            window.__testApi.messages.push({ type: 'sidePanelClosed' });
+        },
 
         // ホストからのメッセージ受信
         onMessage: function(handler) {
@@ -13237,6 +13240,8 @@
             sidePanelBlobUrl = null;
         }
         sidePanelFilePath = null;
+        // Notify VSCode to dispose side panel file watcher
+        host.notifySidePanelClosed();
         // Restore sidebar if it was open before
         if (sidebarWasOpenBeforeSidePanel) {
             openSidebar();
