@@ -135,6 +135,10 @@
     // Base URI for resolving relative image paths
     const documentBaseUri = '__DOCUMENT_BASE_URI__';
 
+    // Image map for side panel iframe (path -> data URL)
+    // blob: iframes can't access file:// or vscode-resource URIs
+    var sidePanelImageMap = {};
+
     let isSourceMode = false;
     // Decode Base64-encoded content to avoid escaping issues with special characters
     let markdown = '';
@@ -363,10 +367,14 @@
     function resolveImagePath(src) {
         if (!src) return '';
         // If already absolute URL or data URL, return as-is
-        if (src.startsWith('http://') || src.startsWith('https://') || 
+        if (src.startsWith('http://') || src.startsWith('https://') ||
             src.startsWith('data:') || src.startsWith('vscode-resource:') ||
             src.startsWith('vscode-webview:')) {
             return src;
+        }
+        // Check side panel image map (blob: iframes can't access file/vscode-resource URIs)
+        if (sidePanelImageMap[src]) {
+            return sidePanelImageMap[src];
         }
         // If absolute file path (starts with /)
         if (src.startsWith('/')) {
@@ -5348,6 +5356,18 @@
         return content;
     }
 
+    // Strip vscode-resource URI prefix from image paths
+    // blob: iframes and re-rendered content may inadvertently include display URIs
+    function cleanImageSrc(src) {
+        if (!src) return '';
+        // Strip vscode-resource prefix (e.g., https://file+.vscode-resource.vscode-cdn.net/path)
+        src = src.replace(/^https:\/\/file\+\.vscode-resource\.vscode-cdn\.net/, '');
+        src = src.replace(/^https:\/\/file%2B\.vscode-resource\.vscode-cdn\.net/, '');
+        // Strip data: URLs — use alt text or markdownPath instead
+        if (src.startsWith('data:')) return '';
+        return src;
+    }
+
     function mdProcessNode(node, listPrefix = '') {
         if (node.nodeType === 3) {
             return node.textContent;
@@ -5498,7 +5518,7 @@
                 return mdGetInlineMarkdown(node);
             case 'img':
                 // Use markdown path if available, otherwise use src
-                const imgSrc = node.dataset.markdownPath || node.getAttribute('src') || '';
+                const imgSrc = cleanImageSrc(node.dataset.markdownPath || node.getAttribute('src') || '');
                 return '![' + (node.getAttribute('alt') || '') + '](' + imgSrc + ')';
             case 'table':
                 return mdProcessTable(node);
@@ -5623,7 +5643,7 @@
         
         if (tag === 'img') {
             // Image - return as single special entry
-            const src = node.dataset.markdownPath || node.getAttribute('src') || '';
+            const src = cleanImageSrc(node.dataset.markdownPath || node.getAttribute('src') || '');
             const alt = node.getAttribute('alt') || '';
             result.push({
                 char: '',
@@ -5989,7 +6009,7 @@
                 const href = node.getAttribute('href') || '';
                 return '[' + innerContent + '](' + href + ')';
             } else if (tag === 'img') {
-                const src = node.dataset.markdownPath || node.getAttribute('src') || '';
+                const src = cleanImageSrc(node.dataset.markdownPath || node.getAttribute('src') || '');
                 const alt = node.getAttribute('alt') || '';
                 return '![' + alt + '](' + src + ')';
             }
@@ -12342,6 +12362,57 @@
             }
         }
         
+        // Handle Cmd+V in side panel iframe
+        // Clipboard API is denied in blob: iframes, so request parent to read clipboard
+        var isSidePanelContext = document.documentElement.getAttribute('data-side-panel') === 'true';
+        if (isMod && e.key === 'v' && isSidePanelContext) {
+            e.preventDefault();
+            logger.log('Side panel iframe: requesting paste from parent...');
+            parent.postMessage({ source: 'sidePanel', type: 'requestPaste' }, '*');
+            return;
+        }
+
+        // Relay Cmd+V to side panel iframe (main webview reads clipboard and sends to iframe)
+        if (isMod && e.key === 'v' && sidePanelIframe && sidePanelIframe.contentWindow && sidePanel && !sidePanel.classList.contains('hidden')) {
+            // Read clipboard and relay to iframe
+            if (navigator.clipboard && navigator.clipboard.read) {
+                e.preventDefault();
+                logger.log('Side panel paste relay: reading clipboard...');
+                (async function() {
+                    try {
+                        var items = await navigator.clipboard.read();
+                        logger.log('Clipboard items:', items.length);
+                        // Check for image first
+                        for (var ci = 0; ci < items.length; ci++) {
+                            for (var ti = 0; ti < items[ci].types.length; ti++) {
+                                if (items[ci].types[ti].startsWith('image/')) {
+                                    var blob = await items[ci].getType(items[ci].types[ti]);
+                                    var reader = new FileReader();
+                                    reader.onload = function(evt) {
+                                        sidePanelImagePending = true;
+                                        host.saveImageAndInsert(evt.target.result);
+                                    };
+                                    reader.readAsDataURL(blob);
+                                    return;
+                                }
+                            }
+                        }
+                        // No image — relay text as paste
+                        var text = await navigator.clipboard.readText();
+                        if (text) {
+                            sidePanelIframe.contentWindow.postMessage({
+                                type: 'pasteText',
+                                text: text
+                            }, '*');
+                        }
+                    } catch (err) {
+                        logger.error('Side panel paste relay failed:', err);
+                    }
+                })();
+                return;
+            }
+        }
+
         // Undo (Ctrl+Z / Cmd+Z)
         if (isMod && !e.shiftKey && e.key === 'z') {
             e.preventDefault();
@@ -13217,8 +13288,41 @@
             imageDirDisplayPath = message.displayPath;
             imageDirSource = message.source;
             updateStatus();
+        } else if (message.type === 'setImageMap') {
+            // Receive image map for side panel (path -> data URL)
+            if (message.imageMap) {
+                sidePanelImageMap = message.imageMap;
+                logger.log('Image map received, entries:', Object.keys(sidePanelImageMap).length);
+                // Re-render to apply image map to existing images
+                var allImgs = editor.querySelectorAll('img');
+                allImgs.forEach(function(imgEl) {
+                    var origSrc = imgEl.dataset.markdownPath || imgEl.getAttribute('alt') || '';
+                    if (sidePanelImageMap[origSrc] && imgEl.src !== sidePanelImageMap[origSrc]) {
+                        imgEl.src = sidePanelImageMap[origSrc];
+                    }
+                });
+            }
         } else if (message.type === 'insertImageHtml') {
-            logger.log('insertImageHtml received:', message);
+            logger.log('insertImageHtml received, sidePanelImagePending:', sidePanelImagePending, 'markdownPath:', message.markdownPath);
+            // If image was requested from side panel, relay to iframe
+            if (sidePanelImagePending && sidePanelIframe && sidePanelIframe.contentWindow) {
+                sidePanelImagePending = false;
+                // blob: iframe can't resolve vscode-resource or file:// URIs
+                // Use dataUri (base64) provided by editorProvider
+                var spImgUri = message.dataUri || message.displayUri;
+                sidePanelIframe.contentWindow.postMessage({
+                    type: 'insertImageHtml',
+                    markdownPath: message.markdownPath,
+                    displayUri: spImgUri,
+                    dataUri: spImgUri
+                }, '*');
+                return;
+            }
+            sidePanelImagePending = false;
+            // If dataUri provided (side panel context), cache in imageMap for re-renders
+            if (message.dataUri && message.markdownPath) {
+                sidePanelImageMap[message.markdownPath] = message.dataUri;
+            }
             // Insert image at cursor position
             const img = document.createElement('img');
             img.src = message.displayUri;
@@ -13308,8 +13412,36 @@
                     }
                 }
             }
+        } else if (message.type === 'pasteText') {
+            // Paste text relayed from main webview (side panel can't receive paste events directly)
+            logger.log('pasteText received from main webview');
+            editor.focus();
+            undoManager.saveSnapshot();
+            markAsEdited();
+            var ptText = message.text || '';
+            if (ptText) {
+                // Check if we're in a special context (code block, blockquote, table)
+                var ptSel = window.getSelection();
+                var ptNode = ptSel && ptSel.rangeCount ? ptSel.getRangeAt(0).startContainer : null;
+                var ptClosest = ptNode && (ptNode.nodeType === 3 ? ptNode.parentElement : ptNode);
+                var ptInCode = ptClosest && ptClosest.closest('pre');
+                var ptInBq = ptClosest && ptClosest.closest('blockquote');
+                var ptInTable = ptClosest && ptClosest.closest('td, th');
+
+                if (ptInCode) {
+                    document.execCommand('insertText', false, ptText);
+                } else if (ptInTable || ptInBq) {
+                    document.execCommand('insertHTML', false, ptText.replace(/\n/g, '<br>'));
+                } else {
+                    // Normal context: insert as plain text
+                    // (Full markdown paste logic is in the paste event handler,
+                    //  but for side panel relay, plain text insertion is sufficient)
+                    document.execCommand('insertText', false, ptText);
+                }
+                syncMarkdown();
+            }
         } else if (message.type === 'openSidePanel') {
-            openSidePanel(message.sidePanelHtml, message.filePath, message.fileName, message.toc);
+            openSidePanel(message.sidePanelHtml, message.filePath, message.fileName, message.toc, message.imageMap);
         } else if (message.type === 'sidePanelMessage') {
             // Relay message from VSCode to iframe
             if (sidePanelIframe && sidePanelIframe.contentWindow) {
@@ -13331,9 +13463,12 @@
     var sidePanelBlobUrl = null;
     var sidePanelTocVisible = true;
     var sidePanelExpanded = false;
+    var sidePanelImagePending = false;
     var sidebarWasOpenBeforeSidePanel = false;
 
-    function openSidePanel(html, filePath, fileName, toc) {
+    var pendingSidePanelImageMap = null;
+
+    function openSidePanel(html, filePath, fileName, toc, imageMap) {
         // Close existing panel if open
         if (sidePanelIframe) {
             closeSidePanelImmediate();
@@ -13345,6 +13480,7 @@
         }
         sidePanelFilePath = filePath;
         sidePanelFilename.textContent = fileName;
+        pendingSidePanelImageMap = imageMap || null;
 
         // Create blob URL and iframe
         var blob = new Blob([html], { type: 'text/html' });
@@ -13358,6 +13494,17 @@
         sidePanelIframe.setAttribute('sandbox', 'allow-scripts allow-same-origin');
         sidePanelIframeContainer.innerHTML = '';
         sidePanelIframeContainer.appendChild(sidePanelIframe);
+
+        // Send imageMap to iframe once loaded
+        sidePanelIframe.addEventListener('load', function() {
+            if (pendingSidePanelImageMap && sidePanelIframe && sidePanelIframe.contentWindow) {
+                sidePanelIframe.contentWindow.postMessage({
+                    type: 'setImageMap',
+                    imageMap: pendingSidePanelImageMap
+                }, '*');
+                pendingSidePanelImageMap = null;
+            }
+        });
 
         // Render TOC
         renderSidePanelToc(toc);
@@ -13475,6 +13622,7 @@
         sidePanelOpenTabBtn.addEventListener('click', function() {
             if (sidePanelFilePath) {
                 host.openLinkInTab(sidePanelFilePath);
+                closeSidePanelImmediate();
             }
         });
     }
@@ -13542,6 +13690,50 @@
             host.createPageAuto();
         } else if (msg.type === 'updatePageH1') {
             host.updatePageH1(msg.relativePath, msg.h1Text);
+        } else if (msg.type === 'saveImageAndInsert') {
+            sidePanelImagePending = true;
+            host.saveImageAndInsert(msg.dataUrl, msg.fileName);
+        } else if (msg.type === 'readAndInsertImage') {
+            sidePanelImagePending = true;
+            host.readAndInsertImage(msg.filePath);
+        } else if (msg.type === 'insertImage') {
+            sidePanelImagePending = true;
+            host.requestInsertImage();
+        } else if (msg.type === 'requestPaste') {
+            // iframe can't read clipboard (blob: origin), so parent reads and relays
+            logger.log('requestPaste from side panel iframe');
+            if (navigator.clipboard && navigator.clipboard.read) {
+                (async function() {
+                    try {
+                        var items = await navigator.clipboard.read();
+                        // Check for image first
+                        for (var ci = 0; ci < items.length; ci++) {
+                            for (var ti = 0; ti < items[ci].types.length; ti++) {
+                                if (items[ci].types[ti].startsWith('image/')) {
+                                    var blob = await items[ci].getType(items[ci].types[ti]);
+                                    var reader = new FileReader();
+                                    reader.onload = function(evt) {
+                                        sidePanelImagePending = true;
+                                        host.saveImageAndInsert(evt.target.result);
+                                    };
+                                    reader.readAsDataURL(blob);
+                                    return;
+                                }
+                            }
+                        }
+                        // No image — relay text
+                        var text = await navigator.clipboard.readText();
+                        if (text && sidePanelIframe && sidePanelIframe.contentWindow) {
+                            sidePanelIframe.contentWindow.postMessage({
+                                type: 'pasteText',
+                                text: text
+                            }, '*');
+                        }
+                    } catch (err) {
+                        logger.error('requestPaste clipboard read failed:', err);
+                    }
+                })();
+            }
         }
     });
 
@@ -13556,6 +13748,46 @@
         if (e.key === 'Escape' && sidePanel && sidePanel.classList.contains('open')) {
             closeSidePanel();
             e.preventDefault();
+        }
+    });
+
+    // Side panel paste relay: VSCode captures Cmd+V at the main webview level.
+    // When the side panel iframe has focus, the paste event fires on the main
+    // document, not inside the iframe. We detect image pastes and relay them.
+    document.addEventListener('paste', function(e) {
+        if (!sidePanel || !sidePanel.classList.contains('open')) return;
+        if (!sidePanelIframe || !sidePanelIframe.contentWindow) return;
+        // Only handle when editor does NOT have focus (iframe has focus)
+        if (editor.contains(document.activeElement) || document.activeElement === editor) return;
+
+        var items = e.clipboardData && e.clipboardData.items;
+        if (items) {
+            for (var i = 0; i < items.length; i++) {
+                if (items[i].kind === 'file' && items[i].type.startsWith('image/')) {
+                    e.preventDefault();
+                    var file = items[i].getAsFile();
+                    if (file) {
+                        var reader = new FileReader();
+                        reader.onload = function(event) {
+                            sidePanelImagePending = true;
+                            host.saveImageAndInsert(event.target.result);
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                    return;
+                }
+            }
+        }
+        // Non-image paste: relay text to iframe
+        var text = e.clipboardData && e.clipboardData.getData('text/plain');
+        if (text) {
+            e.preventDefault();
+            sidePanelIframe.contentWindow.postMessage({
+                type: 'pasteText',
+                text: text,
+                html: e.clipboardData.getData('text/html') || '',
+                internalMd: e.clipboardData.getData('text/x-any-md') || ''
+            }, '*');
         }
     });
 

@@ -49,7 +49,8 @@ function getVendorInline(): typeof vendorCache & {} {
 export function getSidePanelHtml(
     nonce: string,
     content: string,
-    config: EditorConfig
+    config: EditorConfig,
+    imageMap?: Record<string, string>
 ): string {
     let safeContent = content ?? '';
     if (safeContent.charCodeAt(0) === 0xFEFF) safeContent = safeContent.slice(1);
@@ -73,11 +74,14 @@ export function getSidePanelHtml(
     const hostBridgeScript = fs.readFileSync(
         path.join(__dirname, 'shared', 'side-panel-host-bridge.js'), 'utf8');
 
+    // Inject image map into editor.js for side panel (replaces empty default)
+    const imageMapJson = imageMap ? JSON.stringify(imageMap) : '{}';
     const editorScript = fs.readFileSync(path.join(__dirname, 'webview', 'editor.js'), 'utf8')
         .replace('__DEBUG_MODE__', String(safeConfig.enableDebugLogging ?? false))
         .replace('__I18N__', JSON.stringify(msg))
         .replace('__DOCUMENT_BASE_URI__', safeConfig.documentBaseUri || '')
-        .replace('__CONTENT__', `'${base64Content}'`);
+        .replace('__CONTENT__', `'${base64Content}'`)
+        .replace('var sidePanelImageMap = {};', `var sidePanelImageMap = ${imageMapJson};`);
 
     const vendor = getVendorInline();
 
@@ -86,6 +90,7 @@ export function getSidePanelHtml(
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}'; img-src data: file: blob: https: http:; font-src data:;">
     <title>Side Panel</title>
     <style nonce="${nonce}">
         ${vendor.katexCss}

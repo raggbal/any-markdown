@@ -20,7 +20,31 @@ contextBridge.exposeInMainWorld('hostBridge', {
         ipcRenderer.send('read-insert-image', filePath),
     openInTextEditor: () => ipcRenderer.send('open-in-text-editor'),
     sendToChat: () => { /* no-op in Electron */ },
+
+    // Side Panel
+    openLinkInTab: (href: string) => ipcRenderer.send('open-link-in-tab', href),
+    saveSidePanelFile: (filePath: string, content: string) =>
+        ipcRenderer.send('save-side-panel-file', filePath, content),
+    sidePanelOpenLink: (href: string, sidePanelFilePath: string) =>
+        ipcRenderer.send('side-panel-open-link', href, sidePanelFilePath),
+    notifySidePanelClosed: () => ipcRenderer.send('side-panel-closed'),
+
+    // Action Panel
+    searchFiles: (query: string) => ipcRenderer.send('search-files', query),
+    createPageAtPath: (relativePath: string) => ipcRenderer.send('create-page-at-path', relativePath),
+    createPageAuto: () => ipcRenderer.send('create-page-auto'),
+    updatePageH1: (relativePath: string, h1Text: string) =>
+        ipcRenderer.send('update-page-h1', relativePath, h1Text),
+
     onMessage: (handler: (message: unknown) => void) => {
         ipcRenderer.on('host-message', (_event, message) => handler(message));
     },
+});
+
+// Welcome screen bridge (separate from hostBridge)
+contextBridge.exposeInMainWorld('welcomeBridge', {
+    openFile: () => ipcRenderer.send('welcome-open-file'),
+    createFile: () => ipcRenderer.send('welcome-create-file'),
+    openRecent: (filePath: string) => ipcRenderer.send('welcome-open-recent', filePath),
+    getRecentFiles: () => ipcRenderer.sendSync('welcome-get-recent-files'),
 });

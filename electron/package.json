@@ -1,6 +1,6 @@
 {
   "name": "any-markdown-desktop",
-  "version": "0.195.393",
+  "version": "0.195.415",
   "description": "Any Markdown — WYSIWYG Markdown editor for desktop",
   "main": "out/main.js",
   "author": {
@@ -54,7 +54,7 @@
       {
         "from": "../out/shared",
         "to": "out/shared",
-        "filter": ["editor-body-html.js"]
+        "filter": ["editor-body-html.js", "side-panel-host-bridge.js"]
       }
     ],
     "mac": {

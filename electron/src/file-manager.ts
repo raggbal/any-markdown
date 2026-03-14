@@ -237,4 +237,32 @@ export class FileManager {
     dispose(): void {
         this.stopWatching();
     }
+
+    /**
+     * ベースディレクトリから .md ファイルを再帰検索し、クエリでフィルタする。
+     */
+    static searchMdFiles(baseDir: string, query: string, limit: number = 10): string[] {
+        const results: string[] = [];
+        function walk(dir: string): void {
+            let entries: fs.Dirent[];
+            try { entries = fs.readdirSync(dir, { withFileTypes: true }); }
+            catch { return; }
+            for (const entry of entries) {
+                if (entry.name.startsWith('.') || entry.name === 'node_modules') continue;
+                const full = path.join(dir, entry.name);
+                if (entry.isDirectory()) {
+                    walk(full);
+                } else if (entry.isFile() && (entry.name.endsWith('.md') || entry.name.endsWith('.markdown'))) {
+                    results.push(path.relative(baseDir, full).replace(/\\/g, '/'));
+                }
+            }
+        }
+        walk(baseDir);
+        if (!query) return results.slice(0, limit);
+        const lowerQuery = query.toLowerCase();
+        return results
+            .filter(p => p.toLowerCase().includes(lowerQuery))
+            .sort((a, b) => a.length - b.length)
+            .slice(0, limit);
+    }
 }

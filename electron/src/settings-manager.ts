@@ -52,6 +52,10 @@ export class SettingsManager {
         return { ...DEFAULTS, ...this.store.store };
     }
 
+    getRecentFiles(): string[] {
+        return this.get('recentFiles') || [];
+    }
+
     addRecentFile(filePath: string): void {
         const recent = this.get('recentFiles') || [];
         const filtered = recent.filter(f => f !== filePath);

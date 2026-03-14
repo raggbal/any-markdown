@@ -5,6 +5,30 @@ All notable changes to the "Any Markdown Editor" extension will be documented in
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.195.416] - 2026-03-15
+
+### Fixed
+- **Side panel image path corruption** — Images inserted via D&D in the side panel no longer save with `vscode-resource` URI prefixes in the markdown.
+- **Side panel Cmd+V paste** — Text and image paste now works correctly in the side panel editor.
+
+## [0.195.411] - 2026-03-15
+
+### Added
+- **Electron: Welcome screen** — Opening the Electron app without a file now shows a welcome screen with Open File, Create New File, and Recent Files options.
+
+### Fixed
+- **Side panel image operations** — Image paste (Cmd+V), drag & drop, and toolbar image insert now work correctly in the side panel editor (both VSCode and Electron).
+- **Side panel "Open in new tab" button** — The button now properly closes the side panel after opening the file in a new tab (both VSCode and Electron).
+- **Electron: Side panel not opening** — Fixed packaged Electron app (DMG) missing `side-panel-host-bridge.js`, which prevented the side panel from loading.
+- **Electron: Action Panel root directory issue** — Opening Electron without a file no longer causes Action Panel to operate on the root directory.
+
+## [0.195.410] - 2026-03-14
+
+### Added
+- **Electron: Side Panel support** — Clicking `.md` links in the Electron desktop app now opens them in a Notion-style side panel with full WYSIWYG editing, external change detection, and in-panel navigation.
+- **Electron: Action Panel support** — Cmd+N page creation with file search autocomplete now works in the Electron desktop app.
+- **Electron: Smart link handling** — `.md` links open in side panel, HTTP links open in browser, anchor links scroll within document.
+
 ## [0.195.409] - 2026-03-13
 
 ### Added

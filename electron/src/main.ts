@@ -3,9 +3,10 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { FileManager } from './file-manager';
 import { SettingsManager } from './settings-manager';
-import { generateEditorHtml, writeHtmlToTempFile } from './html-generator';
+import { generateEditorHtml, generateSidePanelHtml, generateWelcomeHtml, extractToc, writeHtmlToTempFile } from './html-generator';
 import { buildMenu } from './menu';
 import { setupUpdateChecker, checkForUpdates } from './updater';
+import * as chokidar from 'chokidar';
 
 /**
  * Any Markdown — Electron Main Process
@@ -13,6 +14,83 @@ import { setupUpdateChecker, checkForUpdates } from './updater';
 
 const settingsManager = new SettingsManager();
 const windows = new Map<BrowserWindow, FileManager>();
+
+// ── Side Panel File Watcher ──
+const sidePanelWatchers = new Map<BrowserWindow, { watcher: chokidar.FSWatcher; filePath: string; isOwnWrite: boolean }>();
+
+function setupSidePanelWatcher(win: BrowserWindow, filePath: string): void {
+    disposeSidePanelWatcher(win);
+    const state = { watcher: null as unknown as chokidar.FSWatcher, filePath, isOwnWrite: false };
+    state.watcher = chokidar.watch(filePath, { persistent: true, ignoreInitial: true });
+    state.watcher.on('change', () => {
+        if (state.isOwnWrite) return;
+        try {
+            const newContent = fs.readFileSync(filePath, 'utf8');
+            const base64 = Buffer.from(newContent, 'utf8').toString('base64');
+            win.webContents.send('host-message', {
+                type: 'sidePanelMessage',
+                data: { type: 'update', content: base64 }
+            });
+        } catch (e) {
+            console.error('[side-panel-watcher] Error reading file:', e);
+        }
+    });
+    sidePanelWatchers.set(win, state);
+}
+
+function disposeSidePanelWatcher(win: BrowserWindow): void {
+    const state = sidePanelWatchers.get(win);
+    if (state) {
+        state.watcher.close();
+        sidePanelWatchers.delete(win);
+    }
+}
+
+function generateUniqueFileName(dir: string, extension: string): string {
+    const timestamp = Date.now();
+    const baseName = `${timestamp}.${extension}`;
+    if (!fs.existsSync(path.join(dir, baseName))) return baseName;
+    let counter = 1;
+    while (true) {
+        const name = `${timestamp}-${counter.toString().padStart(4, '0')}.${extension}`;
+        if (!fs.existsSync(path.join(dir, name))) return name;
+        counter++;
+    }
+}
+
+/** サイドパネル用の設定を生成 */
+function getSidePanelConfig(fileDir: string): { theme: string; fontSize: number; toolbarMode: string; documentBaseUri: string; webviewMessages: Record<string, string>; enableDebugLogging: boolean } {
+    const settings = settingsManager.getAll();
+    return {
+        theme: settings.theme,
+        fontSize: settings.fontSize,
+        toolbarMode: 'simple',
+        documentBaseUri: `file://${fileDir}/`,
+        webviewMessages: getI18nMessages(),
+        enableDebugLogging: settings.enableDebugLogging,
+    };
+}
+
+/** .md/.markdown ファイルをサイドパネルで開く */
+function openInSidePanel(win: BrowserWindow, resolvedPath: string): void {
+    try {
+        const content = fs.readFileSync(resolvedPath, 'utf8');
+        const fileName = path.basename(resolvedPath);
+        const fileDir = path.dirname(resolvedPath);
+        const html = generateSidePanelHtml(content, getSidePanelConfig(fileDir));
+        const toc = extractToc(content);
+        win.webContents.send('host-message', {
+            type: 'openSidePanel',
+            sidePanelHtml: html,
+            filePath: resolvedPath,
+            fileName: fileName,
+            toc: toc
+        });
+        setupSidePanelWatcher(win, resolvedPath);
+    } catch (e) {
+        console.error('[open-link] Cannot open file:', resolvedPath, e);
+    }
+}
 
 function getI18nMessages(): Record<string, string> {
     const settings = settingsManager.getAll();
@@ -124,7 +202,11 @@ function createWindow(filePath?: string): BrowserWindow {
             }
         });
     } else {
-        loadContent();
+        // Show welcome screen when no file specified
+        const settings = settingsManager.getAll();
+        const welcomeHtml = generateWelcomeHtml(settings.theme);
+        const tempFile = writeHtmlToTempFile(welcomeHtml);
+        win.loadFile(tempFile);
     }
 
     // Close handling
@@ -151,6 +233,7 @@ function createWindow(filePath?: string): BrowserWindow {
     });
 
     win.on('closed', () => {
+        disposeSidePanelWatcher(win);
         fileManager.dispose();
         windows.delete(win);
     });
@@ -182,8 +265,44 @@ ipcMain.on('save', async (event) => {
     fm.save(md);
 });
 
-ipcMain.on('open-link', (_event, href: string) => {
-    shell.openExternal(href);
+ipcMain.on('open-link', (event, href: string) => {
+    if (href.startsWith('http://') || href.startsWith('https://')) {
+        shell.openExternal(href);
+        return;
+    }
+    if (href.startsWith('#')) {
+        const win = BrowserWindow.fromWebContents(event.sender);
+        if (win) {
+            win.webContents.send('host-message', {
+                type: 'scrollToAnchor', anchor: href.substring(1)
+            });
+        }
+        return;
+    }
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win) return;
+    const fm = windows.get(win);
+    if (!fm) return;
+    const docDir = fm.getDocumentDir();
+    const resolvedPath = href.startsWith('/') ? href : path.resolve(docDir, href);
+    const lc = resolvedPath.toLowerCase();
+    if (lc.endsWith('.md') || lc.endsWith('.markdown')) {
+        openInSidePanel(win, resolvedPath);
+    } else {
+        shell.openPath(resolvedPath);
+    }
+});
+
+ipcMain.on('open-link-in-tab', (event, href: string) => {
+    if (href.startsWith('http://') || href.startsWith('https://')) {
+        shell.openExternal(href);
+    } else {
+        const win = BrowserWindow.fromWebContents(event.sender);
+        const fm = win ? windows.get(win) : null;
+        const docDir = fm?.getDocumentDir() || process.cwd();
+        const resolved = href.startsWith('/') ? href : path.resolve(docDir, href);
+        createWindow(resolved);
+    }
 });
 
 ipcMain.on('insert-link', async (event, text: string) => {
@@ -277,6 +396,175 @@ ipcMain.on('open-in-text-editor', (event) => {
     if (!win) return;
     const fm = windows.get(win);
     if (fm) fm.openInTextEditor();
+});
+
+// ── Side Panel IPC ──
+
+ipcMain.on('save-side-panel-file', (event, filePath: string, content: string) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win) return;
+    const state = sidePanelWatchers.get(win);
+    if (state) state.isOwnWrite = true;
+    try {
+        fs.writeFileSync(filePath, content, 'utf8');
+    } catch (e) {
+        console.error('[save-side-panel-file] Error:', e);
+    }
+    if (state) setTimeout(() => { state.isOwnWrite = false; }, 200);
+});
+
+ipcMain.on('side-panel-open-link', (event, href: string, sidePanelFilePath: string) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win) return;
+    if (href.startsWith('http://') || href.startsWith('https://')) {
+        shell.openExternal(href);
+    } else if (href.startsWith('#')) {
+        win.webContents.send('host-message', {
+            type: 'sidePanelMessage',
+            data: { type: 'scrollToAnchor', anchor: href.substring(1) }
+        });
+    } else {
+        const spDir = path.dirname(sidePanelFilePath);
+        const resolvedPath = href.startsWith('/') ? href : path.resolve(spDir, href);
+        const lc = resolvedPath.toLowerCase();
+        if (lc.endsWith('.md') || lc.endsWith('.markdown')) {
+            openInSidePanel(win, resolvedPath);
+        } else {
+            shell.openPath(resolvedPath);
+        }
+    }
+});
+
+ipcMain.on('side-panel-closed', (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win) disposeSidePanelWatcher(win);
+});
+
+// ── Action Panel IPC ──
+
+ipcMain.on('search-files', (event, query: string) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win) return;
+    if (!query || query.length < 1) {
+        win.webContents.send('host-message', {
+            type: 'fileSearchResults', results: [], query: query || ''
+        });
+        return;
+    }
+    const fm = windows.get(win);
+    const docDir = fm?.getDocumentDir() || process.cwd();
+    const results = FileManager.searchMdFiles(docDir, query, 10);
+    win.webContents.send('host-message', {
+        type: 'fileSearchResults', results, query
+    });
+});
+
+ipcMain.on('create-page-at-path', (event, relativePath: string) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win || !relativePath) return;
+    const fm = windows.get(win);
+    const docDir = fm?.getDocumentDir() || process.cwd();
+    let targetPath = relativePath;
+    if (!targetPath.endsWith('.md')) targetPath += '.md';
+    const absPath = path.resolve(docDir, targetPath);
+    try {
+        const targetDir = path.dirname(absPath);
+        if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
+        if (!fs.existsSync(absPath)) fs.writeFileSync(absPath, '', 'utf8');
+        win.webContents.send('host-message', {
+            type: 'pageCreatedAtPath',
+            relativePath: path.relative(docDir, absPath).replace(/\\/g, '/')
+        });
+    } catch (e: any) {
+        console.error('[create-page-at-path] Error:', e.message);
+    }
+});
+
+ipcMain.on('create-page-auto', (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win) return;
+    const fm = windows.get(win);
+    const docDir = fm?.getDocumentDir() || process.cwd();
+    const pagesDir = path.join(docDir, 'pages');
+    if (!fs.existsSync(pagesDir)) fs.mkdirSync(pagesDir, { recursive: true });
+    const fileName = generateUniqueFileName(pagesDir, 'md');
+    const absPath = path.join(pagesDir, fileName);
+    fs.writeFileSync(absPath, '', 'utf8');
+    win.webContents.send('host-message', {
+        type: 'pageCreatedAtPath',
+        relativePath: path.relative(docDir, absPath).replace(/\\/g, '/')
+    });
+});
+
+ipcMain.on('update-page-h1', (event, relativePath: string, h1Text: string) => {
+    if (!relativePath || !h1Text) return;
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win) return;
+    const fm = windows.get(win);
+    const docDir = fm?.getDocumentDir() || process.cwd();
+    const absPath = path.resolve(docDir, relativePath);
+    try {
+        if (fs.existsSync(absPath)) fs.writeFileSync(absPath, `# ${h1Text}\n`, 'utf8');
+    } catch { /* Silent fail */ }
+});
+
+// ── Welcome Screen IPC ──
+
+ipcMain.on('welcome-open-file', async (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win) return;
+    const result = await dialog.showOpenDialog(win, {
+        filters: [{ name: 'Markdown', extensions: ['md', 'markdown'] }],
+        properties: ['openFile'],
+    });
+    if (result.canceled || result.filePaths.length === 0) return;
+    const fp = result.filePaths[0];
+    const fm = windows.get(win);
+    if (!fm) return;
+    const content = await fm.open(fp);
+    if (content !== null) {
+        settingsManager.addRecentFile(fp);
+        const loadContent = (win as any).__loadContent;
+        if (loadContent) await loadContent(content);
+    }
+});
+
+ipcMain.on('welcome-create-file', async (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win) return;
+    const result = await dialog.showSaveDialog(win, {
+        filters: [{ name: 'Markdown', extensions: ['md', 'markdown'] }],
+        defaultPath: 'untitled.md',
+    });
+    if (result.canceled || !result.filePath) return;
+    const fp = result.filePath;
+    if (!fs.existsSync(fp)) fs.writeFileSync(fp, '', 'utf8');
+    const fm = windows.get(win);
+    if (!fm) return;
+    const content = await fm.open(fp);
+    if (content !== null) {
+        settingsManager.addRecentFile(fp);
+        const loadContent = (win as any).__loadContent;
+        if (loadContent) await loadContent(content);
+    }
+});
+
+ipcMain.on('welcome-open-recent', async (event, filePath: string) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win) return;
+    if (!fs.existsSync(filePath)) return;
+    const fm = windows.get(win);
+    if (!fm) return;
+    const content = await fm.open(filePath);
+    if (content !== null) {
+        settingsManager.addRecentFile(filePath);
+        const loadContent = (win as any).__loadContent;
+        if (loadContent) await loadContent(content);
+    }
+});
+
+ipcMain.on('welcome-get-recent-files', (event) => {
+    event.returnValue = settingsManager.getRecentFiles();
 });
 
 ipcMain.on('editing-state', () => { /* no-op for Electron */ });
