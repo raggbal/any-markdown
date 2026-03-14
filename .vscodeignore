@@ -11,6 +11,8 @@ vsc-extension-quickstart.md
 node_modules/**
 !vendor/**
 test/**
+test2/**
+test3/**
 test-results/**
 samples/**
 images/**
