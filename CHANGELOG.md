@@ -5,6 +5,13 @@ All notable changes to the "Any Markdown Editor" extension will be documented in
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.195.433] - 2026-03-16
+
+### Fixed
+- **Image in list item treated as empty** — Fixed Enter/Backspace on list items containing only images incorrectly treating them as empty (outdenting instead of creating new sibling).
+- **Image paste misalignment in lists** — Fixed pasted images appearing visually offset from the bullet due to a trailing `<br>` element.
+- **Image bullet disappears in lists** — Fixed list bullet (marker) disappearing for list items containing images due to `display: block` on images.
+
 ## [0.195.432] - 2026-03-15
 
 ### Fixed

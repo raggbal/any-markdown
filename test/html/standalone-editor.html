@@ -6736,19 +6736,22 @@ class EditorInstance {
                 
                 // Get only direct text content (excluding nested lists and br)
                 let directTextContent = '';
+                let hasContentElement = false;
                 for (const child of liElement.childNodes) {
                     if (child.nodeType === 3) {
                         directTextContent += child.textContent;
                     } else if (child.nodeType === 1) {
                         const childTag = child.tagName ? child.tagName.toLowerCase() : '';
-                        if (childTag !== 'ul' && childTag !== 'ol' && childTag !== 'input' && childTag !== 'br') {
+                        if (childTag === 'img') {
+                            hasContentElement = true;
+                        } else if (childTag !== 'ul' && childTag !== 'ol' && childTag !== 'input' && childTag !== 'br') {
                             directTextContent += child.textContent;
                         }
                     }
                 }
                 directTextContent = directTextContent.trim();
-                const isEmptyItem = directTextContent === '';
-                
+                const isEmptyItem = directTextContent === '' && !hasContentElement;
+
                 // Check if cursor is at the beginning of the li
                 const isAtBeginning = (() => {
                     // Get the first text position in the li (excluding nested lists)
@@ -7461,21 +7464,23 @@ class EditorInstance {
                 
                 // Get only direct text content (excluding nested lists and br)
                 let directTextContent = '';
+                let hasContentElement = false;
                 for (const child of listItem.childNodes) {
                     if (child.nodeType === 3) { // Text node
                         directTextContent += child.textContent;
                     } else if (child.nodeType === 1) { // Element node
                         const tag = child.tagName?.toLowerCase();
-                        // Exclude ul, ol, input, and br (br is used as placeholder in empty items)
-                        if (tag !== 'ul' && tag !== 'ol' && tag !== 'input' && tag !== 'br') {
+                        if (tag === 'img') {
+                            hasContentElement = true; // img has empty textContent but is real content
+                        } else if (tag !== 'ul' && tag !== 'ol' && tag !== 'input' && tag !== 'br') {
                             directTextContent += child.textContent;
                         }
                     }
                 }
                 directTextContent = directTextContent.trim();
-                
-                // Item is empty if it has no text content (br is just a placeholder for empty items)
-                const isEmptyItem = directTextContent === '' || (checkbox && directTextContent === '');
+
+                // Item is empty if it has no text content and no content elements like img
+                const isEmptyItem = (directTextContent === '' && !hasContentElement) || (checkbox && directTextContent === '' && !hasContentElement);
 
                 if (isEmptyItem) {
                     // Empty item - outdent (keep position) or exit list
@@ -9630,22 +9635,24 @@ class EditorInstance {
                 
                 // Get only direct text content (excluding nested lists and br)
                 let directTextContent = '';
+                let hasContentElement = false;
                 for (const child of liElement.childNodes) {
                     if (child.nodeType === 3) { // Text node
                         directTextContent += child.textContent;
                     } else if (child.nodeType === 1) { // Element node
                         const childTag = child.tagName?.toLowerCase();
-                        // Exclude ul, ol, input, and br (br is used as placeholder in empty items)
-                        if (childTag !== 'ul' && childTag !== 'ol' && childTag !== 'input' && childTag !== 'br') {
+                        if (childTag === 'img') {
+                            hasContentElement = true; // img has empty textContent but is real content
+                        } else if (childTag !== 'ul' && childTag !== 'ol' && childTag !== 'input' && childTag !== 'br') {
                             directTextContent += child.textContent;
                         }
                     }
                 }
                 directTextContent = directTextContent.trim();
-                
-                // Item is empty if it has no text content (br is just a placeholder for empty items)
-                const isEmptyItem = directTextContent === '' || (checkbox && directTextContent === '');
-                
+
+                // Item is empty if it has no text content and no content elements like img
+                const isEmptyItem = (directTextContent === '' && !hasContentElement) || (checkbox && directTextContent === '' && !hasContentElement);
+
                 // Check if this is a standalone single-item list at top level
                 const isTopLevel = list && list.parentNode === editor;
                 const isSingleItem = list && list.children.length === 1;
@@ -10695,21 +10702,23 @@ class EditorInstance {
                     
                     // Get only direct text content (excluding nested lists and br)
                     let directTextContent = '';
+                    let hasContentElement = false;
                     for (const child of liElement.childNodes) {
                         if (child.nodeType === 3) { // Text node
                             directTextContent += child.textContent;
                         } else if (child.nodeType === 1) { // Element node
                             const childTag = child.tagName?.toLowerCase();
-                            // Exclude ul, ol, input, and br (br is used as placeholder in empty items)
-                            if (childTag !== 'ul' && childTag !== 'ol' && childTag !== 'input' && childTag !== 'br') {
+                            if (childTag === 'img') {
+                                hasContentElement = true; // img has empty textContent but is real content
+                            } else if (childTag !== 'ul' && childTag !== 'ol' && childTag !== 'input' && childTag !== 'br') {
                                 directTextContent += child.textContent;
                             }
                         }
                     }
                     directTextContent = directTextContent.trim();
-                    
-                    // Item is empty if it has no text content (br is just a placeholder for empty items)
-                    const isEmptyItem = directTextContent === '';
+
+                    // Item is empty if it has no text content and no content elements like img
+                    const isEmptyItem = directTextContent === '' && !hasContentElement;
                     const prevLi = liElement.previousElementSibling;
                     const isFirstItem = !prevLi;
                     const isTopLevel = list && list.parentNode === editor;
@@ -13702,6 +13711,15 @@ class EditorInstance {
                 const range = sel.getRangeAt(0);
                 range.deleteContents();
                 range.insertNode(img);
+                // Clean up trailing BR after image in list items
+                // (contenteditable adds BR for cursor placement, causing visual misalignment)
+                const parentLi = img.closest('li');
+                if (parentLi) {
+                    const nextSib = img.nextSibling;
+                    if (nextSib && nextSib.nodeName === 'BR') {
+                        nextSib.remove();
+                    }
+                }
                 range.setStartAfter(img);
                 range.setEndAfter(img);
                 sel.removeAllRanges();
