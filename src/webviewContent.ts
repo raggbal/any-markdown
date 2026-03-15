@@ -74,6 +74,9 @@ export function getSidePanelHtml(
     const hostBridgeScript = fs.readFileSync(
         path.join(__dirname, 'shared', 'side-panel-host-bridge.js'), 'utf8');
 
+    const editorUtilsScript = fs.readFileSync(
+        path.join(__dirname, 'webview', 'editor-utils.js'), 'utf8');
+
     // Inject image map into editor.js for side panel (replaces empty default)
     const imageMapJson = imageMap ? JSON.stringify(imageMap) : '{}';
     const editorScript = fs.readFileSync(path.join(__dirname, 'webview', 'editor.js'), 'utf8')
@@ -111,6 +114,9 @@ export function getSidePanelHtml(
     <script nonce="${nonce}">${vendor.katexJs}</script>
     <script nonce="${nonce}">
         ${hostBridgeScript}
+    </script>
+    <script nonce="${nonce}">
+        ${editorUtilsScript}
     </script>
     <script nonce="${nonce}">
         ${editorScript}
@@ -176,6 +182,9 @@ export function getWebviewContent(
     const hostBridgePath = path.join(__dirname, 'shared', 'vscode-host-bridge.js');
     const hostBridgeScript = fs.readFileSync(hostBridgePath, 'utf8');
 
+    const editorUtilsScript = fs.readFileSync(
+        path.join(__dirname, 'webview', 'editor-utils.js'), 'utf8');
+
     // Vendor library URIs (local instead of CDN)
     const vendorDir = path.join(__dirname, '..', 'vendor');
     const vendorUri = (file: string) => webview.asWebviewUri(
@@ -217,6 +226,9 @@ export function getWebviewContent(
     <script src="${katexJsUri}"></script>
     <script nonce="${nonce}">
         ${hostBridgeScript}
+    </script>
+    <script nonce="${nonce}">
+        ${editorUtilsScript}
     </script>
     <script nonce="${nonce}">
         ${editorScript}

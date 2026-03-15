@@ -11,6 +11,7 @@ const fs = require('fs');
 const path = require('path');
 
 const editorJsPath = path.join(__dirname, '../src/webview/editor.js');
+const editorUtilsJsPath = path.join(__dirname, '../src/webview/editor-utils.js');
 const testHostBridgePath = path.join(__dirname, '../src/shared/test-host-bridge.js');
 const outputPath = path.join(__dirname, 'html/standalone-editor.html');
 
@@ -33,6 +34,9 @@ if (fs.existsSync(vendorSrc)) {
         }
     }
 }
+
+// editor-utils.js を読み込み（editor.jsより前にロードされる）
+const editorUtilsScript = fs.readFileSync(editorUtilsJsPath, 'utf-8');
 
 // editor.jsを読み込み
 let editorScript = fs.readFileSync(editorJsPath, 'utf-8');
@@ -166,31 +170,31 @@ const html = `<!DOCTYPE html>
     </style>
 </head>
 <body>
-    <div id="sidebar" style="display:none;"><div id="outline"></div></div>
-    <div id="sidebarResizer" style="display:none;"></div>
-    <div id="toolbar" style="display:none;"></div>
+    <div class="sidebar" id="sidebar" style="display:none;"><div class="outline" id="outline"></div></div>
+    <div class="sidebar-resizer" id="sidebarResizer" style="display:none;"></div>
+    <div class="toolbar" id="toolbar" style="display:none;"></div>
     <div id="statusLeft" style="display:none;"></div>
-    <div id="statusImageDir" style="display:none;"></div>
-    <div id="wordCount" style="display:none;"></div>
-    <div id="sourceEditor" style="display:none;"></div>
-    <button id="closeSidebar" style="display:none;"></button>
-    <button id="openSidebarBtn" style="display:none;"></button>
+    <div class="sidebar-status-imagedir" id="statusImageDir" style="display:none;"></div>
+    <div class="word-count" id="wordCount" style="display:none;"></div>
+    <div class="source-editor" id="sourceEditor" style="display:none;"></div>
+    <button class="sidebar-toggle" id="closeSidebar" style="display:none;"></button>
+    <button data-action="openOutline" id="openSidebarBtn" style="display:none;"></button>
     <!-- Search & Replace elements (hidden, required by script) -->
-    <div id="searchReplaceBox" style="display:none;">
-        <input id="searchInput" type="text">
-        <input id="replaceInput" type="text">
-        <span id="searchCount"></span>
-        <button id="searchPrev"></button>
-        <button id="searchNext"></button>
-        <button id="toggleReplace"></button>
-        <button id="closeSearch"></button>
-        <div id="replaceRow">
-            <button id="replaceOne"></button>
-            <button id="replaceAll"></button>
+    <div class="search-replace-box" id="searchReplaceBox" style="display:none;">
+        <input class="search-input" id="searchInput" type="text">
+        <input class="replace-input" id="replaceInput" type="text">
+        <span class="search-count" id="searchCount"></span>
+        <button class="search-prev" id="searchPrev"></button>
+        <button class="search-next" id="searchNext"></button>
+        <button class="toggle-replace" id="toggleReplace"></button>
+        <button class="close-search" id="closeSearch"></button>
+        <div class="replace-row" id="replaceRow">
+            <button class="replace-one" id="replaceOne"></button>
+            <button class="replace-all" id="replaceAll"></button>
         </div>
-        <input id="searchCaseSensitive" type="checkbox">
-        <input id="searchWholeWord" type="checkbox">
-        <input id="searchRegex" type="checkbox">
+        <input class="search-case-sensitive" id="searchCaseSensitive" type="checkbox">
+        <input class="search-whole-word" id="searchWholeWord" type="checkbox">
+        <input class="search-regex" id="searchRegex" type="checkbox">
     </div>
     <div class="editor" id="editor" contenteditable="true" spellcheck="false"></div>
     
@@ -201,6 +205,9 @@ const html = `<!DOCTYPE html>
     __TEST_HOST_BRIDGE__
     </script>
     <script>
+    __EDITOR_UTILS_SCRIPT__
+    </script>
+    <script>
     __EDITOR_SCRIPT__
     </script>
 </body>
@@ -208,5 +215,6 @@ const html = `<!DOCTYPE html>
 
 fs.writeFileSync(outputPath, html
     .replace('__TEST_HOST_BRIDGE__', testHostBridgeScript)
+    .replace('__EDITOR_UTILS_SCRIPT__', editorUtilsScript)
     .replace('__EDITOR_SCRIPT__', editorScript));
 console.log('Generated:', outputPath);

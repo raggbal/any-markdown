@@ -86,22 +86,22 @@ function generateEditorBodyHtml(messages, platform) {
             <div class="editor-wrapper" id="editorWrapper">
                 <div class="search-replace-box" id="searchReplaceBox" style="display: none;">
                     <div class="search-row">
-                        <input type="text" id="searchInput" placeholder="${m('searchPlaceholder')}" />
+                        <input type="text" class="search-input" id="searchInput" placeholder="${m('searchPlaceholder')}" />
                         <span class="search-count" id="searchCount">0/0</span>
-                        <button id="searchPrev" title="${m('searchPrev')}">&#9650;</button>
-                        <button id="searchNext" title="${m('searchNext')}">&#9660;</button>
-                        <button id="toggleReplace" title="${m('toggleReplace')}">&#8693;</button>
-                        <button id="closeSearch" title="${m('closeSearch')}">&#10005;</button>
+                        <button class="search-prev" id="searchPrev" title="${m('searchPrev')}">&#9650;</button>
+                        <button class="search-next" id="searchNext" title="${m('searchNext')}">&#9660;</button>
+                        <button class="toggle-replace" id="toggleReplace" title="${m('toggleReplace')}">&#8693;</button>
+                        <button class="close-search" id="closeSearch" title="${m('closeSearch')}">&#10005;</button>
                     </div>
                     <div class="replace-row" id="replaceRow" style="display: none;">
-                        <input type="text" id="replaceInput" placeholder="${m('replacePlaceholder')}" />
-                        <button id="replaceOne" title="${m('replace')}">${m('replace')}</button>
-                        <button id="replaceAll" title="${m('replaceAll')}">${m('replaceAll')}</button>
+                        <input type="text" class="replace-input" id="replaceInput" placeholder="${m('replacePlaceholder')}" />
+                        <button class="replace-one" id="replaceOne" title="${m('replace')}">${m('replace')}</button>
+                        <button class="replace-all" id="replaceAll" title="${m('replaceAll')}">${m('replaceAll')}</button>
                     </div>
                     <div class="search-options">
-                        <label><input type="checkbox" id="searchCaseSensitive" /> ${m('caseSensitive')}</label>
-                        <label><input type="checkbox" id="searchWholeWord" /> ${m('wholeWord')}</label>
-                        <label><input type="checkbox" id="searchRegex" /> ${m('regex')}</label>
+                        <label><input type="checkbox" class="search-case-sensitive" id="searchCaseSensitive" /> ${m('caseSensitive')}</label>
+                        <label><input type="checkbox" class="search-whole-word" id="searchWholeWord" /> ${m('wholeWord')}</label>
+                        <label><input type="checkbox" class="search-regex" id="searchRegex" /> ${m('regex')}</label>
                     </div>
                 </div>
                 <div class="editor" id="editor" contenteditable="true" spellcheck="true"></div>

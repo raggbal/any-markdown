@@ -3,7 +3,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { FileManager } from './file-manager';
 import { SettingsManager } from './settings-manager';
-import { generateEditorHtml, generateSidePanelHtml, generateWelcomeHtml, extractToc, writeHtmlToTempFile } from './html-generator';
+import { generateEditorHtml, generateWelcomeHtml, extractToc, writeHtmlToTempFile } from './html-generator';
 import { buildMenu } from './menu';
 import { setupUpdateChecker, checkForUpdates } from './updater';
 import * as chokidar from 'chokidar';
@@ -59,17 +59,6 @@ function generateUniqueFileName(dir: string, extension: string): string {
 }
 
 /** サイドパネル用の設定を生成 */
-function getSidePanelConfig(fileDir: string): { theme: string; fontSize: number; toolbarMode: string; documentBaseUri: string; webviewMessages: Record<string, string>; enableDebugLogging: boolean } {
-    const settings = settingsManager.getAll();
-    return {
-        theme: settings.theme,
-        fontSize: settings.fontSize,
-        toolbarMode: 'simple',
-        documentBaseUri: `file://${fileDir}/`,
-        webviewMessages: getI18nMessages(),
-        enableDebugLogging: settings.enableDebugLogging,
-    };
-}
 
 /** .md/.markdown ファイルをサイドパネルで開く */
 function openInSidePanel(win: BrowserWindow, resolvedPath: string): void {
@@ -77,14 +66,16 @@ function openInSidePanel(win: BrowserWindow, resolvedPath: string): void {
         const content = fs.readFileSync(resolvedPath, 'utf8');
         const fileName = path.basename(resolvedPath);
         const fileDir = path.dirname(resolvedPath);
-        const html = generateSidePanelHtml(content, getSidePanelConfig(fileDir));
         const toc = extractToc(content);
+        // Send markdown directly — editor.js creates EditorInstance in same webview
+        const documentBaseUri = 'file://' + (fileDir.startsWith('/') ? '' : '/') + fileDir.replace(/\\/g, '/') + '/';
         win.webContents.send('host-message', {
             type: 'openSidePanel',
-            sidePanelHtml: html,
+            markdown: content,
             filePath: resolvedPath,
             fileName: fileName,
-            toc: toc
+            toc: toc,
+            documentBaseUri: documentBaseUri
         });
         setupSidePanelWatcher(win, resolvedPath);
     } catch (e) {

@@ -1,6 +1,6 @@
 {
   "name": "any-markdown-desktop",
-  "version": "0.195.415",
+  "version": "0.195.419",
   "description": "Any Markdown — WYSIWYG Markdown editor for desktop",
   "main": "out/main.js",
   "author": {
@@ -39,6 +39,7 @@
         "to": "webview",
         "filter": [
           "editor.js",
+          "editor-utils.js",
           "styles.css"
         ]
       },

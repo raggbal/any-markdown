@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { getWebviewContent, getSidePanelHtml, getNonce } from './webviewContent';
+import { getWebviewContent, getNonce } from './webviewContent';
 import { t, getWebviewMessages, initLocale } from './i18n/messages';
 
 // ============================================
@@ -358,33 +358,6 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
      * The blob: iframe can't access file:// or vscode-resource URIs,
      * so all images must be provided as data URLs.
      */
-    private buildImageMap(markdown: string, docUri: vscode.Uri): Record<string, string> {
-        const fs = require('fs');
-        const pathMod = require('path');
-        const imageMap: Record<string, string> = {};
-        const docDir = pathMod.dirname(docUri.fsPath);
-        // Match ![alt](path) patterns
-        const regex = /!\[[^\]]*\]\(([^)]+)\)/g;
-        let match;
-        while ((match = regex.exec(markdown)) !== null) {
-            const imgPath = match[1];
-            if (imgPath.startsWith('http://') || imgPath.startsWith('https://') || imgPath.startsWith('data:')) {
-                continue;
-            }
-            const absPath = imgPath.startsWith('/') ? imgPath : pathMod.resolve(docDir, imgPath);
-            if (imageMap[imgPath]) continue; // already processed
-            try {
-                if (fs.existsSync(absPath)) {
-                    const buf = fs.readFileSync(absPath);
-                    const ext = pathMod.extname(absPath).slice(1) || 'png';
-                    const mime = ext === 'jpg' ? 'image/jpeg' : ext === 'svg' ? 'image/svg+xml' : `image/${ext}`;
-                    imageMap[imgPath] = `data:${mime};base64,${buf.toString('base64')}`;
-                }
-            } catch (_) { /* skip unreadable files */ }
-        }
-        return imageMap;
-    }
-
     private extractToc(markdown: string): Array<{level: number, text: string, anchor: string}> {
         const lines = markdown.split('\n');
         const toc: Array<{level: number, text: string, anchor: string}> = [];
@@ -864,32 +837,21 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
                             if (linkOpenMode === 'tab') {
                                 vscode.commands.executeCommand('vscode.openWith', resolvedUri, 'any-markdown.editor');
                             } else {
-                                // sidePanel mode: generate iframe HTML and send to webview
+                                // sidePanel mode: send markdown to webview for EditorInstance creation
                                 try {
                                     const fileContent = await vscode.workspace.fs.readFile(resolvedUri);
                                     const text = Buffer.from(fileContent).toString('utf8');
                                     const fileName = resolvedUri.path.split('/').pop() || 'untitled.md';
-                                    const linkConfig = vscode.workspace.getConfiguration('any-markdown');
-                                    const sidePanelImageMap = this.buildImageMap(text, resolvedUri);
-                                    const sidePanelHtml = getSidePanelHtml(
-                                        webviewNonce.value,
-                                        text,
-                                        {
-                                            theme: linkConfig.get<string>('theme', 'github'),
-                                            fontSize: linkConfig.get<number>('fontSize', 16),
-                                            documentBaseUri: resolvedUri.with({ path: resolvedUri.path.replace(/\/[^/]+$/, '/') }).toString(),
-                                            webviewMessages: getWebviewMessages(),
-                                            enableDebugLogging: linkConfig.get<boolean>('enableDebugLogging', false)
-                                        },
-                                        sidePanelImageMap
-                                    );
+                                    const spBaseUri = webviewPanel.webview.asWebviewUri(
+                                        resolvedUri.with({ path: resolvedUri.path.replace(/\/[^/]+$/, '/') })
+                                    ).toString();
                                     webviewPanel.webview.postMessage({
                                         type: 'openSidePanel',
-                                        sidePanelHtml: sidePanelHtml,
+                                        markdown: text,
                                         filePath: resolvedUri.fsPath,
                                         fileName: fileName,
                                         toc: this.extractToc(text),
-                                        imageMap: this.buildImageMap(text, resolvedUri)
+                                        documentBaseUri: spBaseUri
                                     });
                                     await setupSidePanelFileWatcher(resolvedUri.fsPath);
                                 } catch (e) {
@@ -992,27 +954,16 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
                                 const spFileContent = await vscode.workspace.fs.readFile(spResolvedUri);
                                 const spText = Buffer.from(spFileContent).toString('utf8');
                                 const spFileName = spResolvedUri.path.split('/').pop() || 'untitled.md';
-                                const spConfig = vscode.workspace.getConfiguration('any-markdown');
-                                const spImageMap = this.buildImageMap(spText, spResolvedUri);
-                                const spHtml = getSidePanelHtml(
-                                    webviewNonce.value,
-                                    spText,
-                                    {
-                                        theme: spConfig.get<string>('theme', 'github'),
-                                        fontSize: spConfig.get<number>('fontSize', 16),
-                                        documentBaseUri: spResolvedUri.with({ path: spResolvedUri.path.replace(/\/[^/]+$/, '/') }).toString(),
-                                        webviewMessages: getWebviewMessages(),
-                                        enableDebugLogging: spConfig.get<boolean>('enableDebugLogging', false)
-                                    },
-                                    spImageMap
-                                );
+                                const spBaseUri = webviewPanel.webview.asWebviewUri(
+                                    spResolvedUri.with({ path: spResolvedUri.path.replace(/\/[^/]+$/, '/') })
+                                ).toString();
                                 webviewPanel.webview.postMessage({
                                     type: 'openSidePanel',
-                                    sidePanelHtml: spHtml,
+                                    markdown: spText,
                                     filePath: spResolvedUri.fsPath,
                                     fileName: spFileName,
                                     toc: this.extractToc(spText),
-                                    imageMap: this.buildImageMap(spText, spResolvedUri)
+                                    documentBaseUri: spBaseUri
                                 });
                                 await setupSidePanelFileWatcher(spResolvedUri.fsPath);
                             } catch (e) {

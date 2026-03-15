@@ -1,4 +1,113 @@
-(function() {
+// SidePanelHostBridge — delegates side panel editor's host calls to the main host bridge
+class SidePanelHostBridge {
+    constructor(mainHost, filePath, callbacks) {
+        this._mainHost = mainHost;
+        this.filePath = filePath;
+        this._onTocUpdate = callbacks.onTocUpdate || null;
+        this._onImageRequest = callbacks.onImageRequest || null;
+        this._messageHandler = null;
+    }
+    syncContent(md) {
+        this._mainHost.saveSidePanelFile(this.filePath, md);
+        if (this._onTocUpdate) this._onTocUpdate(md);
+    }
+    save() { /* auto-save via syncContent */ }
+    reportEditingState() {}
+    reportFocus() {}
+    reportBlur() {}
+    openLink(href) { this._mainHost.sidePanelOpenLink(href, this.filePath); }
+    openLinkInTab(href) { this._mainHost.openLinkInTab(href); }
+    requestInsertLink(text) { /* not used in side panel */ }
+    requestInsertImage() {
+        if (this._onImageRequest) this._onImageRequest();
+        this._mainHost.requestInsertImage();
+    }
+    requestSetImageDir() {}
+    saveImageAndInsert(dataUrl, fileName) {
+        if (this._onImageRequest) this._onImageRequest();
+        this._mainHost.saveImageAndInsert(dataUrl, fileName);
+    }
+    readAndInsertImage(filePath) {
+        if (this._onImageRequest) this._onImageRequest();
+        this._mainHost.readAndInsertImage(filePath);
+    }
+    openInTextEditor() {}
+    sendToChat() {}
+    notifySidePanelClosed() {}
+    searchFiles(query) { this._mainHost.searchFiles(query); }
+    createPageAtPath(path) { this._mainHost.createPageAtPath(path); }
+    createPageAuto() { this._mainHost.createPageAuto(); }
+    updatePageH1(path, h1) { this._mainHost.updatePageH1(path, h1); }
+    onMessage(handler) { this._messageHandler = handler; }
+    _sendMessage(msg) { if (this._messageHandler) this._messageHandler(msg); }
+}
+
+// EditorInstance class — Phase 2 skeleton wrapping legacy IIFE code
+class EditorInstance {
+    // ===== Static members =====
+    static instances = [];
+    static activeInstance = null;
+
+    static getActiveInstance() {
+        for (const inst of EditorInstance.instances) {
+            if (inst.container.contains(document.activeElement)) return inst;
+        }
+        return EditorInstance.instances[0]; // fallback: main
+    }
+
+    // ===== Constructor =====
+    constructor(container, hostBridge, options = {}) {
+        this.container = container;
+        this.host = hostBridge;
+        this.options = options;
+        EditorInstance.instances.push(this);
+        EditorInstance.activeInstance = this;
+        this._legacyInit();
+    }
+
+    // ===== Destroy instance =====
+    destroy() {
+        const idx = EditorInstance.instances.indexOf(this);
+        if (idx !== -1) EditorInstance.instances.splice(idx, 1);
+        if (EditorInstance.activeInstance === this) {
+            EditorInstance.activeInstance = EditorInstance.instances[0] || null;
+        }
+    }
+
+    // ===== Create minimal DOM for side panel editor =====
+    static createSidePanelContainer() {
+        const el = document.createElement('div');
+        el.className = 'side-panel-editor-root';
+        el.innerHTML = `
+            <aside class="sidebar" style="display:none!important">
+                <button class="sidebar-toggle"></button>
+                <nav class="outline"></nav>
+                <div class="sidebar-footer">
+                    <div class="word-count"></div>
+                    <div class="sidebar-status-imagedir">
+                        <div class="imagedir-header"><span class="imagedir-label"></span><span class="imagedir-source"></span><button class="imagedir-settings-btn"></button></div>
+                        <div class="imagedir-info"><span class="imagedir-path"></span></div>
+                    </div>
+                </div>
+                <div class="sidebar-resizer"></div>
+            </aside>
+            <div class="toolbar" style="display:none"></div>
+            <div class="editor-wrapper">
+                <div class="search-replace-box" style="display:none">
+                    <input class="search-input" type="text"><input class="replace-input" type="text"><span class="search-count"></span>
+                    <button class="search-prev"></button><button class="search-next"></button><button class="toggle-replace"></button><button class="close-search"></button>
+                    <div class="replace-row"><button class="replace-one"></button><button class="replace-all"></button></div>
+                    <input class="search-case-sensitive" type="checkbox"><input class="search-whole-word" type="checkbox"><input class="search-regex" type="checkbox">
+                </div>
+                <div class="editor" contenteditable="true" spellcheck="true"></div>
+                <textarea class="source-editor" style="display:none"></textarea>
+            </div>
+        `;
+        return el;
+    }
+
+    // ===== Legacy IIFE code (will be refactored in later phases) =====
+    _legacyInit() {
     // Debug logging configuration
     const DEBUG_MODE = __DEBUG_MODE__;
     const logger = {
@@ -6,66 +115,30 @@
         warn: DEBUG_MODE ? (...args) => console.warn('[DEBUG]', ...args) : () => {},
         error: DEBUG_MODE ? (...args) => console.error('[DEBUG]', ...args) : () => {}
     };
-    
-    const host = window.hostBridge;
-    const i18n = __I18N__;
-    logger.log('[Any MD] i18n loaded:', i18n.livePreviewMode ? 'OK' : 'EMPTY', '- Sample:', i18n.bold || '(none)');
-    const editor = document.getElementById('editor');
-    const sourceEditor = document.getElementById('sourceEditor');
-    const outline = document.getElementById('outline');
-    const wordCount = document.getElementById('wordCount');
-    const statusImageDir = document.getElementById('statusImageDir');
-    const sidebar = document.getElementById('sidebar');
-    const toolbar = document.getElementById('toolbar');
 
-    // Lucide Icons (inline SVG) - unified icon set for all toolbars
-    const LUCIDE_ICONS = {
-        // Undo/Redo
-        'undo': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>',
-        'redo': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/></svg>',
-        // Group A: Inline formatting
-        'bold': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12h9a4 4 0 0 1 0 8H7a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h7a4 4 0 0 1 0 8"/></svg>',
-        'italic': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" x2="10" y1="4" y2="4"/><line x1="14" x2="5" y1="20" y2="20"/><line x1="15" x2="9" y1="4" y2="20"/></svg>',
-        'strikethrough': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4H9a3 3 0 0 0-2.83 4"/><path d="M14 12a4 4 0 0 1 0 8H6"/><line x1="4" x2="20" y1="12" y2="12"/></svg>',
-        'code': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/></svg>',
-        // Group B: Block elements
-        'heading1': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h8"/><path d="M4 18V6"/><path d="M12 18V6"/><path d="m17 12 3-2v8"/></svg>',
-        'heading2': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h8"/><path d="M4 18V6"/><path d="M12 18V6"/><path d="M21 18h-4c0-4 4-3 4-6 0-1.5-2-2.5-4-1"/></svg>',
-        'heading3': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h8"/><path d="M4 18V6"/><path d="M12 18V6"/><path d="M17.5 10.5c1.7-1 3.5 0 3.5 1.5a2 2 0 0 1-2 2"/><path d="M17 17.5c2 1.5 4 .3 4-1.5a2 2 0 0 0-2-2"/></svg>',
-        'heading4': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 18V6"/><path d="M17 10v3a1 1 0 0 0 1 1h3"/><path d="M21 10v8"/><path d="M4 12h8"/><path d="M4 18V6"/></svg>',
-        'heading5': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h8"/><path d="M4 18V6"/><path d="M12 18V6"/><path d="M17 13v-3h4"/><path d="M17 17.7c.4.2.8.3 1.3.3 1.5 0 2.7-1.1 2.7-2.5S19.8 13 18.3 13H17"/></svg>',
-        'heading6': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h8"/><path d="M4 18V6"/><path d="M12 18V6"/><circle cx="19" cy="16" r="2"/><path d="M20 10c-2 2-3 3.5-3 6"/></svg>',
-        'ul': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h.01"/><path d="M3 12h.01"/><path d="M3 19h.01"/><path d="M8 5h13"/><path d="M8 12h13"/><path d="M8 19h13"/></svg>',
-        'ol': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5h10"/><path d="M11 12h10"/><path d="M11 19h10"/><path d="M4 4h1v5"/><path d="M4 9h2"/><path d="M6.5 20H3.4c0-1 2.6-1.925 2.6-3.5a1.5 1.5 0 0 0-2.6-1.02"/></svg>',
-        'task': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 5h8"/><path d="M13 12h8"/><path d="M13 19h8"/><path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/></svg>',
-        'quote': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1z"/><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1z"/></svg>',
-        'codeblock': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m10 9-3 3 3 3"/><path d="m14 15 3-3-3-3"/><rect x="3" y="3" width="18" height="18" rx="2"/></svg>',
-        'hr': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/></svg>',
-        'mermaid': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="18" r="3"/><path d="M12 2v4"/><path d="M6.8 15.2 12 6l5.2 9.2"/></svg>',
-        'math': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 7V4H6l6 8-6 8h12v-3"/></svg>',
-        // Group C: Insert/Media
-        'link': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>',
-        'image': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>',
-        'imageDir': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></svg>',
-        'table': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/></svg>',
-        // Utility
-        'openOutline': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg>',
-        'openInTextEditor': '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M23.15 2.587L18.21.21a1.494 1.494 0 0 0-1.705.29l-9.46 8.63-4.12-3.128a.999.999 0 0 0-1.276.057L.327 7.261A1 1 0 0 0 .326 8.74L3.899 12 .326 15.26a1 1 0 0 0 .001 1.479L1.65 17.94a.999.999 0 0 0 1.276.057l4.12-3.128 9.46 8.63a1.492 1.492 0 0 0 1.704.29l4.942-2.377A1.5 1.5 0 0 0 24 20.06V3.939a1.5 1.5 0 0 0-.85-1.352zm-5.146 14.861L10.826 12l7.178-5.448v10.896z"/></svg>',
-        'source': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/><path d="M10 12.5 8 15l2 2.5"/><path d="m14 12.5 2 2.5-2 2.5"/></svg>',
-        // Table toolbar icons
-        'add-col-left': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="13" x="3" y="8" rx="1"/><path d="m15 2-3 3-3-3"/><rect width="7" height="13" x="14" y="8" rx="1"/></svg>',
-        'add-col-right': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="13" x="3" y="3" rx="1"/><path d="m9 22 3-3 3 3"/><rect width="7" height="13" x="14" y="3" rx="1"/></svg>',
-        'del-col': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>',
-        'add-row-above': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="13" height="7" x="8" y="3" rx="1"/><path d="m2 9 3 3-3 3"/><rect width="13" height="7" x="8" y="14" rx="1"/></svg>',
-        'add-row-below': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="13" height="7" x="3" y="3" rx="1"/><path d="m22 15-3-3 3-3"/><rect width="13" height="7" x="3" y="14" rx="1"/></svg>',
-        'del-row': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>',
-        'align-left': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 5H3"/><path d="M15 12H3"/><path d="M17 19H3"/></svg>',
-        'align-center': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 5H3"/><path d="M17 12H7"/><path d="M19 19H5"/></svg>',
-        'align-right': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 5H3"/><path d="M21 12H9"/><path d="M21 19H7"/></svg>',
-    };
+    const host = this.host;
+    const container = this.container;
+    const isMainInstance = EditorInstance.instances.length === 1;
+    const i18n = __I18N__;
+
+    // Import shared pure functions/constants from editor-utils.js (loaded before this script)
+    const {
+        LUCIDE_ICONS, SUPPORTED_LANGUAGES, LANGUAGE_ALIASES, REGEX,
+        escapeHtml, normalizeBlockHtml, parseInlineCode,
+        getCodeFence, wrapInlineCode, cleanImageSrc, getHighlightPatterns
+    } = window.__editorUtils;
+    logger.log('[Any MD] i18n loaded:', i18n.livePreviewMode ? 'OK' : 'EMPTY', '- Sample:', i18n.bold || '(none)');
+    const editor = container.querySelector('.editor');
+    const sourceEditor = container.querySelector('.source-editor');
+    const outline = container.querySelector('.outline');
+    const wordCount = container.querySelector('.word-count');
+    const statusImageDir = container.querySelector('.sidebar-status-imagedir');
+    const sidebar = container.querySelector('.sidebar');
+    const toolbar = container.querySelector('.toolbar');
 
     // Populate toolbar buttons with Lucide icons
     function initToolbarIcons() {
+        if (!toolbar) return;
         toolbar.querySelectorAll('button[data-action]').forEach(function(btn) {
             var icon = LUCIDE_ICONS[btn.dataset.action];
             if (icon) btn.innerHTML = icon;
@@ -74,9 +147,9 @@
     initToolbarIcons();
 
     // Toolbar horizontal scroll navigation
-    var toolbarScrollLeftBtn = document.getElementById('toolbarScrollLeft');
-    var toolbarScrollRightBtn = document.getElementById('toolbarScrollRight');
-    var toolbarInner = document.getElementById('toolbarInner');
+    var toolbarScrollLeftBtn = container.querySelector('.toolbar-scroll-btn--left');
+    var toolbarScrollRightBtn = container.querySelector('.toolbar-scroll-btn--right');
+    var toolbarInner = container.querySelector('.toolbar-inner');
 
     function updateToolbarScrollButtons() {
         if (!toolbarInner) return;
@@ -113,45 +186,46 @@
     }
 
     // Search & Replace elements
-    const searchReplaceBox = document.getElementById('searchReplaceBox');
-    const searchInput = document.getElementById('searchInput');
-    const replaceInput = document.getElementById('replaceInput');
-    const searchCount = document.getElementById('searchCount');
-    const searchPrev = document.getElementById('searchPrev');
-    const searchNext = document.getElementById('searchNext');
-    const toggleReplace = document.getElementById('toggleReplace');
-    const closeSearch = document.getElementById('closeSearch');
-    const replaceRow = document.getElementById('replaceRow');
-    const replaceOne = document.getElementById('replaceOne');
-    const replaceAll = document.getElementById('replaceAll');
-    const searchCaseSensitive = document.getElementById('searchCaseSensitive');
-    const searchWholeWord = document.getElementById('searchWholeWord');
-    const searchRegex = document.getElementById('searchRegex');
+    const searchReplaceBox = container.querySelector('.search-replace-box');
+    const searchInput = container.querySelector('.search-input');
+    const replaceInput = container.querySelector('.replace-input');
+    const searchCount = container.querySelector('.search-count');
+    const searchPrev = container.querySelector('.search-prev');
+    const searchNext = container.querySelector('.search-next');
+    const toggleReplace = container.querySelector('.toggle-replace');
+    const closeSearch = container.querySelector('.close-search');
+    const replaceRow = container.querySelector('.replace-row');
+    const replaceOne = container.querySelector('.replace-one');
+    const replaceAll = container.querySelector('.replace-all');
+    const searchCaseSensitive = container.querySelector('.search-case-sensitive');
+    const searchWholeWord = container.querySelector('.search-whole-word');
+    const searchRegex = container.querySelector('.search-regex');
     
     // Search state
     let searchMatches = [];
     let currentMatchIndex = -1;
     
     // Base URI for resolving relative image paths
-    const documentBaseUri = '__DOCUMENT_BASE_URI__';
-
-    // Image map for side panel iframe (path -> data URL)
-    // blob: iframes can't access file:// or vscode-resource URIs
-    var sidePanelImageMap = {};
+    const documentBaseUri = this.options.documentBaseUri || '__DOCUMENT_BASE_URI__';
 
     let isSourceMode = false;
     // Decode Base64-encoded content to avoid escaping issues with special characters
     let markdown = '';
-    try {
-        markdown = decodeURIComponent(escape(atob(__CONTENT__)));
-        // Strip BOM (Byte Order Mark) if present - some editors add this to UTF-8 files
-        if (markdown.charCodeAt(0) === 0xFEFF) {
-            markdown = markdown.slice(1);
+    if (this.options.initialContent !== undefined) {
+        // Side panel or programmatic instantiation — content passed directly
+        markdown = this.options.initialContent;
+    } else {
+        try {
+            markdown = decodeURIComponent(escape(atob(__CONTENT__)));
+            // Strip BOM (Byte Order Mark) if present - some editors add this to UTF-8 files
+            if (markdown.charCodeAt(0) === 0xFEFF) {
+                markdown = markdown.slice(1);
+            }
+            // Normalize line endings: \r\n → \n, lone \r → \n
+            markdown = markdown.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+        } catch (e) {
+            console.error('[Any MD] Failed to decode Base64 content:', e);
         }
-        // Normalize line endings: \r\n → \n, lone \r → \n
-        markdown = markdown.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-    } catch (e) {
-        console.error('[Any MD] Failed to decode Base64 content:', e);
     }
     let saveTimeout = null;
     let syncTimeout = null;
@@ -290,44 +364,6 @@
     let queuedExternalContent = null; // Queued external change waiting for idle
     const EDITING_IDLE_TIMEOUT = 1500; // 1.5 seconds of inactivity = idle
     
-    // Supported languages for syntax highlighting (must be defined before init())
-    const SUPPORTED_LANGUAGES = [
-        'mermaid', 'math',
-        'javascript', 'typescript', 'python', 'json', 'bash', 'shell', 'css', 'html', 'xml',
-        'sql', 'java', 'go', 'rust', 'yaml', 'markdown', 'c', 'cpp', 'csharp', 'php',
-        'ruby', 'swift', 'kotlin', 'dockerfile', 'plaintext'
-    ];
-    
-    const LANGUAGE_ALIASES = {
-        'js': 'javascript', 'ts': 'typescript', 'py': 'python', 'sh': 'bash', 'zsh': 'bash',
-        'htm': 'html', 'yml': 'yaml', 'md': 'markdown', 'c++': 'cpp', 'c#': 'csharp',
-        'cs': 'csharp', 'rb': 'ruby', 'docker': 'dockerfile', 'text': 'plaintext', 'txt': 'plaintext'
-    };
-    
-    // Pre-compiled regex patterns for performance (avoid creating regex objects on every call)
-    const REGEX = {
-        // parseMarkdownLine patterns
-        heading: /^(#{1,6}) (.*)$/,
-        hr: /^(---|\*\*\*|___)$/,
-        task: /^(\s*)[-*+] \[([ xX])\] (.*)$/,
-        ul: /^(\s*)[-*+] (.*)$/,
-        ol: /^(\s*)(\d+)\. (.*)$/,
-        quote: /^> (.*)$/,
-        codeBlock: /^(\`{3,}|~{3,})(.*)$/,
-        // parseInline patterns
-        brTag: /&lt;br&gt;/gi,
-        image: /!\[([^\]]*)\]\(([^)]+)\)/g,
-        link: /\[([^\]]+)\]\(([^)]+)\)/g,
-        boldItalicAsterisk: /\*\*\*(.+?)\*\*\*/g,
-        boldItalicUnderscore: /(^|[^\w])___([^_]+)___([^\w]|$)/g,
-        boldAsterisk: /\*\*(.+?)\*\*/g,
-        boldUnderscore: /(^|[^\w])__([^_]+)__([^\w]|$)/g,
-        italicAsterisk: /\*(.+?)\*/g,
-        italicUnderscore: /(^|[^\w])_([^_]+)_([^\w]|$)/g,
-        strikethrough: /~~(.+?)~~/g,
-        inlineCode: /\`([^\`]+)\`/g
-    };
-    
     // Extract IMAGE_DIR from markdown content
     // Supports both standalone and combined directive blocks
     function extractImageDirFromMarkdown(md) {
@@ -371,10 +407,6 @@
             src.startsWith('data:') || src.startsWith('vscode-resource:') ||
             src.startsWith('vscode-webview:')) {
             return src;
-        }
-        // Check side panel image map (blob: iframes can't access file/vscode-resource URIs)
-        if (sidePanelImageMap[src]) {
-            return sidePanelImageMap[src];
         }
         // If absolute file path (starts with /)
         if (src.startsWith('/')) {
@@ -1447,76 +1479,6 @@
         return html;
     }
     
-    // Parse inline code spans according to CommonMark spec
-    // Opening and closing backtick strings must be exactly the same length
-    // Uses placeholders to protect code content from further markdown processing
-    function parseInlineCode(text, placeholders, getNextIndex) {
-        let result = '';
-        let i = 0;
-        
-        while (i < text.length) {
-            // Check for backtick sequence
-            if (text[i] === '`') {
-                // Count opening backticks
-                let openStart = i;
-                while (i < text.length && text[i] === '`') {
-                    i++;
-                }
-                let openLen = i - openStart;
-                
-                // Look for closing backtick sequence of the same length
-                let contentStart = i;
-                let found = false;
-                
-                while (i < text.length) {
-                    if (text[i] === '`') {
-                        // Count this backtick sequence
-                        let closeStart = i;
-                        while (i < text.length && text[i] === '`') {
-                            i++;
-                        }
-                        let closeLen = i - closeStart;
-                        
-                        if (closeLen === openLen) {
-                            // Found matching closing sequence
-                            let content = text.substring(contentStart, closeStart);
-                            // Strip one leading and one trailing space if both exist (CommonMark rule)
-                            if (content.startsWith(' ') && content.endsWith(' ') && content.length > 1) {
-                                content = content.slice(1, -1);
-                            }
-                            // Use placeholder to protect code content from further processing
-                            const codeHtml = '<code>' + content + '</code>';
-                            const placeholder = '\x00CODE' + getNextIndex() + '\x00';
-                            placeholders.push({ placeholder, html: codeHtml });
-                            result += placeholder;
-                            found = true;
-                            break;
-                        }
-                        // Not matching length, continue searching
-                    } else {
-                        i++;
-                    }
-                }
-                
-                if (!found) {
-                    // No matching closing sequence found, output as literal backticks
-                    result += text.substring(openStart, i);
-                }
-            } else {
-                result += text[i];
-                i++;
-            }
-        }
-        
-        return result;
-    }
-
-    function escapeHtml(text) {
-        // Single pass replacement using a map for better performance
-        const escapeMap = { '&': '&amp;', '<': '&lt;', '>': '&gt;' };
-        return text.replace(/[&<>]/g, char => escapeMap[char]);
-    }
-
     function renderFromMarkdown() {
         // Remove IMAGE_DIR and FORCE_RELATIVE_PATH directives before rendering (they're stored in variables)
         let markdownToRender = removeDirectivesFromMarkdown(markdown);
@@ -1666,17 +1628,6 @@
         } catch (e) {
             logger.log('[Any MD] restoreCursorState failed:', e);
         }
-    }
-
-    /**
-     * Normalize block HTML for comparison (collapse whitespace differences).
-     */
-    function normalizeBlockHtml(html) {
-        return html
-            .replace(/\s+/g, ' ')
-            .replace(/>\s+</g, '><')
-            .replace(/\s*contenteditable="[^"]*"/g, '')  // Ignore contenteditable attr diffs
-            .trim();
     }
 
     /**
@@ -2825,8 +2776,8 @@
             
             if (isExpanded) {
                 // Calculate width to fill editor-wrapper
-                const editorWrapper = document.querySelector('.editor-wrapper');
-                const editorEl = document.getElementById('editor');
+                const editorWrapper = container.querySelector('.editor-wrapper');
+                const editorEl = editor;
                 if (editorWrapper && editorEl) {
                     const wrapperRect = editorWrapper.getBoundingClientRect();
                     const editorRect = editorEl.getBoundingClientRect();
@@ -3142,157 +3093,6 @@
         
         // Convert newlines to <br>, with extra <br> for trailing empty line
         code.innerHTML = result.replace(/\n/g, '<br>') + trailingBr;
-    }
-    
-    // Get highlight patterns for a language
-    function getHighlightPatterns(lang) {
-        const patterns = [];
-        
-        // Common patterns
-        const addCommon = () => {
-            // Strings (double and single quotes)
-            patterns.push({ regex: /"(?:[^"\\]|\\.)*"/g, className: 'hljs-string' });
-            patterns.push({ regex: /'(?:[^'\\]|\\.)*'/g, className: 'hljs-string' });
-            // Numbers
-            patterns.push({ regex: /\b\d+(\.\d+)?\b/g, className: 'hljs-number' });
-        };
-        
-        switch (lang) {
-            case 'javascript':
-            case 'typescript':
-                // Comments
-                patterns.push({ regex: /\/\/.*$/gm, className: 'hljs-comment' });
-                patterns.push({ regex: /\/\*[\s\S]*?\*\//g, className: 'hljs-comment' });
-                addCommon();
-                // Template literals
-                patterns.push({ regex: /`(?:[^`\\]|\\.)*`/g, className: 'hljs-string' });
-                // Keywords
-                patterns.push({ regex: /\b(const|let|var|function|return|if|else|for|while|do|switch|case|break|continue|new|this|class|extends|import|export|from|default|async|await|try|catch|finally|throw|typeof|instanceof|in|of|null|undefined|true|false)\b/g, className: 'hljs-keyword' });
-                // Built-ins
-                patterns.push({ regex: /\b(console|document|window|Array|Object|String|Number|Boolean|Promise|Map|Set|JSON|Math|Date|RegExp|Error)\b/g, className: 'hljs-built_in' });
-                break;
-                
-            case 'python':
-                // Comments
-                patterns.push({ regex: /#.*$/gm, className: 'hljs-comment' });
-                // Triple-quoted strings
-                patterns.push({ regex: /"""[\s\S]*?"""/g, className: 'hljs-string' });
-                patterns.push({ regex: /'''[\s\S]*?'''/g, className: 'hljs-string' });
-                addCommon();
-                // Keywords
-                patterns.push({ regex: /\b(def|class|return|if|elif|else|for|while|break|continue|pass|import|from|as|try|except|finally|raise|with|lambda|yield|global|nonlocal|True|False|None|and|or|not|in|is)\b/g, className: 'hljs-keyword' });
-                // Built-ins
-                patterns.push({ regex: /\b(print|len|range|str|int|float|list|dict|set|tuple|bool|type|isinstance|hasattr|getattr|setattr|open|input|super|self)\b/g, className: 'hljs-built_in' });
-                break;
-                
-            case 'json':
-                addCommon();
-                // Property names
-                patterns.push({ regex: /"[^"]*"(?=\s*:)/g, className: 'hljs-attr' });
-                // Literals
-                patterns.push({ regex: /\b(true|false|null)\b/g, className: 'hljs-literal' });
-                break;
-                
-            case 'bash':
-            case 'shell':
-                // Comments
-                patterns.push({ regex: /#.*$/gm, className: 'hljs-comment' });
-                addCommon();
-                // Keywords
-                patterns.push({ regex: /\b(if|then|else|elif|fi|for|while|do|done|case|esac|function|return|exit|echo|cd|ls|rm|cp|mv|mkdir|chmod|chown|grep|sed|awk|cat|head|tail|find|xargs|export|source|alias)\b/g, className: 'hljs-keyword' });
-                // Variables
-                patterns.push({ regex: /\$[a-zA-Z_][a-zA-Z0-9_]*/g, className: 'hljs-built_in' });
-                patterns.push({ regex: /\$\{[^}]+\}/g, className: 'hljs-built_in' });
-                break;
-                
-            case 'css':
-                // Comments
-                patterns.push({ regex: /\/\*[\s\S]*?\*\//g, className: 'hljs-comment' });
-                addCommon();
-                // Selectors
-                patterns.push({ regex: /[.#][a-zA-Z_][a-zA-Z0-9_-]*/g, className: 'hljs-selector' });
-                // Properties
-                patterns.push({ regex: /[a-z-]+(?=\s*:)/g, className: 'hljs-property' });
-                // Keywords
-                patterns.push({ regex: /@[a-z-]+/g, className: 'hljs-keyword' });
-                break;
-                
-            case 'html':
-            case 'xml':
-                // Comments
-                patterns.push({ regex: /<!--[\s\S]*?-->/g, className: 'hljs-comment' });
-                addCommon();
-                // Tags
-                patterns.push({ regex: /&lt;\/?[a-zA-Z][a-zA-Z0-9]*(?=[\s&gt;])/g, className: 'hljs-tag' });
-                // Attributes
-                patterns.push({ regex: /[a-zA-Z-]+(?==)/g, className: 'hljs-attr' });
-                break;
-                
-            case 'sql':
-                // Comments
-                patterns.push({ regex: /--.*$/gm, className: 'hljs-comment' });
-                patterns.push({ regex: /\/\*[\s\S]*?\*\//g, className: 'hljs-comment' });
-                addCommon();
-                // Keywords (case insensitive)
-                patterns.push({ regex: /\b(SELECT|FROM|WHERE|AND|OR|NOT|IN|LIKE|ORDER|BY|GROUP|HAVING|JOIN|LEFT|RIGHT|INNER|OUTER|ON|AS|INSERT|INTO|VALUES|UPDATE|SET|DELETE|CREATE|TABLE|INDEX|DROP|ALTER|ADD|COLUMN|PRIMARY|KEY|FOREIGN|REFERENCES|NULL|DEFAULT|UNIQUE|CHECK|CONSTRAINT)\b/gi, className: 'hljs-keyword' });
-                // Functions
-                patterns.push({ regex: /\b(COUNT|SUM|AVG|MIN|MAX|COALESCE|NULLIF|CAST|CONVERT|SUBSTRING|CONCAT|UPPER|LOWER|TRIM|LENGTH)\b/gi, className: 'hljs-built_in' });
-                break;
-                
-            case 'java':
-            case 'csharp':
-            case 'cpp':
-            case 'c':
-                // Comments
-                patterns.push({ regex: /\/\/.*$/gm, className: 'hljs-comment' });
-                patterns.push({ regex: /\/\*[\s\S]*?\*\//g, className: 'hljs-comment' });
-                addCommon();
-                // Keywords
-                patterns.push({ regex: /\b(public|private|protected|static|final|abstract|class|interface|extends|implements|new|return|if|else|for|while|do|switch|case|break|continue|try|catch|finally|throw|throws|void|int|long|float|double|boolean|char|byte|short|string|var|const|null|true|false|this|super|import|package|using|namespace)\b/g, className: 'hljs-keyword' });
-                // Types
-                patterns.push({ regex: /\b(String|Integer|Long|Float|Double|Boolean|Object|List|Map|Set|Array|ArrayList|HashMap|HashSet)\b/g, className: 'hljs-type' });
-                break;
-                
-            case 'go':
-                // Comments
-                patterns.push({ regex: /\/\/.*$/gm, className: 'hljs-comment' });
-                patterns.push({ regex: /\/\*[\s\S]*?\*\//g, className: 'hljs-comment' });
-                addCommon();
-                // Keywords
-                patterns.push({ regex: /\b(package|import|func|return|if|else|for|range|switch|case|default|break|continue|go|defer|chan|select|type|struct|interface|map|var|const|nil|true|false|make|new|len|cap|append|copy|delete|panic|recover)\b/g, className: 'hljs-keyword' });
-                // Types
-                patterns.push({ regex: /\b(string|int|int8|int16|int32|int64|uint|uint8|uint16|uint32|uint64|float32|float64|bool|byte|rune|error)\b/g, className: 'hljs-type' });
-                break;
-                
-            case 'rust':
-                // Comments
-                patterns.push({ regex: /\/\/.*$/gm, className: 'hljs-comment' });
-                patterns.push({ regex: /\/\*[\s\S]*?\*\//g, className: 'hljs-comment' });
-                addCommon();
-                // Keywords
-                patterns.push({ regex: /\b(fn|let|mut|const|static|if|else|match|loop|while|for|in|break|continue|return|struct|enum|impl|trait|type|pub|mod|use|crate|self|super|where|async|await|move|ref|true|false|Some|None|Ok|Err)\b/g, className: 'hljs-keyword' });
-                // Types
-                patterns.push({ regex: /\b(i8|i16|i32|i64|i128|u8|u16|u32|u64|u128|f32|f64|bool|char|str|String|Vec|Option|Result|Box|Rc|Arc)\b/g, className: 'hljs-type' });
-                // Macros
-                patterns.push({ regex: /[a-z_]+!/g, className: 'hljs-built_in' });
-                break;
-                
-            case 'yaml':
-                // Comments
-                patterns.push({ regex: /#.*$/gm, className: 'hljs-comment' });
-                addCommon();
-                // Keys
-                patterns.push({ regex: /^[a-zA-Z_][a-zA-Z0-9_-]*(?=:)/gm, className: 'hljs-attr' });
-                // Literals
-                patterns.push({ regex: /\b(true|false|null|yes|no|on|off)\b/gi, className: 'hljs-literal' });
-                break;
-                
-            default:
-                // No highlighting for unknown languages
-                return null;
-        }
-        
-        return patterns;
     }
     
     // Show language selector dropdown
@@ -5298,52 +5098,7 @@
 
     // ========== HTML TO MARKDOWN CONVERSION HELPERS ==========
     // These functions are shared between htmlToMarkdown() and copy handler
-    
-    // Determine the appropriate code fence for content
-    // If content contains triple backticks, use more backticks to avoid conflicts
-    function getCodeFence(content) {
-        // Find the longest sequence of backticks in the content
-        const backtickMatches = content.match(/\`+/g);
-        let maxBackticks = 0;
-        if (backtickMatches) {
-            for (const match of backtickMatches) {
-                if (match.length > maxBackticks) {
-                    maxBackticks = match.length;
-                }
-            }
-        }
-        // Use at least 3 backticks, or one more than the longest sequence found
-        const fenceLength = Math.max(3, maxBackticks + 1);
-        return '\`'.repeat(fenceLength);
-    }
-    
-    // Wrap inline code with appropriate number of backticks
-    // If content contains backticks, use more backticks to wrap
-    function wrapInlineCode(content) {
-        // Find the longest sequence of backticks in the content
-        const backtickMatches = content.match(/`+/g);
-        let maxBackticks = 0;
-        if (backtickMatches) {
-            for (const match of backtickMatches) {
-                if (match.length > maxBackticks) {
-                    maxBackticks = match.length;
-                }
-            }
-        }
-        
-        if (maxBackticks === 0) {
-            // No backticks in content, use single backticks
-            return '`' + content + '`';
-        }
-        
-        // Use at least 2 more backticks than the longest sequence found
-        // This ensures the fence won't be confused with content
-        // e.g., content with ``` needs ````` (5) to wrap safely
-        const fence = '`'.repeat(maxBackticks + 2);
-        // Add spaces around content (CommonMark rule for backtick-containing content)
-        return fence + ' ' + content + ' ' + fence;
-    }
-    
+
     // Strip display-only trailing <br> and/or browser sentinel \n from code content.
     // Used by mdProcessNode for both regular code blocks and special wrappers.
     function stripTrailingNewlines(content, code, sentinelOwner) {
@@ -5354,18 +5109,6 @@
             if (content.endsWith('\n')) content = content.slice(0, -1);
         }
         return content;
-    }
-
-    // Strip vscode-resource URI prefix from image paths
-    // blob: iframes and re-rendered content may inadvertently include display URIs
-    function cleanImageSrc(src) {
-        if (!src) return '';
-        // Strip vscode-resource prefix (e.g., https://file+.vscode-resource.vscode-cdn.net/path)
-        src = src.replace(/^https:\/\/file\+\.vscode-resource\.vscode-cdn\.net/, '');
-        src = src.replace(/^https:\/\/file%2B\.vscode-resource\.vscode-cdn\.net/, '');
-        // Strip data: URLs — use alt text or markdownPath instead
-        if (src.startsWith('data:')) return '';
-        return src;
     }
 
     function mdProcessNode(node, listPrefix = '') {
@@ -6102,8 +5845,18 @@
     // ========== EVENT HANDLERS ==========
 
     // Capture Tab key at document level to prevent focus change
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Tab' && document.activeElement === editor) {
+    if (isMainInstance) document.addEventListener('keydown', function(e) {
+        // Check if active element is any EditorInstance's .editor
+        var activeEl = document.activeElement;
+        var isAnyEditor = false;
+        for (var ei = 0; ei < EditorInstance.instances.length; ei++) {
+            var instEd = EditorInstance.instances[ei].container.querySelector('.editor');
+            if (instEd && (activeEl === instEd || instEd.contains(activeEl))) {
+                isAnyEditor = true;
+                break;
+            }
+        }
+        if (e.key === 'Tab' && isAnyEditor) {
             // #region agent log
             logger.log('Document captured Tab key - preventing default (no stopPropagation)');
             // #endregion
@@ -11106,7 +10859,7 @@
 
     // Save the editor selection before toolbar buttons steal focus
     let savedToolbarRange = null;
-    toolbar.addEventListener('mousedown', function(e) {
+    if (toolbar) toolbar.addEventListener('mousedown', function(e) {
         const btn = e.target.closest('button');
         if (!btn) return;
         const sel = window.getSelection();
@@ -11117,7 +10870,7 @@
         }
     });
 
-    toolbar.addEventListener('click', function(e) {
+    if (toolbar) toolbar.addEventListener('click', function(e) {
         const btn = e.target.closest('button');
         if (!btn) return;
 
@@ -11880,11 +11633,11 @@
             })(i));
             resultsList.appendChild(div);
         }
-        // Also relay to side panel iframe if open
-        if (sidePanelIframe && sidePanelIframe.contentWindow) {
-            sidePanelIframe.contentWindow.postMessage({
+        // Also relay to side panel instance if open
+        if (sidePanelInstance && sidePanelHostBridge) {
+            sidePanelHostBridge._sendMessage({
                 type: 'fileSearchResults', results: results, query: query
-            }, '*');
+            });
         }
     }
 
@@ -12076,7 +11829,7 @@
     }
 
     // Handle keyboard in action panel menu step
-    document.addEventListener('keydown', function(e) {
+    if (isMainInstance) document.addEventListener('keydown', function(e) {
         if (!actionPanelVisible) return;
         if (actionPanelState.step === 'menu') {
             if (e.key === 'ArrowDown') {
@@ -12101,40 +11854,40 @@
     function handlePageCreatedAtPath(relativePath) {
         if (!actionPanelVisible) return;
         showActionPanelLinkName(relativePath, false);
-        // Also relay to side panel iframe if open
-        if (sidePanelIframe && sidePanelIframe.contentWindow) {
-            sidePanelIframe.contentWindow.postMessage({
+        // Also relay to side panel instance if open
+        if (sidePanelInstance && sidePanelHostBridge) {
+            sidePanelHostBridge._sendMessage({
                 type: 'pageCreatedAtPath', relativePath: relativePath
-            }, '*');
+            });
         }
     }
 
     // ========== UTILITIES ==========
 
     // Sidebar toggle functions
-    const openSidebarBtn = document.getElementById('openSidebarBtn');
-    const closeSidebarBtn = document.getElementById('closeSidebar');
-    const sidebarResizer = document.getElementById('sidebarResizer');
+    const openSidebarBtn = container.querySelector('[data-action="openOutline"]');
+    const closeSidebarBtn = container.querySelector('.sidebar-toggle');
+    const sidebarResizer = container.querySelector('.sidebar-resizer');
     
     function openSidebar() {
-        sidebar.classList.remove('hidden');
-        openSidebarBtn.classList.add('hidden');
+        if (sidebar) sidebar.classList.remove('hidden');
+        if (openSidebarBtn) openSidebarBtn.classList.add('hidden');
     }
-    
+
     function closeSidebar() {
-        sidebar.classList.add('hidden');
+        if (sidebar) sidebar.classList.add('hidden');
         // Clear inline width so .hidden class can take effect
-        sidebar.style.width = '';
-        openSidebarBtn.classList.remove('hidden');
+        if (sidebar) sidebar.style.width = '';
+        if (openSidebarBtn) openSidebarBtn.classList.remove('hidden');
     }
     
     // Close sidebar button handler
-    closeSidebarBtn.addEventListener('click', function() {
+    if (closeSidebarBtn) closeSidebarBtn.addEventListener('click', function() {
         closeSidebar();
     });
 
     // Image directory settings button handler
-    const imageDirSettingsBtn = document.getElementById('imageDirSettingsBtn');
+    const imageDirSettingsBtn = container.querySelector('.imagedir-settings-btn');
     if (imageDirSettingsBtn) {
         imageDirSettingsBtn.addEventListener('click', function() {
             host.requestSetImageDir();
@@ -12146,7 +11899,7 @@
     let startX = 0;
     let startWidth = 0;
     
-    sidebarResizer.addEventListener('mousedown', function(e) {
+    if (sidebarResizer) sidebarResizer.addEventListener('mousedown', function(e) {
         isResizing = true;
         startX = e.clientX;
         startWidth = sidebar.offsetWidth;
@@ -12156,14 +11909,14 @@
         e.preventDefault();
     });
     
-    document.addEventListener('mousemove', function(e) {
+    if (isMainInstance) document.addEventListener('mousemove', function(e) {
         if (!isResizing) return;
         const diff = e.clientX - startX;
         const newWidth = Math.min(Math.max(startWidth + diff, 150), 500);
         sidebar.style.width = newWidth + 'px';
     });
-    
-    document.addEventListener('mouseup', function() {
+
+    if (isMainInstance) document.addEventListener('mouseup', function() {
         if (isResizing) {
             isResizing = false;
             sidebarResizer.classList.remove('dragging');
@@ -12305,8 +12058,8 @@
     function updateStatus() {
         // Update IMAGE_DIR display in sidebar footer
         if (statusImageDir) {
-            const pathEl = document.getElementById('imageDirPath');
-            const sourceEl = document.getElementById('imageDirSource');
+            const pathEl = container.querySelector('.imagedir-path');
+            const sourceEl = container.querySelector('.imagedir-source');
             if (pathEl && imageDirDisplayPath !== null) {
                 pathEl.textContent = imageDirDisplayPath;
                 pathEl.title = imageDirDisplayPath;
@@ -12323,20 +12076,20 @@
     }
 
     // Keyboard shortcuts
-    document.addEventListener('keydown', async function(e) {
+    if (isMainInstance) document.addEventListener('keydown', async function(e) {
         const isMod = e.ctrlKey || e.metaKey;
-        
+
         // Handle paste shortcut for Kiro only
         // Kiro's paste event doesn't include image data, so we need to use Clipboard API
         // VSCode/Cursor paste event works normally, so skip this for them
         const isKiro = navigator.userAgent.includes('Kiro');
         if (isMod && e.key === 'v' && isKiro) {
             logger.log('Cmd/Ctrl+V keydown detected (Kiro)');
-            
+
             if (navigator.clipboard && navigator.clipboard.read) {
                 try {
                     const items = await navigator.clipboard.read();
-                    
+
                     for (const item of items) {
                         for (const type of item.types) {
                             if (type.startsWith('image/')) {
@@ -12346,7 +12099,9 @@
                                 const reader = new FileReader();
                                 reader.onload = function(event) {
                                     const dataUrl = event.target.result;
-                                    host.saveImageAndInsert(dataUrl);
+                                    // Use active instance's host for correct routing
+                                    var activeInst = EditorInstance.getActiveInstance();
+                                    (activeInst ? activeInst.host : host).saveImageAndInsert(dataUrl);
                                     logger.log('Image sent to extension for saving (Kiro)');
                                 };
                                 reader.readAsDataURL(blob);
@@ -12359,57 +12114,6 @@
                 } catch (err) {
                     logger.log('Clipboard API read failed (Kiro):', err.message);
                 }
-            }
-        }
-        
-        // Handle Cmd+V in side panel iframe
-        // Clipboard API is denied in blob: iframes, so request parent to read clipboard
-        var isSidePanelContext = document.documentElement.getAttribute('data-side-panel') === 'true';
-        if (isMod && e.key === 'v' && isSidePanelContext) {
-            e.preventDefault();
-            logger.log('Side panel iframe: requesting paste from parent...');
-            parent.postMessage({ source: 'sidePanel', type: 'requestPaste' }, '*');
-            return;
-        }
-
-        // Relay Cmd+V to side panel iframe (main webview reads clipboard and sends to iframe)
-        if (isMod && e.key === 'v' && sidePanelIframe && sidePanelIframe.contentWindow && sidePanel && !sidePanel.classList.contains('hidden')) {
-            // Read clipboard and relay to iframe
-            if (navigator.clipboard && navigator.clipboard.read) {
-                e.preventDefault();
-                logger.log('Side panel paste relay: reading clipboard...');
-                (async function() {
-                    try {
-                        var items = await navigator.clipboard.read();
-                        logger.log('Clipboard items:', items.length);
-                        // Check for image first
-                        for (var ci = 0; ci < items.length; ci++) {
-                            for (var ti = 0; ti < items[ci].types.length; ti++) {
-                                if (items[ci].types[ti].startsWith('image/')) {
-                                    var blob = await items[ci].getType(items[ci].types[ti]);
-                                    var reader = new FileReader();
-                                    reader.onload = function(evt) {
-                                        sidePanelImagePending = true;
-                                        host.saveImageAndInsert(evt.target.result);
-                                    };
-                                    reader.readAsDataURL(blob);
-                                    return;
-                                }
-                            }
-                        }
-                        // No image — relay text as paste
-                        var text = await navigator.clipboard.readText();
-                        if (text) {
-                            sidePanelIframe.contentWindow.postMessage({
-                                type: 'pasteText',
-                                text: text
-                            }, '*');
-                        }
-                    } catch (err) {
-                        logger.error('Side panel paste relay failed:', err);
-                    }
-                })();
-                return;
             }
         }
 
@@ -13288,41 +12992,20 @@
             imageDirDisplayPath = message.displayPath;
             imageDirSource = message.source;
             updateStatus();
-        } else if (message.type === 'setImageMap') {
-            // Receive image map for side panel (path -> data URL)
-            if (message.imageMap) {
-                sidePanelImageMap = message.imageMap;
-                logger.log('Image map received, entries:', Object.keys(sidePanelImageMap).length);
-                // Re-render to apply image map to existing images
-                var allImgs = editor.querySelectorAll('img');
-                allImgs.forEach(function(imgEl) {
-                    var origSrc = imgEl.dataset.markdownPath || imgEl.getAttribute('alt') || '';
-                    if (sidePanelImageMap[origSrc] && imgEl.src !== sidePanelImageMap[origSrc]) {
-                        imgEl.src = sidePanelImageMap[origSrc];
-                    }
-                });
-            }
         } else if (message.type === 'insertImageHtml') {
             logger.log('insertImageHtml received, sidePanelImagePending:', sidePanelImagePending, 'markdownPath:', message.markdownPath);
-            // If image was requested from side panel, relay to iframe
-            if (sidePanelImagePending && sidePanelIframe && sidePanelIframe.contentWindow) {
+            // If image was requested from side panel, dispatch to side panel instance
+            if (sidePanelImagePending && sidePanelHostBridge) {
                 sidePanelImagePending = false;
-                // blob: iframe can't resolve vscode-resource or file:// URIs
-                // Use dataUri (base64) provided by editorProvider
-                var spImgUri = message.dataUri || message.displayUri;
-                sidePanelIframe.contentWindow.postMessage({
+                sidePanelHostBridge._sendMessage({
                     type: 'insertImageHtml',
                     markdownPath: message.markdownPath,
-                    displayUri: spImgUri,
-                    dataUri: spImgUri
-                }, '*');
+                    displayUri: message.displayUri,
+                    dataUri: message.dataUri
+                });
                 return;
             }
             sidePanelImagePending = false;
-            // If dataUri provided (side panel context), cache in imageMap for re-renders
-            if (message.dataUri && message.markdownPath) {
-                sidePanelImageMap[message.markdownPath] = message.dataUri;
-            }
             // Insert image at cursor position
             const img = document.createElement('img');
             img.src = message.displayUri;
@@ -13441,80 +13124,71 @@
                 syncMarkdown();
             }
         } else if (message.type === 'openSidePanel') {
-            openSidePanel(message.sidePanelHtml, message.filePath, message.fileName, message.toc, message.imageMap);
+            openSidePanel(message.markdown, message.filePath, message.fileName, message.toc, message.documentBaseUri);
         } else if (message.type === 'sidePanelMessage') {
-            // Relay message from VSCode to iframe
-            if (sidePanelIframe && sidePanelIframe.contentWindow) {
-                sidePanelIframe.contentWindow.postMessage(message.data, '*');
+            // Dispatch message to side panel EditorInstance
+            if (sidePanelHostBridge) {
+                sidePanelHostBridge._sendMessage(message.data);
             }
         }
     });
 
-    // ========== Side Panel (iframe) ==========
-    var sidePanel = document.getElementById('sidePanel');
-    var sidePanelFilename = document.getElementById('sidePanelFilename');
-    var sidePanelClose = document.getElementById('sidePanelClose');
-    var sidePanelOverlay = document.getElementById('sidePanelOverlay');
-    var sidePanelIframeContainer = document.getElementById('sidePanelIframeContainer');
-    var sidePanelToc = document.getElementById('sidePanelToc');
-    var sidePanelTocToggle = document.getElementById('sidePanelTocToggle');
-    var sidePanelIframe = null;
+    // ========== Side Panel (class-based EditorInstance) ==========
+    var sidePanel = container.querySelector('.side-panel');
+    var sidePanelFilename = container.querySelector('.side-panel-filename');
+    var sidePanelClose = container.querySelector('.side-panel-close');
+    var sidePanelOverlay = container.querySelector('.side-panel-overlay');
+    var sidePanelIframeContainer = container.querySelector('.side-panel-iframe-container');
+    var sidePanelToc = container.querySelector('.side-panel-toc');
+    var sidePanelTocToggle = container.querySelector('.side-panel-toc-toggle');
+    var sidePanelInstance = null;
+    var sidePanelHostBridge = null;
     var sidePanelFilePath = null;
-    var sidePanelBlobUrl = null;
     var sidePanelTocVisible = true;
     var sidePanelExpanded = false;
     var sidePanelImagePending = false;
     var sidebarWasOpenBeforeSidePanel = false;
 
-    var pendingSidePanelImageMap = null;
-
-    function openSidePanel(html, filePath, fileName, toc, imageMap) {
+    function openSidePanel(markdown, filePath, fileName, toc, spDocumentBaseUri) {
         // Close existing panel if open
-        if (sidePanelIframe) {
+        if (sidePanelInstance) {
             closeSidePanelImmediate();
         }
         // Close sidebar (outline) and remember its state
-        sidebarWasOpenBeforeSidePanel = !sidebar.classList.contains('hidden');
+        sidebarWasOpenBeforeSidePanel = sidebar && !sidebar.classList.contains('hidden');
         if (sidebarWasOpenBeforeSidePanel) {
             closeSidebar();
         }
         sidePanelFilePath = filePath;
-        sidePanelFilename.textContent = fileName;
-        pendingSidePanelImageMap = imageMap || null;
+        if (sidePanelFilename) sidePanelFilename.textContent = fileName;
 
-        // Create blob URL and iframe
-        var blob = new Blob([html], { type: 'text/html' });
-        sidePanelBlobUrl = URL.createObjectURL(blob);
+        // Create container and EditorInstance
+        var spContainer = EditorInstance.createSidePanelContainer();
+        if (sidePanelIframeContainer) {
+            sidePanelIframeContainer.innerHTML = '';
+            sidePanelIframeContainer.appendChild(spContainer);
+        }
 
-        sidePanelIframe = document.createElement('iframe');
-        sidePanelIframe.src = sidePanelBlobUrl;
-        sidePanelIframe.style.width = '100%';
-        sidePanelIframe.style.height = '100%';
-        sidePanelIframe.style.border = 'none';
-        sidePanelIframe.setAttribute('sandbox', 'allow-scripts allow-same-origin');
-        sidePanelIframeContainer.innerHTML = '';
-        sidePanelIframeContainer.appendChild(sidePanelIframe);
+        sidePanelHostBridge = new SidePanelHostBridge(host, filePath, {
+            onTocUpdate: updateSidePanelTocFromMarkdown,
+            onImageRequest: function() { sidePanelImagePending = true; }
+        });
 
-        // Send imageMap to iframe once loaded
-        sidePanelIframe.addEventListener('load', function() {
-            if (pendingSidePanelImageMap && sidePanelIframe && sidePanelIframe.contentWindow) {
-                sidePanelIframe.contentWindow.postMessage({
-                    type: 'setImageMap',
-                    imageMap: pendingSidePanelImageMap
-                }, '*');
-                pendingSidePanelImageMap = null;
-            }
+        sidePanelInstance = new EditorInstance(spContainer, sidePanelHostBridge, {
+            initialContent: markdown,
+            documentBaseUri: spDocumentBaseUri || '',
+            isSidePanel: true
         });
 
         // Render TOC
         renderSidePanelToc(toc);
 
         // Show panel with animation
-        sidePanel.style.display = 'flex';
-        sidePanelOverlay.style.display = 'block';
+        if (sidePanel) sidePanel.style.display = 'flex';
+        if (sidePanelOverlay) sidePanelOverlay.style.display = 'block';
         requestAnimationFrame(function() {
-            sidePanel.classList.add('open');
-            sidePanelOverlay.classList.add('open');
+            if (sidePanel) sidePanel.classList.add('open');
+            if (sidePanelOverlay) sidePanelOverlay.classList.add('open');
         });
     }
 
@@ -13544,10 +13218,8 @@
         sidePanelToc.querySelectorAll('.side-panel-toc-item').forEach(function(item) {
             item.addEventListener('click', function() {
                 var anchor = item.dataset.anchor;
-                if (sidePanelIframe && sidePanelIframe.contentWindow) {
-                    sidePanelIframe.contentWindow.postMessage(
-                        { type: 'scrollToAnchor', anchor: anchor }, '*'
-                    );
+                if (sidePanelHostBridge) {
+                    sidePanelHostBridge._sendMessage({ type: 'scrollToAnchor', anchor: anchor });
                 }
                 // Update active state
                 sidePanelToc.querySelectorAll('.side-panel-toc-item').forEach(function(i) {
@@ -13588,23 +13260,21 @@
     }
 
     function closeSidePanelImmediate() {
-        sidePanel.style.display = 'none';
-        sidePanelOverlay.style.display = 'none';
+        if (sidePanel) sidePanel.style.display = 'none';
+        if (sidePanelOverlay) sidePanelOverlay.style.display = 'none';
         // Reset expanded state
         if (sidePanelExpanded) {
-            sidePanel.classList.remove('expanded');
+            if (sidePanel) sidePanel.classList.remove('expanded');
             sidePanelExpanded = false;
-            var expandBtn = document.getElementById('sidePanelExpand');
+            var expandBtn = container.querySelector('.side-panel-expand');
             if (expandBtn) expandBtn.classList.remove('active');
         }
-        if (sidePanelIframe) {
-            sidePanelIframe.remove();
-            sidePanelIframe = null;
+        if (sidePanelInstance) {
+            sidePanelInstance.destroy();
+            sidePanelInstance = null;
         }
-        if (sidePanelBlobUrl) {
-            URL.revokeObjectURL(sidePanelBlobUrl);
-            sidePanelBlobUrl = null;
-        }
+        sidePanelHostBridge = null;
+        if (sidePanelIframeContainer) sidePanelIframeContainer.innerHTML = '';
         sidePanelFilePath = null;
         // Notify VSCode to dispose side panel file watcher
         host.notifySidePanelClosed();
@@ -13617,7 +13287,7 @@
 
     // Side panel expand toggle button
     // Side panel open in new tab button
-    var sidePanelOpenTabBtn = document.getElementById('sidePanelOpenTab');
+    var sidePanelOpenTabBtn = container.querySelector('.side-panel-open-tab');
     if (sidePanelOpenTabBtn) {
         sidePanelOpenTabBtn.addEventListener('click', function() {
             if (sidePanelFilePath) {
@@ -13627,7 +13297,7 @@
         });
     }
 
-    var sidePanelExpandBtn = document.getElementById('sidePanelExpand');
+    var sidePanelExpandBtn = container.querySelector('.side-panel-expand');
     if (sidePanelExpandBtn) {
         sidePanelExpandBtn.addEventListener('click', function() {
             sidePanelExpanded = !sidePanelExpanded;
@@ -13659,83 +13329,7 @@
         });
     }
 
-    // Listen for messages from iframe (side panel)
-    window.addEventListener('message', function(e) {
-        if (!e.data || e.data.source !== 'sidePanel') return;
-        var msg = e.data;
-        if (msg.type === 'edit') {
-            // iframe editor synced content — save to file
-            if (sidePanelFilePath) {
-                host.saveSidePanelFile(sidePanelFilePath, msg.content);
-                // Update TOC when content changes
-                updateSidePanelTocFromMarkdown(msg.content);
-            }
-        } else if (msg.type === 'save') {
-            // Explicit save from iframe — save immediately
-            if (sidePanelFilePath && sidePanelIframe && sidePanelIframe.contentWindow) {
-                // iframe will send edit with latest content
-            }
-        } else if (msg.type === 'openLink') {
-            // Link clicked in side panel — relay to VSCode with side panel file path for resolution
-            if (sidePanelFilePath) {
-                host.sidePanelOpenLink(msg.href, sidePanelFilePath);
-            }
-        } else if (msg.type === 'openLinkInTab') {
-            host.openLinkInTab(msg.href);
-        } else if (msg.type === 'searchFiles') {
-            host.searchFiles(msg.query);
-        } else if (msg.type === 'createPageAtPath') {
-            host.createPageAtPath(msg.relativePath);
-        } else if (msg.type === 'createPageAuto') {
-            host.createPageAuto();
-        } else if (msg.type === 'updatePageH1') {
-            host.updatePageH1(msg.relativePath, msg.h1Text);
-        } else if (msg.type === 'saveImageAndInsert') {
-            sidePanelImagePending = true;
-            host.saveImageAndInsert(msg.dataUrl, msg.fileName);
-        } else if (msg.type === 'readAndInsertImage') {
-            sidePanelImagePending = true;
-            host.readAndInsertImage(msg.filePath);
-        } else if (msg.type === 'insertImage') {
-            sidePanelImagePending = true;
-            host.requestInsertImage();
-        } else if (msg.type === 'requestPaste') {
-            // iframe can't read clipboard (blob: origin), so parent reads and relays
-            logger.log('requestPaste from side panel iframe');
-            if (navigator.clipboard && navigator.clipboard.read) {
-                (async function() {
-                    try {
-                        var items = await navigator.clipboard.read();
-                        // Check for image first
-                        for (var ci = 0; ci < items.length; ci++) {
-                            for (var ti = 0; ti < items[ci].types.length; ti++) {
-                                if (items[ci].types[ti].startsWith('image/')) {
-                                    var blob = await items[ci].getType(items[ci].types[ti]);
-                                    var reader = new FileReader();
-                                    reader.onload = function(evt) {
-                                        sidePanelImagePending = true;
-                                        host.saveImageAndInsert(evt.target.result);
-                                    };
-                                    reader.readAsDataURL(blob);
-                                    return;
-                                }
-                            }
-                        }
-                        // No image — relay text
-                        var text = await navigator.clipboard.readText();
-                        if (text && sidePanelIframe && sidePanelIframe.contentWindow) {
-                            sidePanelIframe.contentWindow.postMessage({
-                                type: 'pasteText',
-                                text: text
-                            }, '*');
-                        }
-                    } catch (err) {
-                        logger.error('requestPaste clipboard read failed:', err);
-                    }
-                })();
-            }
-        }
-    });
+    // Side panel message relay is no longer needed — SidePanelHostBridge handles all communication directly
 
     // Side panel close handlers
     if (sidePanelClose) {
@@ -13744,52 +13338,14 @@
     if (sidePanelOverlay) {
         sidePanelOverlay.addEventListener('click', closeSidePanel);
     }
-    document.addEventListener('keydown', function(e) {
+    if (isMainInstance) document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape' && sidePanel && sidePanel.classList.contains('open')) {
             closeSidePanel();
             e.preventDefault();
         }
     });
 
-    // Side panel paste relay: VSCode captures Cmd+V at the main webview level.
-    // When the side panel iframe has focus, the paste event fires on the main
-    // document, not inside the iframe. We detect image pastes and relay them.
-    document.addEventListener('paste', function(e) {
-        if (!sidePanel || !sidePanel.classList.contains('open')) return;
-        if (!sidePanelIframe || !sidePanelIframe.contentWindow) return;
-        // Only handle when editor does NOT have focus (iframe has focus)
-        if (editor.contains(document.activeElement) || document.activeElement === editor) return;
-
-        var items = e.clipboardData && e.clipboardData.items;
-        if (items) {
-            for (var i = 0; i < items.length; i++) {
-                if (items[i].kind === 'file' && items[i].type.startsWith('image/')) {
-                    e.preventDefault();
-                    var file = items[i].getAsFile();
-                    if (file) {
-                        var reader = new FileReader();
-                        reader.onload = function(event) {
-                            sidePanelImagePending = true;
-                            host.saveImageAndInsert(event.target.result);
-                        };
-                        reader.readAsDataURL(file);
-                    }
-                    return;
-                }
-            }
-        }
-        // Non-image paste: relay text to iframe
-        var text = e.clipboardData && e.clipboardData.getData('text/plain');
-        if (text) {
-            e.preventDefault();
-            sidePanelIframe.contentWindow.postMessage({
-                type: 'pasteText',
-                text: text,
-                html: e.clipboardData.getData('text/html') || '',
-                internalMd: e.clipboardData.getData('text/x-any-md') || ''
-            }, '*');
-        }
-    });
+    // Side panel paste relay no longer needed — same-DOM EditorInstance handles paste natively
 
     // External change toast notification
     let externalChangeToast = null;
@@ -13829,7 +13385,7 @@
         }
     }
     
-    function showDragCursor(x, y) {
+    function showDragCursor(x, y, targetEditorEl) {
         createDragCursor();
         // Try to get caret position
         const range = document.caretRangeFromPoint(x, y);
@@ -13844,7 +13400,8 @@
             } else {
                 // For empty lines, find the nearest element and position there
                 const element = document.elementFromPoint(x, y);
-                if (element && editor.contains(element)) {
+                var editorEl = targetEditorEl || editor;
+                if (element && editorEl.contains(element)) {
                     const elemRect = element.getBoundingClientRect();
                     dragCursor.style.left = (elemRect.left + 5) + 'px';
                     dragCursor.style.top = elemRect.top + 'px';
@@ -13868,43 +13425,59 @@
     }
 
     // Handle drag and drop for images - capture at document level for reliability
-    document.addEventListener('dragenter', function(e) {
-        if (editor.contains(e.target) || e.target === editor) {
+    // Helper: find which EditorInstance's .editor element contains the target
+    function findTargetEditor(target) {
+        for (const inst of EditorInstance.instances) {
+            var instEditor = inst.container.querySelector('.editor');
+            if (instEditor && (instEditor.contains(target) || instEditor === target)) {
+                return { instance: inst, editorEl: instEditor };
+            }
+        }
+        return null;
+    }
+
+    if (isMainInstance) document.addEventListener('dragenter', function(e) {
+        var t = findTargetEditor(e.target);
+        if (t) {
             e.preventDefault();
             e.stopPropagation();
             logger.log('dragenter on editor');
-            editor.classList.add('drag-over');
+            t.editorEl.classList.add('drag-over');
         }
     });
 
-    document.addEventListener('dragover', function(e) {
-        if (editor.contains(e.target) || e.target === editor) {
+    if (isMainInstance) document.addEventListener('dragover', function(e) {
+        var t = findTargetEditor(e.target);
+        if (t) {
             e.preventDefault();
             e.stopPropagation();
             if (e.dataTransfer) {
                 e.dataTransfer.dropEffect = 'copy';
             }
-            editor.classList.add('drag-over');
+            t.editorEl.classList.add('drag-over');
             // Show cursor at drop position
-            showDragCursor(e.clientX, e.clientY);
+            showDragCursor(e.clientX, e.clientY, t.editorEl);
         }
     });
 
-    document.addEventListener('dragleave', function(e) {
-        if (e.target === editor) {
-            editor.classList.remove('drag-over');
+    if (isMainInstance) document.addEventListener('dragleave', function(e) {
+        var t = findTargetEditor(e.target);
+        if (t && e.target === t.editorEl) {
+            t.editorEl.classList.remove('drag-over');
             hideDragCursor();
         }
     });
 
-    document.addEventListener('drop', function(e) {
-        if (!editor.contains(e.target) && e.target !== editor) {
-            return; // Not on editor
+    if (isMainInstance) document.addEventListener('drop', function(e) {
+        var t = findTargetEditor(e.target);
+        if (!t) {
+            return; // Not on any editor
         }
-        
+        var targetHost = t.instance.host;
+
         e.preventDefault();
         e.stopPropagation();
-        editor.classList.remove('drag-over');
+        t.editorEl.classList.remove('drag-over');
         hideDragCursor();
         
         logger.log('Drop event fired on editor');
@@ -13921,31 +13494,45 @@
             sel.addRange(dropRange);
         }
         
+        // Helper to read file and send via correct host
+        function readAndInsertImageViaHost(file, h) {
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                logger.log('FileReader onload called');
+                h.saveImageAndInsert(event.target.result);
+                logger.log('Image sent to extension for saving');
+            };
+            reader.onerror = function(err) {
+                logger.error('FileReader error:', err);
+            };
+            reader.readAsDataURL(file);
+        }
+
         // Try to get files first
         const files = e.dataTransfer?.files;
-        
+
         if (files && files.length > 0) {
             const file = files[0];
             logger.log('Dropped file from files:', file.name, file.type, file.size);
-            
+
             if (file.type.startsWith('image/')) {
-                readAndInsertImage(file);
+                readAndInsertImageViaHost(file, targetHost);
                 return;
             }
         }
-        
+
         // Fallback: try items
         const items = e.dataTransfer?.items;
         if (items && items.length > 0) {
             for (let i = 0; i < items.length; i++) {
                 const item = items[i];
                 logger.log('Item:', item.kind, item.type);
-                
+
                 if (item.kind === 'file' && item.type.startsWith('image/')) {
                     const file = item.getAsFile();
                     if (file) {
                         logger.log('Got file from items:', file.name, file.size);
-                        readAndInsertImage(file);
+                        readAndInsertImageViaHost(file, targetHost);
                         return;
                     }
                 }
@@ -13990,7 +13577,7 @@
         if (filePath) {
             logger.log('Found image file path:', filePath);
             // Send to extension to read the file
-            host.readAndInsertImage(filePath);
+            targetHost.readAndInsertImage(filePath);
             return;
         }
         
@@ -14003,7 +13590,7 @@
             img.src = url;
             img.alt = 'image';
             img.style.maxWidth = '100%';
-            
+
             const sel = window.getSelection();
             if (sel && sel.rangeCount) {
                 const range = sel.getRangeAt(0);
@@ -14011,7 +13598,7 @@
                 range.setStartAfter(img);
                 range.collapse(true);
             } else {
-                editor.appendChild(img);
+                t.editorEl.appendChild(img);
             }
             syncMarkdown();
             return;
@@ -15206,7 +14793,7 @@
     });
 
     // Also save when the webview itself loses visibility
-    document.addEventListener('visibilitychange', function() {
+    if (isMainInstance) document.addEventListener('visibilitychange', function() {
         if (document.visibilityState === 'hidden' && hasUserEdited) {
             if (isSourceMode) {
                 markdown = sourceEditor.value;
@@ -15477,7 +15064,7 @@
     searchRegex.addEventListener('change', performSearch);
     
     // Ctrl+F / Cmd+F to open search
-    document.addEventListener('keydown', (e) => {
+    if (isMainInstance) document.addEventListener('keydown', (e) => {
         if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
             e.preventDefault();
             e.stopPropagation();
@@ -15546,4 +15133,11 @@
             set: (value) => { markdown = value; }
         });
     }
-})();
+    } // end _legacyInit()
+} // end class EditorInstance
+
+// Expose class globally
+window.EditorInstance = EditorInstance;
+
+// Auto-create main instance
+new EditorInstance(document.body, window.hostBridge);

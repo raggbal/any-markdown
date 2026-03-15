@@ -1283,6 +1283,11 @@ body {
     flex: 1;
     overflow: hidden;
 }
+.side-panel-editor-root {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
 /* Overlay behind side panel to darken main editor */
 .side-panel-overlay {
     position: absolute;

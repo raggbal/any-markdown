@@ -60,6 +60,7 @@ export function generateEditorHtml(
 ): string {
     const stylesPath = getResourcePath('src/webview/styles.css');
     const editorScriptPath = getResourcePath('src/webview/editor.js');
+    const editorUtilsScriptPath = getResourcePath('src/webview/editor-utils.js');
     const vendorDir = getResourcePath('vendor');
 
     // Load shared body HTML generator
@@ -70,6 +71,7 @@ export function generateEditorHtml(
     const styles = fs.readFileSync(stylesPath, 'utf8')
         .replace('__FONT_SIZE__', String(config.fontSize));
 
+    const editorUtilsScript = fs.readFileSync(editorUtilsScriptPath, 'utf8');
     const editorScript = fs.readFileSync(editorScriptPath, 'utf8')
         .replace('__DEBUG_MODE__', String(config.enableDebugLogging))
         .replace('__I18N__', JSON.stringify(config.webviewMessages))
@@ -97,6 +99,7 @@ export function generateEditorHtml(
     <script src="${vendorFileUri('mermaid.min.js')}"></script>
     <link rel="stylesheet" href="${vendorFileUri('katex.min.css')}">
     <script src="${vendorFileUri('katex.min.js')}"></script>
+    <script>${editorUtilsScript}</script>
     <script>
         ${editorScript}
     </script>
@@ -118,6 +121,7 @@ export function generateSidePanelHtml(
 
     const stylesPath = getResourcePath('src/webview/styles.css');
     const editorScriptPath = getResourcePath('src/webview/editor.js');
+    const editorUtilsScriptPath = getResourcePath('src/webview/editor-utils.js');
     const vendorDir = getResourcePath('vendor');
 
     // Load shared body HTML generator
@@ -135,6 +139,7 @@ export function generateSidePanelHtml(
     const styles = fs.readFileSync(stylesPath, 'utf8')
         .replace('__FONT_SIZE__', String(config.fontSize));
 
+    const editorUtilsScript = fs.readFileSync(editorUtilsScriptPath, 'utf8');
     const base64Content = Buffer.from(safeContent, 'utf8').toString('base64');
     const editorScript = fs.readFileSync(editorScriptPath, 'utf8')
         .replace('__DEBUG_MODE__', String(config.enableDebugLogging))
@@ -171,6 +176,7 @@ export function generateSidePanelHtml(
     <script>${mermaidJs}</script>
     <script>${katexJs}</script>
     <script>${hostBridgeScript}</script>
+    <script>${editorUtilsScript}</script>
     <script>${editorScript}</script>
 </body>
 </html>`;
