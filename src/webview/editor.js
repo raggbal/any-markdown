@@ -47,11 +47,37 @@ class EditorInstance {
     // ===== Static members =====
     static instances = [];
     static activeInstance = null;
+    static _lastKnownActive = null;
 
     static getActiveInstance() {
+        // Find the most specific (deepest nested) container that contains activeElement.
+        // This is necessary because the side panel's container is nested inside the main
+        // container, so main.container.contains(activeElement) is also true for side panel.
+        var best = null;
         for (const inst of EditorInstance.instances) {
-            if (inst.container.contains(document.activeElement)) return inst;
+            if (inst.container.contains(document.activeElement)) {
+                if (!best || best.container.contains(inst.container)) {
+                    best = inst;
+                }
+            }
         }
+        if (best) {
+            // When VSCode intercepts a shortcut (e.g. Cmd+Shift+Z), the webview may
+            // briefly lose focus, making document.activeElement === document.body.
+            // In that case, document.body matches only the main instance (whose container
+            // IS document.body), even if the user was editing in the side panel.
+            // Prefer _lastKnownActive over the non-specific body match.
+            var lka = EditorInstance._lastKnownActive;
+            if (document.activeElement === document.body
+                && lka && EditorInstance.instances.indexOf(lka) !== -1) {
+                return lka;
+            }
+            EditorInstance._lastKnownActive = best;
+            return best;
+        }
+        // Fallback: return last known active instance (covers VSCode keybinding timing)
+        var lka2 = EditorInstance._lastKnownActive;
+        if (lka2 && EditorInstance.instances.indexOf(lka2) !== -1) return lka2;
         return EditorInstance.instances[0]; // fallback: main
     }
 
@@ -72,6 +98,9 @@ class EditorInstance {
         if (EditorInstance.activeInstance === this) {
             EditorInstance.activeInstance = EditorInstance.instances[0] || null;
         }
+        if (EditorInstance._lastKnownActive === this) {
+            EditorInstance._lastKnownActive = EditorInstance.instances[0] || null;
+        }
     }
 
     // ===== Create minimal DOM for side panel editor =====
@@ -91,7 +120,39 @@ class EditorInstance {
                 </div>
                 <div class="sidebar-resizer"></div>
             </aside>
-            <div class="toolbar" style="display:none"></div>
+            <div class="toolbar">
+                <button class="toolbar-scroll-btn toolbar-scroll-btn--left hidden">&#x276E;</button>
+                <div class="toolbar-inner">
+                    <div class="toolbar-group" data-group="inline">
+                        <button data-action="bold"></button>
+                        <button data-action="italic"></button>
+                        <button data-action="strikethrough"></button>
+                        <button data-action="code"></button>
+                    </div>
+                    <div class="toolbar-group" data-group="block">
+                        <button data-action="heading1"></button>
+                        <button data-action="heading2"></button>
+                        <button data-action="heading3"></button>
+                        <button data-action="heading4"></button>
+                        <button data-action="heading5"></button>
+                        <button data-action="heading6"></button>
+                        <button data-action="ul"></button>
+                        <button data-action="ol"></button>
+                        <button data-action="task"></button>
+                        <button data-action="quote"></button>
+                        <button data-action="codeblock"></button>
+                        <button data-action="mermaid"></button>
+                        <button data-action="math"></button>
+                        <button data-action="hr"></button>
+                    </div>
+                    <div class="toolbar-group" data-group="insert">
+                        <button data-action="link"></button>
+                        <button data-action="image"></button>
+                        <button data-action="table"></button>
+                    </div>
+                </div>
+                <button class="toolbar-scroll-btn toolbar-scroll-btn--right hidden">&#x276F;</button>
+            </div>
             <div class="editor-wrapper">
                 <div class="search-replace-box" style="display:none">
                     <input class="search-input" type="text"><input class="replace-input" type="text"><span class="search-count"></span>
@@ -145,6 +206,25 @@ class EditorInstance {
         });
     }
     initToolbarIcons();
+
+    // Set toolbar button titles from i18n (needed for side panel whose HTML lacks titles)
+    var toolbarTitleMap = {
+        undo: i18n.undo, redo: i18n.redo, bold: i18n.bold, italic: i18n.italic,
+        strikethrough: i18n.strikethrough, code: i18n.inlineCode,
+        heading1: i18n.heading1, heading2: i18n.heading2, heading3: i18n.heading3,
+        heading4: i18n.heading4, heading5: i18n.heading5, heading6: i18n.heading6,
+        ul: i18n.unorderedList, ol: i18n.orderedList, task: i18n.taskList,
+        quote: i18n.blockquote, codeblock: i18n.codeBlock, mermaid: i18n.mermaidBlock,
+        math: i18n.mathBlock, hr: i18n.horizontalRule, link: i18n.insertLink,
+        image: i18n.insertImage, table: i18n.insertTable, source: i18n.toggleSourceMode,
+        openInTextEditor: i18n.openInTextEditor, openOutline: i18n.openOutline
+    };
+    if (toolbar) {
+        toolbar.querySelectorAll('button[data-action]').forEach(function(btn) {
+            var title = toolbarTitleMap[btn.dataset.action];
+            if (title && !btn.title) btn.title = title;
+        });
+    }
 
     // Toolbar horizontal scroll navigation
     var toolbarScrollLeftBtn = container.querySelector('.toolbar-scroll-btn--left');
@@ -468,6 +548,10 @@ class EditorInstance {
             try {
                 clearTimeout(syncTimeout);
                 pendingSync = false;
+                // Ensure markdown reflects current DOM before capturing for redo stack.
+                // Without this, typing then immediately undoing captures stale markdown
+                // (debouncedSync hasn't fired yet), so redo restores the wrong state.
+                markdown = htmlToMarkdown();
                 redoStack.push(capture());
                 var state = undoStack.pop();
                 markdown = state.markdown;
@@ -500,11 +584,13 @@ class EditorInstance {
             updateButtons();
         }
 
+        var _onUpdateButtons = null;
         function updateButtons() {
-            var u = document.querySelector('[data-action="undo"]');
-            var r = document.querySelector('[data-action="redo"]');
+            var u = container.querySelector('[data-action="undo"]');
+            var r = container.querySelector('[data-action="redo"]');
             if (u) { u.disabled = !undoStack.length; u.style.opacity = undoStack.length ? '1' : '0.3'; }
             if (r) { r.disabled = !redoStack.length; r.style.opacity = redoStack.length ? '1' : '0.3'; }
+            if (_onUpdateButtons) _onUpdateButtons(!undoStack.length, !redoStack.length);
         }
 
         function clear() {
@@ -520,6 +606,7 @@ class EditorInstance {
             redo: redo,
             updateButtons: updateButtons,
             clear: clear,
+            set onUpdateButtons(fn) { _onUpdateButtons = fn; },
             get isUndoRedo() { return _isUndoRedo; }
         };
     })();
@@ -5863,10 +5950,22 @@ class EditorInstance {
             e.preventDefault();
             // Do NOT call stopPropagation - let the event reach the editor's keydown handler
         }
-        // Disable browser native undo/redo in live preview mode
+        // Handle undo/redo directly in capture phase.
+        // Do NOT stopPropagation — VSCode keybinding may also fire (dedup guard in _undo/_redo prevents double execution).
+        // Use e.code (keyboard-layout-independent) as primary check.
         var isMod = e.ctrlKey || e.metaKey;
-        if (isMod && !isSourceMode && (e.key === 'z' || e.key === 'Z' || e.key === 'y')) {
-            e.preventDefault();
+        if (isMod && isAnyEditor && (e.code === 'KeyZ' || e.code === 'KeyY' || e.key === 'z' || e.key === 'Z' || e.key === 'y')) {
+            var activeInst = EditorInstance.getActiveInstance();
+            if (activeInst && !activeInst._isSourceMode()) {
+                e.preventDefault();
+                if (!e.shiftKey && (e.code === 'KeyZ' || e.key === 'z')) {
+                    activeInst._undo();
+                } else if (e.shiftKey && (e.code === 'KeyZ' || e.key.toLowerCase() === 'z')) {
+                    activeInst._redo();
+                } else if (!e.shiftKey && (e.code === 'KeyY' || e.key === 'y')) {
+                    activeInst._redo();
+                }
+            }
         }
     }, true); // true = capture phase
 
@@ -12076,12 +12175,31 @@ class EditorInstance {
     }
 
     // Keyboard shortcuts
-    if (isMainInstance) document.addEventListener('keydown', async function(e) {
+    // Expose instance methods for global shortcut delegation
+    this._isSourceMode = function() { return isSourceMode; };
+    var _lastUndoRedoTime = 0;
+    var instanceUndo = function() {
+        var now = Date.now();
+        if (now - _lastUndoRedoTime < 100) return; // dedup: DOM handler + VSCode keybinding
+        _lastUndoRedoTime = now;
+        if (!isSourceMode) undoManager.undo();
+    };
+    var instanceRedo = function() {
+        var now = Date.now();
+        if (now - _lastUndoRedoTime < 100) return;
+        _lastUndoRedoTime = now;
+        if (!isSourceMode) undoManager.redo();
+    };
+    this._undo = instanceUndo;
+    this._redo = instanceRedo;
+    this._toggleSourceMode = function() { toggleSourceMode(); };
+    this._setUndoUpdateCallback = function(fn) { undoManager.onUpdateButtons = fn; };
+
+    // Instance-aware global shortcut handler (captures closure variables)
+    this._handleGlobalShortcut = async function(e) {
         const isMod = e.ctrlKey || e.metaKey;
 
         // Handle paste shortcut for Kiro only
-        // Kiro's paste event doesn't include image data, so we need to use Clipboard API
-        // VSCode/Cursor paste event works normally, so skip this for them
         const isKiro = navigator.userAgent.includes('Kiro');
         if (isMod && e.key === 'v' && isKiro) {
             logger.log('Cmd/Ctrl+V keydown detected (Kiro)');
@@ -12099,9 +12217,7 @@ class EditorInstance {
                                 const reader = new FileReader();
                                 reader.onload = function(event) {
                                     const dataUrl = event.target.result;
-                                    // Use active instance's host for correct routing
-                                    var activeInst = EditorInstance.getActiveInstance();
-                                    (activeInst ? activeInst.host : host).saveImageAndInsert(dataUrl);
+                                    host.saveImageAndInsert(dataUrl);
                                     logger.log('Image sent to extension for saving (Kiro)');
                                 };
                                 reader.readAsDataURL(blob);
@@ -12109,7 +12225,6 @@ class EditorInstance {
                             }
                         }
                     }
-                    // No image found - let native paste event handle text
                     logger.log('No image in clipboard, falling through to native paste (Kiro)');
                 } catch (err) {
                     logger.log('Clipboard API read failed (Kiro):', err.message);
@@ -12118,18 +12233,18 @@ class EditorInstance {
         }
 
         // Undo (Ctrl+Z / Cmd+Z)
-        if (isMod && !e.shiftKey && e.key === 'z') {
+        if (isMod && !e.shiftKey && (e.key === 'z' || e.code === 'KeyZ')) {
             e.preventDefault();
             e.stopPropagation();
-            if (!isSourceMode) undoManager.undo();
+            instanceUndo();
             return;
         }
 
         // Redo (Ctrl+Shift+Z / Cmd+Shift+Z / Ctrl+Y)
-        if (isMod && ((e.shiftKey && e.key.toLowerCase() === 'z') || (!e.shiftKey && e.key === 'y'))) {
+        if (isMod && ((e.shiftKey && (e.key.toLowerCase() === 'z' || e.code === 'KeyZ')) || (!e.shiftKey && (e.key === 'y' || e.code === 'KeyY')))) {
             e.preventDefault();
             e.stopPropagation();
-            if (!isSourceMode) undoManager.redo();
+            instanceRedo();
             return;
         }
 
@@ -12306,8 +12421,7 @@ class EditorInstance {
         if (isMod && e.shiftKey && e.key === 'I') {
             e.preventDefault();
             e.stopPropagation();
-            // Trigger image insertion via toolbar
-            toolbar.querySelector('[data-action="image"]')?.click();
+            host.requestInsertImage();
             return;
         }
 
@@ -12490,8 +12604,14 @@ class EditorInstance {
             host.sendToChat(startLine, endLine, mdSelected);
             return;
         }
+    };
+
+    // Register document-level shortcut delegation (once, by main instance)
+    if (isMainInstance) document.addEventListener('keydown', function(e) {
+        var inst = EditorInstance.getActiveInstance();
+        if (inst && inst._handleGlobalShortcut) inst._handleGlobalShortcut(e);
     });
-    
+
     // ========== SHORTCUT HELPER FUNCTIONS ==========
     
     function convertToHeading(level) {
@@ -12936,15 +13056,21 @@ class EditorInstance {
     // Handle messages from host (VSCode / Electron / test)
     host.onMessage(function(message) {
         if (message.type === 'performUndo') {
-            if (!isSourceMode) undoManager.undo();
+            var activeInst = EditorInstance.getActiveInstance();
+            if (activeInst && activeInst._undo) activeInst._undo();
+            else if (!isSourceMode) undoManager.undo();
             return;
         }
         if (message.type === 'performRedo') {
-            if (!isSourceMode) undoManager.redo();
+            var activeInst = EditorInstance.getActiveInstance();
+            if (activeInst && activeInst._redo) activeInst._redo();
+            else if (!isSourceMode) undoManager.redo();
             return;
         }
         if (message.type === 'toggleSourceMode') {
-            toggleSourceMode();
+            var activeInst = EditorInstance.getActiveInstance();
+            if (activeInst && activeInst._toggleSourceMode) activeInst._toggleSourceMode();
+            else toggleSourceMode();
             return;
         }
         if (message.type === 'update') {
@@ -13180,6 +13306,9 @@ class EditorInstance {
             isSidePanel: true
         });
 
+        // Setup header bar buttons (undo/redo/source)
+        setupSidePanelHeaderButtons();
+
         // Render TOC
         renderSidePanelToc(toc);
 
@@ -13190,6 +13319,43 @@ class EditorInstance {
             if (sidePanel) sidePanel.classList.add('open');
             if (sidePanelOverlay) sidePanelOverlay.classList.add('open');
         });
+    }
+
+    function setupSidePanelHeaderButtons() {
+        if (!sidePanel || !sidePanelInstance) return;
+        var header = sidePanel.querySelector('.side-panel-header');
+        if (!header) return;
+        // Set icons and titles for header action buttons
+        header.querySelectorAll('button[data-action]').forEach(function(btn) {
+            var icon = LUCIDE_ICONS[btn.dataset.action];
+            if (icon) btn.innerHTML = icon;
+            var title = toolbarTitleMap[btn.dataset.action];
+            if (title) btn.title = title;
+        });
+
+        var undoBtn = header.querySelector('[data-action="undo"]');
+        var redoBtn = header.querySelector('[data-action="redo"]');
+        var sourceBtn = header.querySelector('[data-action="source"]');
+
+        if (undoBtn) undoBtn.addEventListener('click', function() {
+            if (sidePanelInstance) sidePanelInstance._undo();
+        });
+        if (redoBtn) redoBtn.addEventListener('click', function() {
+            if (sidePanelInstance) sidePanelInstance._redo();
+        });
+        if (sourceBtn) sourceBtn.addEventListener('click', function() {
+            if (sidePanelInstance) sidePanelInstance._toggleSourceMode();
+        });
+
+        // Hook undoManager to also update header buttons
+        sidePanelInstance._setUndoUpdateCallback(function(undoDisabled, redoDisabled) {
+            if (undoBtn) { undoBtn.disabled = undoDisabled; undoBtn.style.opacity = undoDisabled ? '0.3' : '1'; }
+            if (redoBtn) { redoBtn.disabled = redoDisabled; redoBtn.style.opacity = redoDisabled ? '0.3' : '1'; }
+        });
+
+        // Set initial disabled state
+        if (undoBtn) { undoBtn.disabled = true; undoBtn.style.opacity = '0.3'; }
+        if (redoBtn) { redoBtn.disabled = true; redoBtn.style.opacity = '0.3'; }
     }
 
     function renderSidePanelToc(toc) {
@@ -14754,7 +14920,9 @@ class EditorInstance {
     });
 
     // Focus/blur notifications for sync policy
+    var self = this;
     editor.addEventListener('focus', function() {
+        EditorInstance._lastKnownActive = self;
         host.reportFocus();
     });
     editor.addEventListener('blur', function() {
@@ -14776,6 +14944,7 @@ class EditorInstance {
     });
 
     sourceEditor.addEventListener('focus', function() {
+        EditorInstance._lastKnownActive = self;
         host.reportFocus();
     });
     sourceEditor.addEventListener('blur', function() {
@@ -14792,8 +14961,8 @@ class EditorInstance {
         applyQueuedExternalChange();
     });
 
-    // Also save when the webview itself loses visibility
-    if (isMainInstance) document.addEventListener('visibilitychange', function() {
+    // Expose visibilitychange handler for delegation
+    this._handleVisibilityChange = function() {
         if (document.visibilityState === 'hidden' && hasUserEdited) {
             if (isSourceMode) {
                 markdown = sourceEditor.value;
@@ -14802,6 +14971,14 @@ class EditorInstance {
                 markdown = htmlToMarkdown();
             }
             host.syncContent(markdown);
+        }
+    };
+
+    // Save all instances when webview loses visibility
+    if (isMainInstance) document.addEventListener('visibilitychange', function() {
+        for (var vi = 0; vi < EditorInstance.instances.length; vi++) {
+            var inst = EditorInstance.instances[vi];
+            if (inst._handleVisibilityChange) inst._handleVisibilityChange();
         }
     });
     
@@ -15063,8 +15240,8 @@ class EditorInstance {
     searchWholeWord.addEventListener('change', performSearch);
     searchRegex.addEventListener('change', performSearch);
     
-    // Ctrl+F / Cmd+F to open search
-    if (isMainInstance) document.addEventListener('keydown', (e) => {
+    // Expose search handler for delegation
+    this._handleSearchShortcut = function(e) {
         if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
             e.preventDefault();
             e.stopPropagation();
@@ -15075,6 +15252,12 @@ class EditorInstance {
             e.stopPropagation();
             openSearchBox(true);
         }
+    };
+
+    // Ctrl+F / Cmd+F to open search - delegate to active instance
+    if (isMainInstance) document.addEventListener('keydown', function(e) {
+        var inst = EditorInstance.getActiveInstance();
+        if (inst && inst._handleSearchShortcut) inst._handleSearchShortcut(e);
     });
 
     // Expose htmlToMarkdown globally for Electron's executeJavaScript

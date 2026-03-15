@@ -110,6 +110,11 @@ function generateEditorBodyHtml(messages, platform) {
             <div class="side-panel" id="sidePanel">
                 <div class="side-panel-header">
                     <span class="side-panel-filename" id="sidePanelFilename"></span>
+                    <div class="side-panel-header-actions">
+                        <button class="side-panel-header-btn" data-action="undo" title="Undo"></button>
+                        <button class="side-panel-header-btn" data-action="redo" title="Redo"></button>
+                        <button class="side-panel-header-btn" data-action="source" title="Source mode"></button>
+                    </div>
                     <button class="side-panel-toc-toggle" id="sidePanelTocToggle" title="TOC">
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="15" y2="12"/><line x1="3" y1="18" x2="11" y2="18"/></svg>
                     </button>

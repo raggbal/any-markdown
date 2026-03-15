@@ -332,15 +332,24 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
     /**
      * Send undo command to the active webview
      */
-    public sendUndo(): void {
-        this.activeWebviewPanel?.webview.postMessage({ type: 'performUndo' });
+    public sendUndo(): boolean {
+        if (this.activeWebviewPanel) {
+            this.activeWebviewPanel.webview.postMessage({ type: 'performUndo' });
+            return true;
+        }
+        return false;
     }
 
     /**
      * Send redo command to the active webview
+     * @returns true if message was sent, false if no active panel
      */
-    public sendRedo(): void {
-        this.activeWebviewPanel?.webview.postMessage({ type: 'performRedo' });
+    public sendRedo(): boolean {
+        if (this.activeWebviewPanel) {
+            this.activeWebviewPanel.webview.postMessage({ type: 'performRedo' });
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -641,6 +650,11 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
                 setTimeout(async () => {
                     try {
                         if (!sidePanelDocument) { console.log('[Any MD][SP-FSW] SKIPPED (no sidePanelDocument)'); return; }
+                        // Re-open if VSCode auto-closed the document
+                        if (sidePanelDocument.isClosed) {
+                            console.log('[Any MD][SP-FSW] Document was closed, re-opening');
+                            sidePanelDocument = await vscode.workspace.openTextDocument(uri);
+                        }
                         const fileContent = await vscode.workspace.fs.readFile(uri);
                         const newContent = new TextDecoder().decode(fileContent);
                         const currentContent = sidePanelDocument.getText();
@@ -657,6 +671,10 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
                             const editResult = await vscode.workspace.applyEdit(edit);
                             console.log('[Any MD][SP-FSW] applyEdit result=', editResult);
                             isApplyingSidePanelEdit = false;
+                            // Re-check after applyEdit
+                            if (sidePanelDocument.isClosed) {
+                                sidePanelDocument = await vscode.workspace.openTextDocument(uri);
+                            }
                             // Save to clear dirty state — file on disk is already up to date
                             await sidePanelDocument.save();
                             console.log('[Any MD][SP-FSW] Relaying update to iframe, content len=', newContent.length);
@@ -894,6 +912,11 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
                     try {
                         console.log('[Any MD][SP-Save] saveSidePanelFile called, hasDoc=', !!sidePanelDocument, 'pathMatch=', sidePanelDocument?.uri.fsPath === message.filePath);
                         if (sidePanelDocument && sidePanelDocument.uri.fsPath === message.filePath) {
+                            // Re-open document if VSCode has closed it (no visible tab = auto-close)
+                            if (sidePanelDocument.isClosed) {
+                                console.log('[Any MD][SP-Save] Document was closed, re-opening');
+                                sidePanelDocument = await vscode.workspace.openTextDocument(vscode.Uri.file(message.filePath));
+                            }
                             // Use TextDocument buffer (same architecture as main editor)
                             const normalize = (s: string) => s.replace(/\r\n/g, '\n');
                             const msgNorm = normalize(message.content);
@@ -910,6 +933,11 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
                             const spEditResult = await vscode.workspace.applyEdit(spEdit);
                             console.log('[Any MD][SP-Save] applyEdit result=', spEditResult);
                             isApplyingSidePanelEdit = false;
+                            // Re-check after applyEdit — VSCode may close the document between async operations
+                            if (sidePanelDocument.isClosed) {
+                                console.log('[Any MD][SP-Save] Document closed after applyEdit, re-opening for save');
+                                sidePanelDocument = await vscode.workspace.openTextDocument(vscode.Uri.file(message.filePath));
+                            }
                             await sidePanelDocument.save();
                             console.log('[Any MD][SP-Save] save() completed');
                         } else {

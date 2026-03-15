@@ -5,6 +5,20 @@ All notable changes to the "Any Markdown Editor" extension will be documented in
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.195.432] - 2026-03-15
+
+### Fixed
+- **Redo after immediate undo** — Fixed redo not working when undoing immediately after typing (before debounce timer fires).
+
+## [0.195.420] - 2026-03-15
+
+### Added
+- **Side panel toolbar** — The side panel editor now has a full toolbar (undo/redo, formatting, block elements, insert) matching the main editor.
+
+### Fixed
+- **Undo/redo button state in side panel** — Undo/redo buttons in the side panel now correctly reflect the stack state.
+- **Dead code cleanup** — Removed obsolete iframe-based side panel code (side-panel-host-bridge.js, getSidePanelHtml, generateSidePanelHtml).
+
 ## [0.195.416] - 2026-03-15
 
 ### Fixed

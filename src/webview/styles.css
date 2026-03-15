@@ -374,6 +374,10 @@ body {
 [data-toolbar-mode="simple"] .toolbar-fixed--right {
     margin-left: auto;
 }
+/* Hide side panel toolbar in simple mode (undo/redo/source are in header) */
+[data-toolbar-mode="simple"] .side-panel-editor-root .toolbar {
+    display: none;
+}
 
 .editor-wrapper { flex: 1; overflow: auto; position: relative; }
 .editor {
@@ -1216,6 +1220,38 @@ body {
 }
 .side-panel-toc-item[data-level="2"] {
     padding-left: 24px;
+}
+/* Side panel header action buttons (undo/redo/source) */
+.side-panel-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    margin-left: 8px;
+}
+.side-panel-header-btn {
+    background: none;
+    border: none;
+    color: var(--text-color);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    opacity: 0.6;
+    display: flex;
+    align-items: center;
+}
+.side-panel-header-btn:hover {
+    opacity: 1;
+    background: var(--hover-bg, rgba(128,128,128,0.15));
+}
+.side-panel-header-btn:disabled {
+    cursor: default;
+}
+.side-panel-header-btn:disabled:hover {
+    background: none;
+}
+.side-panel-header-btn svg {
+    width: 14px;
+    height: 14px;
 }
 /* Side panel TOC toggle button */
 .side-panel-toc-toggle {

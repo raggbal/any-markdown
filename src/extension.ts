@@ -101,7 +101,10 @@ export function activate(context: vscode.ExtensionContext) {
     );
     context.subscriptions.push(
         vscode.commands.registerCommand('any-markdown.redo', () => {
-            provider.sendRedo();
+            if (!provider.sendRedo()) {
+                // Fallback to built-in redo when our custom editor is not active
+                vscode.commands.executeCommand('redo');
+            }
         })
     );
 
