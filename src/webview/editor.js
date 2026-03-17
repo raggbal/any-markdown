@@ -3254,7 +3254,7 @@ class EditorInstance {
         const code = pre.querySelector('code');
         if (!code) return;
         
-        const text = code.textContent || '';
+        const text = getCodePlainText(code);
         navigator.clipboard.writeText(text).then(() => {
             const copyBtn = pre.querySelector('.code-copy-btn');
             if (copyBtn) {
