@@ -13297,9 +13297,10 @@ class EditorInstance {
     var sidePanelClose = container.querySelector('.side-panel-close');
     var sidePanelOverlay = container.querySelector('.side-panel-overlay');
     var sidePanelIframeContainer = container.querySelector('.side-panel-iframe-container');
-    var sidePanelTocColumn = container.querySelector('.side-panel-toc-column');
+    var sidePanelSidebar = container.querySelector('.side-panel-sidebar');
     var sidePanelToc = container.querySelector('.side-panel-toc');
-    var sidePanelTocToggle = container.querySelector('.side-panel-toc-toggle');
+    var sidePanelOpenOutlineBtn = container.querySelector('.side-panel-outline-btn');
+    var sidePanelSidebarCloseBtn = container.querySelector('#sidePanelSidebarClose');
     var sidePanelImageDirEl = container.querySelector('.side-panel-imagedir');
     var sidePanelImageDirPath = container.querySelector('#sidePanelImageDirPath');
     var sidePanelImageDirSource = container.querySelector('#sidePanelImageDirSource');
@@ -13407,15 +13408,13 @@ class EditorInstance {
                     escapeHtml(item.text) + '</a>';
             }).join('');
             bindSidePanelTocClicks();
-            // Show TOC column if it was previously visible or if this is the first open with content
+            // Show sidebar if it was previously visible or if this is the first open with content
             if (sidePanelTocVisible) {
-                if (sidePanelTocColumn) sidePanelTocColumn.classList.add('visible');
-                if (sidePanelTocToggle) sidePanelTocToggle.classList.add('active');
+                openSidePanelSidebar();
             }
         } else {
             sidePanelToc.innerHTML = '';
-            if (sidePanelTocColumn) sidePanelTocColumn.classList.remove('visible');
-            if (sidePanelTocToggle) sidePanelTocToggle.classList.remove('active');
+            closeSidePanelSidebar();
         }
     }
 
@@ -13543,21 +13542,29 @@ class EditorInstance {
         });
     }
 
-    // Side panel TOC toggle button
-    if (sidePanelTocToggle) {
-        sidePanelTocToggle.addEventListener('click', function() {
-            if (!sidePanelToc) return;
-            sidePanelTocVisible = !sidePanelTocVisible;
-            if (sidePanelTocVisible && sidePanelToc.children.length > 0) {
-                if (sidePanelTocColumn) sidePanelTocColumn.classList.add('visible');
-                sidePanelTocToggle.classList.add('active');
-            } else {
-                if (sidePanelTocColumn) sidePanelTocColumn.classList.remove('visible');
-                sidePanelTocToggle.classList.remove('active');
-                if (sidePanelToc.children.length === 0) {
-                    sidePanelTocVisible = false;
-                }
-            }
+    // Side panel sidebar open/close (mirrors main sidebar pattern)
+    function openSidePanelSidebar() {
+        if (sidePanelSidebar) sidePanelSidebar.classList.add('visible');
+        if (sidePanelOpenOutlineBtn) sidePanelOpenOutlineBtn.classList.add('hidden');
+    }
+    function closeSidePanelSidebar() {
+        if (sidePanelSidebar) sidePanelSidebar.classList.remove('visible');
+        if (sidePanelOpenOutlineBtn) sidePanelOpenOutlineBtn.classList.remove('hidden');
+    }
+
+    // Open outline button in header
+    if (sidePanelOpenOutlineBtn) {
+        sidePanelOpenOutlineBtn.addEventListener('click', function() {
+            if (!sidePanelToc || sidePanelToc.children.length === 0) return;
+            sidePanelTocVisible = true;
+            openSidePanelSidebar();
+        });
+    }
+    // Close button (hamburger) in sidebar header
+    if (sidePanelSidebarCloseBtn) {
+        sidePanelSidebarCloseBtn.addEventListener('click', function() {
+            sidePanelTocVisible = false;
+            closeSidePanelSidebar();
         });
     }
 

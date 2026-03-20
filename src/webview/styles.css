@@ -1146,7 +1146,7 @@ body {
     border-left: 1px solid var(--border-color);
     box-shadow: -4px 0 16px rgba(0, 0, 0, 0.15);
     display: none;
-    flex-direction: column;
+    flex-direction: row;
     z-index: 100;
     transform: translateX(100%);
     transition: transform 0.2s ease-out;
@@ -1158,6 +1158,34 @@ body {
 .side-panel.expanded {
     width: 95%;
     max-width: 95%;
+}
+/* Side panel sidebar (mirrors main .sidebar) */
+.side-panel-sidebar {
+    width: 180px;
+    min-width: 140px;
+    flex-shrink: 0;
+    background: var(--sidebar-bg);
+    border-right: 1px solid var(--sidebar-border);
+    display: none;
+    flex-direction: column;
+    position: relative;
+}
+.side-panel-sidebar.visible {
+    display: flex;
+}
+.side-panel-sidebar .sidebar-header {
+    padding: 16px;
+}
+.side-panel-sidebar .sidebar-header h3 {
+    font-size: 13px;
+}
+/* Side panel editor container (mirrors main .editor-container) */
+.side-panel-editor-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    overflow: hidden;
 }
 .side-panel-header {
     display: flex;
@@ -1192,27 +1220,14 @@ body {
     opacity: 1;
     background: var(--hover-bg, rgba(128,128,128,0.15));
 }
-/* Side panel body: TOC + iframe horizontal layout */
-.side-panel-body {
-    display: flex;
-    flex: 1;
-    overflow: hidden;
-}
-/* Side panel TOC column (toc + footer) */
-.side-panel-toc-column {
-    width: 180px;
-    min-width: 140px;
-    flex-shrink: 0;
-    border-right: 1px solid var(--border-color);
-    display: none;
-    flex-direction: column;
-}
-.side-panel-toc-column.visible {
-    display: flex;
-}
+/* Side panel TOC footer */
 .side-panel-toc-footer {
     flex-shrink: 0;
+    padding: 8px 16px;
     border-top: 1px solid var(--border-color);
+    font-size: 11px;
+    color: var(--text-color);
+    opacity: 0.7;
 }
 /* Side panel TOC navigation */
 .side-panel-toc {
@@ -1222,15 +1237,11 @@ body {
 }
 .side-panel-toc-item {
     display: block;
-    padding: 4px 12px;
+    padding: 6px 16px;
     color: var(--text-color);
-    font-size: 12px;
+    text-decoration: none;
+    font-size: 13px;
     cursor: pointer;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    border-radius: 3px;
-    margin: 1px 4px;
 }
 .side-panel-toc-item:hover {
     background: var(--selection-bg);
@@ -1239,14 +1250,12 @@ body {
     background: var(--selection-bg);
     font-weight: 600;
 }
-.side-panel-toc-item[data-level="1"] {
-    padding-left: 12px;
-    font-weight: 600;
-    font-size: 13px;
-}
-.side-panel-toc-item[data-level="2"] {
-    padding-left: 24px;
-}
+.side-panel-toc-item[data-level="1"] { padding-left: 16px; font-weight: 600; }
+.side-panel-toc-item[data-level="2"] { padding-left: 28px; }
+.side-panel-toc-item[data-level="3"] { padding-left: 40px; font-size: 13px; }
+.side-panel-toc-item[data-level="4"] { padding-left: 52px; font-size: 12px; }
+.side-panel-toc-item[data-level="5"] { padding-left: 60px; font-size: 12px; color: var(--text-muted); }
+.side-panel-toc-item[data-level="6"] { padding-left: 64px; font-size: 11px; color: var(--text-muted); }
 /* Side panel header action buttons (undo/redo/source) */
 .side-panel-header-actions {
     display: flex;
@@ -1279,28 +1288,26 @@ body {
     width: 14px;
     height: 14px;
 }
-/* Side panel TOC toggle button */
-.side-panel-toc-toggle {
+/* Side panel outline button (in header, mirrors main openOutline) */
+.side-panel-outline-btn {
     background: none;
     border: none;
     color: var(--text-color);
     cursor: pointer;
-    padding: 2px 6px;
+    padding: 4px;
     border-radius: 4px;
-    line-height: 1;
     opacity: 0.6;
-    margin-left: auto;
-    margin-right: 4px;
     display: flex;
     align-items: center;
+    margin-right: 8px;
+    flex-shrink: 0;
 }
-.side-panel-toc-toggle:hover {
+.side-panel-outline-btn:hover {
     opacity: 1;
     background: var(--hover-bg, rgba(128,128,128,0.15));
 }
-.side-panel-toc-toggle.active {
-    opacity: 1;
-    background: var(--selection-bg);
+.side-panel-outline-btn.hidden {
+    display: none;
 }
 /* Side panel expand button */
 .side-panel-open-tab {
