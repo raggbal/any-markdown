@@ -595,6 +595,18 @@ var Outliner = (function() {
             parsed[q].level -= minLevel;
         }
 
+        // ツリー構造の正規化: 先頭行はlevel 0、各行は前行+1以下に制約
+        // (先頭行がlevel 0でない場合、有効な親がなくツリーが壊れるため)
+        if (parsed.length > 0 && parsed[0].level > 0) {
+            var cap = 0;
+            for (var r = 0; r < parsed.length; r++) {
+                if (parsed[r].level > cap) {
+                    parsed[r].level = cap;
+                }
+                cap = parsed[r].level + 1;
+            }
+        }
+
         // ノード作成 (レベルに応じて親子関係を設定)
         // levelToLastId[level] = そのレベルで最後に作成されたノードID
         var levelToLastId = {};
