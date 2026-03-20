@@ -34,7 +34,7 @@ var OutlinerModel = (function() {
         var tags = [];
         // インラインコード内のタグは除外
         var cleaned = text.replace(/`[^`]*`/g, '');
-        var regex = /(?<!\w)([#@]\w[\w-]*)/g;
+        var regex = /(?<![&#\w\p{L}])([#@][\w\p{L}][\w\p{L}-]*)/gu;
         var match;
         while ((match = regex.exec(cleaned)) !== null) {
             tags.push(match[1]);

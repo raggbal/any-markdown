@@ -101,6 +101,14 @@
     background: var(--outliner-focus-bg);
 }
 
+.outliner-node.is-selected {
+    background: var(--vscode-editor-selectionBackground, rgba(0,120,212,0.3));
+}
+
+.outliner-node.is-selected .outliner-text {
+    color: var(--vscode-editor-selectionForeground, inherit);
+}
+
 .outliner-node.is-search-match {
     background: var(--outliner-match-bg);
 }

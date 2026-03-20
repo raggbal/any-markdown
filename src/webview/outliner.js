@@ -26,6 +26,10 @@ var Outliner = (function() {
     var syncDebounceTimer = null;
     var SYNC_DEBOUNCE_MS = 1000;
 
+    // --- 複数ノード選択 ---
+    var selectedNodeIds = new Set();    // 選択中のノードIDセット
+    var selectionAnchorId = null;       // Shift選択の起点ノードID
+
     // --- Undo/Redo ---
     var undoStack = [];
     var redoStack = [];
@@ -245,6 +249,18 @@ var Outliner = (function() {
             setFocusedNode(node.id);
         });
 
+        textEl.addEventListener('mousedown', function(e) {
+            if (e.shiftKey && focusedNodeId && focusedNodeId !== node.id) {
+                // Shift+Click: 範囲選択
+                e.preventDefault();
+                if (!selectionAnchorId) { selectionAnchorId = focusedNodeId; }
+                selectRange(selectionAnchorId, node.id);
+            } else if (!e.shiftKey) {
+                // 通常クリック: 選択クリア
+                clearSelection();
+            }
+        });
+
         var isComposing = false;
         textEl.addEventListener('compositionstart', function() { isComposing = true; });
         textEl.addEventListener('compositionend', function() {
@@ -267,6 +283,10 @@ var Outliner = (function() {
                 setCursorAtOffset(textEl, off);
             }
             scheduleSyncToHost();
+        });
+
+        textEl.addEventListener('paste', function(e) {
+            handleNodePaste(e, node.id, textEl);
         });
 
         textEl.addEventListener('keydown', function(e) {
@@ -302,8 +322,8 @@ var Outliner = (function() {
         // リンク
         html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" title="$2">$1</a>');
 
-        // タグ (#tag / @tag)
-        html = html.replace(/(?<!\w)([#@]\w[\w-]*)/g, '<span class="outliner-tag">$1</span>');
+        // タグ (#tag / @tag) — \w では日本語にマッチしないため Unicode プロパティを使用
+        html = html.replace(/(?<![&#\w\p{L}])([#@][\w\p{L}][\w\p{L}-]*)/gu, '<span class="outliner-tag">$1</span>');
 
         // 末尾スペースをNBSPに変換 (contenteditableで末尾空白が描画されない問題を回避)
         html = html.replace(/ $/, '\u00A0');
@@ -387,6 +407,221 @@ var Outliner = (function() {
         if (el) { el.classList.add('is-focused'); }
     }
 
+    // --- 複数ノード選択管理 ---
+
+    /** 選択をクリアしてDOM反映 */
+    function clearSelection() {
+        selectedNodeIds.forEach(function(id) {
+            var el = treeEl.querySelector('.outliner-node[data-id="' + id + '"]');
+            if (el) { el.classList.remove('is-selected'); }
+        });
+        selectedNodeIds.clear();
+        selectionAnchorId = null;
+    }
+
+    /** DOMの選択ハイライトだけクリア (anchorはリセットしない) */
+    function clearSelectionVisual() {
+        selectedNodeIds.forEach(function(id) {
+            var el = treeEl.querySelector('.outliner-node[data-id="' + id + '"]');
+            if (el) { el.classList.remove('is-selected'); }
+        });
+        selectedNodeIds.clear();
+    }
+
+    /** 指定範囲のノードを選択 (fromId〜toId の表示順) */
+    function selectRange(fromId, toId) {
+        clearSelectionVisual();  // anchorを維持したままビジュアルだけクリア
+        var flat = model.getFlattenedIds(true);
+        var i1 = flat.indexOf(fromId);
+        var i2 = flat.indexOf(toId);
+        if (i1 < 0 || i2 < 0) { return; }
+        var start = Math.min(i1, i2);
+        var end = Math.max(i1, i2);
+        for (var i = start; i <= end; i++) {
+            selectedNodeIds.add(flat[i]);
+            var el = treeEl.querySelector('.outliner-node[data-id="' + flat[i] + '"]');
+            if (el) { el.classList.add('is-selected'); }
+        }
+    }
+
+    /** 選択中ノードのテキストをインデント付きで取得 (表示順) */
+    function getSelectedText() {
+        var flat = model.getFlattenedIds(true);
+        // 選択ノードの最小深さを求めて相対インデントにする
+        var minDepth = Infinity;
+        var selectedFlat = [];
+        for (var i = 0; i < flat.length; i++) {
+            if (selectedNodeIds.has(flat[i])) {
+                var depth = model.getDepth(flat[i]);
+                if (depth < minDepth) { minDepth = depth; }
+                selectedFlat.push(flat[i]);
+            }
+        }
+        var lines = [];
+        for (var j = 0; j < selectedFlat.length; j++) {
+            var node = model.getNode(selectedFlat[j]);
+            if (!node) { continue; }
+            var relDepth = model.getDepth(selectedFlat[j]) - minDepth;
+            var indent = '';
+            for (var k = 0; k < relDepth; k++) { indent += '\t'; }
+            lines.push(indent + node.text);
+        }
+        return lines.join('\n');
+    }
+
+    /** 選択中ノードを削除 */
+    function deleteSelectedNodes() {
+        if (selectedNodeIds.size === 0) { return; }
+        saveSnapshot();
+        var flat = model.getFlattenedIds(true);
+        // 最初の選択ノードの前のノードにフォーカスを戻す
+        var firstIdx = -1;
+        for (var i = 0; i < flat.length; i++) {
+            if (selectedNodeIds.has(flat[i])) { firstIdx = i; break; }
+        }
+        var focusTarget = firstIdx > 0 ? flat[firstIdx - 1] : null;
+        // 逆順で削除 (子→親の順)
+        for (var j = flat.length - 1; j >= 0; j--) {
+            if (selectedNodeIds.has(flat[j])) {
+                model.removeNode(flat[j]);
+            }
+        }
+        clearSelection();
+        renderTree();
+        if (focusTarget && model.getNode(focusTarget)) {
+            focusNode(focusTarget);
+        } else if (model.rootIds.length > 0) {
+            focusNode(model.rootIds[0]);
+        }
+        scheduleSyncToHost();
+    }
+
+    /** paste イベントハンドラ (keydownではなくpasteイベントで処理) */
+    function handleNodePaste(e, nodeId, textEl) {
+        var clipText = e.clipboardData ? e.clipboardData.getData('text/plain') : '';
+        if (!clipText) { return; }
+
+        e.preventDefault();
+
+        var node = model.getNode(nodeId);
+        if (!node) { return; }
+
+        // 複数選択時: 選択ノードを置換
+        if (selectedNodeIds.size > 0) {
+            saveSnapshot();
+            var flat = model.getFlattenedIds(true);
+            var firstIdx = -1;
+            for (var fi = 0; fi < flat.length; fi++) {
+                if (selectedNodeIds.has(flat[fi])) { firstIdx = fi; break; }
+            }
+            var insertParentId = null;
+            var insertAfter = firstIdx > 0 ? flat[firstIdx - 1] : null;
+            var firstSelected = flat[firstIdx];
+            var firstSelNode = model.getNode(firstSelected);
+            if (firstSelNode) { insertParentId = firstSelNode.parentId; }
+            for (var di = flat.length - 1; di >= 0; di--) {
+                if (selectedNodeIds.has(flat[di])) { model.removeNode(flat[di]); }
+            }
+            clearSelection();
+            pasteNodesFromText(clipText, insertParentId, insertAfter);
+            return;
+        }
+
+        // 単一行: 現在ノードのカーソル位置に挿入
+        if (!clipText.includes('\n')) {
+            document.execCommand('insertText', false, clipText);
+            return;
+        }
+
+        // 複数行: インデント構造を保持して一括挿入
+        saveSnapshot();
+        var currentText = (node.text || '').trim();
+
+        if (currentText === '') {
+            // 空ノード: 現在ノードを削除して、全行を pasteNodesFromText で挿入
+            var parentId = node.parentId;
+            // 同じ親の兄弟リストから直前のノードを探す
+            var siblings = parentId ? (model.getNode(parentId).children || []) : model.rootIds;
+            var sibIdx = siblings.indexOf(nodeId);
+            var insertAfterForEmpty = sibIdx > 0 ? siblings[sibIdx - 1] : null;
+            model.removeNode(nodeId);
+            pasteNodesFromText(clipText, parentId, insertAfterForEmpty);
+        } else {
+            // テキストありノード: 現在ノードの後に全行を挿入
+            pasteNodesFromText(clipText, node.parentId, nodeId);
+        }
+    }
+
+    /** インデント付きテキストからノード階層を構築してモデルに追加 */
+    function pasteNodesFromText(text, baseParentId, afterId) {
+        var lines = text.split('\n');
+        if (lines.length === 0) { return; }
+
+        // 各行のインデントレベルを計算 (タブ or 2/4スペース)
+        var parsed = [];
+        for (var i = 0; i < lines.length; i++) {
+            var line = lines[i];
+            var tabs = 0;
+            var j = 0;
+            while (j < line.length) {
+                if (line[j] === '\t') { tabs++; j++; }
+                else if (line[j] === ' ') {
+                    // 2〜4スペースを1レベルとして扱う
+                    var spaceCount = 0;
+                    while (j < line.length && line[j] === ' ') { spaceCount++; j++; }
+                    tabs += Math.max(1, Math.round(spaceCount / 2));
+                }
+                else { break; }
+            }
+            var content = line.substring(j);
+            if (content === '' && i === lines.length - 1) { continue; } // 最終空行スキップ
+            parsed.push({ level: tabs, text: content });
+        }
+        if (parsed.length === 0) { return; }
+
+        // 最小レベルを0に正規化
+        var minLevel = Infinity;
+        for (var p = 0; p < parsed.length; p++) {
+            if (parsed[p].level < minLevel) { minLevel = parsed[p].level; }
+        }
+        for (var q = 0; q < parsed.length; q++) {
+            parsed[q].level -= minLevel;
+        }
+
+        // ノード作成 (レベルに応じて親子関係を設定)
+        // levelToLastId[level] = そのレベルで最後に作成されたノードID
+        var levelToLastId = {};
+        var lastId = null;
+
+        for (var n = 0; n < parsed.length; n++) {
+            var level = parsed[n].level;
+            var parentId = null;
+            var after = null;
+
+            if (level === 0) {
+                // ベースレベル: 指定された親の子として追加
+                parentId = baseParentId;
+                after = (n === 0) ? afterId : levelToLastId[0] || afterId;
+            } else {
+                // 子レベル: 直近の (level-1) ノードの子として追加
+                parentId = levelToLastId[level - 1] || baseParentId;
+                after = null; // 親の子リスト末尾に追加
+            }
+
+            var newNode = model.addNode(parentId, after, parsed[n].text);
+            levelToLastId[level] = newNode.id;
+            lastId = newNode.id;
+            // 深いレベルをクリア (新しい親が変わったため)
+            for (var cl = level + 1; cl <= 10; cl++) {
+                delete levelToLastId[cl];
+            }
+        }
+
+        renderTree();
+        if (lastId) { focusNode(lastId); }
+        scheduleSyncToHost();
+    }
+
     function focusNode(nodeId) {
         var nodeEl = treeEl.querySelector('.outliner-node[data-id="' + nodeId + '"]');
         if (!nodeEl) { return; }
@@ -420,6 +655,13 @@ var Outliner = (function() {
         var textLen = (textEl.textContent || '').length;
         var isAtStart = (offset === 0);
         var isAtEnd = (offset >= textLen);
+
+        // 選択状態でShift/Ctrl/Meta以外のキーが押されたら選択をクリア
+        // (ただし Shift+Arrow, Cmd+C/X/V/A, Backspace/Delete は除く)
+        if (selectedNodeIds.size > 0 && !e.shiftKey && !e.metaKey && !e.ctrlKey
+            && e.key !== 'Backspace' && e.key !== 'Delete') {
+            clearSelection();
+        }
 
         switch (e.key) {
             case 'Enter':
@@ -502,10 +744,20 @@ var Outliner = (function() {
                         focusNode(nodeId);
                         scheduleSyncToHost();
                     }
-                } else if (!e.shiftKey) {
+                } else if (e.shiftKey) {
+                    // Shift+↑: 複数ノード選択を上に拡張
                     e.preventDefault();
+                    if (!selectionAnchorId) { selectionAnchorId = nodeId; }
                     var prevId = model.getPreviousVisibleId(nodeId);
-                    if (prevId) { focusNode(prevId); }
+                    if (prevId) {
+                        selectRange(selectionAnchorId, prevId);
+                        focusNode(prevId);
+                    }
+                } else {
+                    e.preventDefault();
+                    clearSelection();
+                    var prevId2 = model.getPreviousVisibleId(nodeId);
+                    if (prevId2) { focusNode(prevId2); }
                 }
                 break;
 
@@ -518,10 +770,20 @@ var Outliner = (function() {
                         focusNode(nodeId);
                         scheduleSyncToHost();
                     }
-                } else if (!e.shiftKey) {
+                } else if (e.shiftKey) {
+                    // Shift+↓: 複数ノード選択を下に拡張
                     e.preventDefault();
+                    if (!selectionAnchorId) { selectionAnchorId = nodeId; }
                     var nextId = model.getNextVisibleId(nodeId);
-                    if (nextId) { focusNode(nextId); }
+                    if (nextId) {
+                        selectRange(selectionAnchorId, nextId);
+                        focusNode(nextId);
+                    }
+                } else {
+                    e.preventDefault();
+                    clearSelection();
+                    var nextId2 = model.getNextVisibleId(nodeId);
+                    if (nextId2) { focusNode(nextId2); }
                 }
                 break;
 
@@ -570,6 +832,13 @@ var Outliner = (function() {
                 break;
         }
 
+        // 複数選択時の Backspace/Delete で選択ノードを削除
+        if ((e.key === 'Backspace' || e.key === 'Delete') && selectedNodeIds.size > 0) {
+            e.preventDefault();
+            deleteSelectedNodes();
+            return;
+        }
+
         // その他ショートカット
         if ((e.metaKey || e.ctrlKey) && !e.shiftKey) {
             switch (e.key) {
@@ -586,6 +855,33 @@ var Outliner = (function() {
                 case '.':
                     e.preventDefault();
                     toggleCollapse(nodeId);
+                    break;
+                case 'c':
+                    // 複数選択時はノードテキストをコピー
+                    if (selectedNodeIds.size > 0) {
+                        e.preventDefault();
+                        navigator.clipboard.writeText(getSelectedText());
+                    }
+                    // 単一ノード内の選択はブラウザデフォルトに任せる
+                    break;
+                case 'x':
+                    // 複数選択時はカット
+                    if (selectedNodeIds.size > 0) {
+                        e.preventDefault();
+                        navigator.clipboard.writeText(getSelectedText());
+                        deleteSelectedNodes();
+                    }
+                    // 単一ノード内の選択はブラウザデフォルトに任せる
+                    break;
+                // case 'v': paste イベントで処理するため keydown では不要
+                case 'a':
+                    // Cmd+A: 全ノード選択
+                    e.preventDefault();
+                    var allIds = model.getFlattenedIds(true);
+                    if (allIds.length > 0) {
+                        selectionAnchorId = allIds[0];
+                        selectRange(allIds[0], allIds[allIds.length - 1]);
+                    }
                     break;
             }
         }
