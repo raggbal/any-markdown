@@ -529,6 +529,54 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
             });
         };
 
+        // Send side panel image directory status to webview
+        const sendSidePanelImageDirStatus = (spFilePath: string) => {
+            const spUri = vscode.Uri.file(spFilePath);
+            const spDir = path.dirname(spFilePath);
+
+            // Read content from sidePanelDocument or disk
+            let spContent = '';
+            if (sidePanelDocument && !sidePanelDocument.isClosed) {
+                spContent = sidePanelDocument.getText();
+            } else {
+                try { spContent = fs.readFileSync(spFilePath, 'utf-8'); } catch { /* empty */ }
+            }
+
+            // Determine source
+            const spUriKey = spUri.toString();
+            const fileImageDir = imageDirectoryManager.getFileImageDir(spUriKey);
+            const docImageDir = extractImageDir(spContent);
+            const cfg = vscode.workspace.getConfiguration('any-markdown');
+            const settingsDir = cfg.get<string>('imageDefaultDir', '');
+
+            let source: 'file' | 'settings' | 'default';
+            if (fileImageDir || docImageDir) {
+                source = 'file';
+            } else if (settingsDir) {
+                source = 'settings';
+            } else {
+                source = 'default';
+            }
+
+            const absDir = imageDirectoryManager.getImageDirectory(spUri, spContent);
+            const useAbsolute = imageDirectoryManager.shouldUseAbsolutePath(spUri);
+            const forceRelative = imageDirectoryManager.shouldForceRelativePath(spUri, spContent);
+
+            let displayPath: string;
+            if (forceRelative || !useAbsolute) {
+                displayPath = path.relative(spDir, absDir) || '.';
+                displayPath = displayPath.replace(/\\/g, '/');
+            } else {
+                displayPath = absDir;
+            }
+
+            webviewPanel.webview.postMessage({
+                type: 'sidePanelImageDirStatus',
+                displayPath,
+                source
+            });
+        };
+
         // Initial content
         updateWebview();
 
@@ -800,19 +848,28 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
                     isActivelyEditing = false;
                     break;
 
-                case 'insertImage':
-                    await this.handleImageInsert(document, webviewPanel.webview);
+                case 'insertImage': {
+                    const imgDocUri = this.resolveImageDocumentUri(message.sidePanelFilePath, sidePanelWatchedPath, document);
+                    const imgDocContent = await this.resolveImageDocumentContent(message.sidePanelFilePath, sidePanelWatchedPath, sidePanelDocument, document);
+                    await this.handleImageInsert(imgDocUri, imgDocContent, webviewPanel.webview);
                     break;
+                }
 
-                case 'saveImageAndInsert':
+                case 'saveImageAndInsert': {
                     // Save pasted/dropped image to file
-                    await this.handleSaveImage(document, webviewPanel.webview, message.dataUrl, message.fileName);
+                    const saveDocUri = this.resolveImageDocumentUri(message.sidePanelFilePath, sidePanelWatchedPath, document);
+                    const saveDocContent = await this.resolveImageDocumentContent(message.sidePanelFilePath, sidePanelWatchedPath, sidePanelDocument, document);
+                    await this.handleSaveImage(saveDocUri, saveDocContent, webviewPanel.webview, message.dataUrl, message.fileName);
                     break;
+                }
 
-                case 'readAndInsertImage':
+                case 'readAndInsertImage': {
                     // Read an existing image file and insert it
-                    await this.handleReadAndInsertImage(document, webviewPanel.webview, message.filePath);
+                    const readDocUri = this.resolveImageDocumentUri(message.sidePanelFilePath, sidePanelWatchedPath, document);
+                    const readDocContent = await this.resolveImageDocumentContent(message.sidePanelFilePath, sidePanelWatchedPath, sidePanelDocument, document);
+                    await this.handleReadAndInsertImage(readDocUri, readDocContent, webviewPanel.webview, message.filePath);
                     break;
+                }
 
                 case 'insertLink':
                     const url = await vscode.window.showInputBox({
@@ -1035,24 +1092,34 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
                     }
                     break;
 
-                case 'setImageDir':
+                case 'setImageDir': {
                     // Set IMAGE_DIR and FORCE_RELATIVE_PATH directives via toolbar button
+                    // Resolve target document: side panel or main
+                    const isSpSetImageDir = !!message.sidePanelFilePath;
+                    const setImgDirUri = this.resolveImageDocumentUri(message.sidePanelFilePath, sidePanelWatchedPath, document);
+                    const setImgDirContent = await this.resolveImageDocumentContent(message.sidePanelFilePath, sidePanelWatchedPath, sidePanelDocument, document);
                     const inputDir = await vscode.window.showInputBox({
                         prompt: t('enterImageDir'),
                         placeHolder: './images',
-                        value: extractImageDir(document.getText()) || ''
+                        value: extractImageDir(setImgDirContent) || ''
                     });
                     if (inputDir !== undefined) {
+                        // Choose message type based on origin (side panel or main)
+                        const setDirMsgType = isSpSetImageDir ? 'sidePanelSetImageDir' : 'setImageDir';
                         if (inputDir === '') {
                             // 空文字の場合: IMAGE_DIR と FORCE_RELATIVE_PATH 両方をクリア
-                            imageDirectoryManager.setFileImageDir(document.uri, '');
+                            imageDirectoryManager.setFileImageDir(setImgDirUri, '');
                             webviewPanel.webview.postMessage({
-                                type: 'setImageDir',
+                                type: setDirMsgType,
                                 dirPath: '',
                                 forceRelativePath: null  // null でクリア
                             });
                             vscode.window.showInformationMessage(t('imageDirCleared'));
-                            sendImageDirStatus();
+                            if (isSpSetImageDir) {
+                                sendSidePanelImageDirStatus(message.sidePanelFilePath);
+                            } else {
+                                sendImageDirStatus();
+                            }
                         } else {
                             // パスが入力された場合: FORCE_RELATIVE_PATH の設定を確認
                             const forceRelativeChoice = await vscode.window.showQuickPick(
@@ -1065,25 +1132,37 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
                                     title: t('forceRelativeTitle')
                                 }
                             );
-                            
+
                             if (forceRelativeChoice !== undefined) {
                                 // Update the manager
-                                imageDirectoryManager.setFileImageDir(document.uri, inputDir);
-                                
+                                imageDirectoryManager.setFileImageDir(setImgDirUri, inputDir);
+
                                 // Send to webview to update both settings
                                 webviewPanel.webview.postMessage({
-                                    type: 'setImageDir',
+                                    type: setDirMsgType,
                                     dirPath: inputDir,
                                     forceRelativePath: forceRelativeChoice.value
                                 });
-                                
+
                                 const relativeMsg = forceRelativeChoice.value ? t('relativePathOn') : '';
                                 vscode.window.showInformationMessage(`${t('imageDirSet')}${inputDir} ${relativeMsg}`);
-                                sendImageDirStatus();
+                                if (isSpSetImageDir) {
+                                    sendSidePanelImageDirStatus(message.sidePanelFilePath);
+                                } else {
+                                    sendImageDirStatus();
+                                }
                             }
                         }
                     }
                     break;
+                }
+
+                case 'getSidePanelImageDir': {
+                    if (message.sidePanelFilePath) {
+                        sendSidePanelImageDirStatus(message.sidePanelFilePath);
+                    }
+                    break;
+                }
 
                 case 'getImageDir':
                     // Return current IMAGE_DIR to webview
@@ -1224,10 +1303,51 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
         });
     }
 
-    private async handleImageInsert(document: vscode.TextDocument, webview: vscode.Webview) {
+    /**
+     * Resolve the document URI to use for image operations.
+     * If sidePanelFilePath is provided, use it; otherwise use the main document.
+     */
+    private resolveImageDocumentUri(
+        sidePanelFilePath: string | undefined,
+        sidePanelWatchedPath: string | undefined,
+        document: vscode.TextDocument
+    ): vscode.Uri {
+        if (sidePanelFilePath && sidePanelWatchedPath === sidePanelFilePath) {
+            return vscode.Uri.file(sidePanelFilePath);
+        }
+        return document.uri;
+    }
+
+    /**
+     * Resolve the document content to use for image operations (IMAGE_DIR directive lookup).
+     * Prefers the in-memory TextDocument buffer if available.
+     */
+    private async resolveImageDocumentContent(
+        sidePanelFilePath: string | undefined,
+        sidePanelWatchedPath: string | undefined,
+        sidePanelDocument: vscode.TextDocument | undefined,
+        document: vscode.TextDocument
+    ): Promise<string> {
+        if (sidePanelFilePath && sidePanelWatchedPath === sidePanelFilePath) {
+            // Prefer sidePanelDocument buffer if available
+            if (sidePanelDocument && !sidePanelDocument.isClosed) {
+                return sidePanelDocument.getText();
+            }
+            // Fallback: read from disk
+            const fs = require('fs');
+            try {
+                return fs.readFileSync(sidePanelFilePath, 'utf-8');
+            } catch {
+                return '';
+            }
+        }
+        return document.getText();
+    }
+
+    private async handleImageInsert(documentUri: vscode.Uri, documentContent: string, webview: vscode.Webview) {
         const path = require('path');
         const fs = require('fs');
-        
+
         const options: vscode.OpenDialogOptions = {
             canSelectMany: false,
             openLabel: t('selectImage'),
@@ -1235,16 +1355,16 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
                 'Images': ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg']
             },
             // Default to current document's directory
-            defaultUri: vscode.Uri.file(path.dirname(document.uri.fsPath))
+            defaultUri: vscode.Uri.file(path.dirname(documentUri.fsPath))
         };
 
         const fileUri = await vscode.window.showOpenDialog(options);
-        
+
         if (fileUri && fileUri[0]) {
             const sourcePath = fileUri[0].fsPath;
-            
+
             // Get the image directory from settings/directive
-            const imageDir = imageDirectoryManager.getImageDirectory(document.uri, document.getText());
+            const imageDir = imageDirectoryManager.getImageDirectory(documentUri, documentContent);
 
             try {
             // Ensure the directory exists
@@ -1256,16 +1376,16 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
             const destPath = path.join(imageDir, fileName);
                 // Copy the image with new name
                 fs.copyFileSync(sourcePath, destPath);
-                
+
                 // Get webview URI for display
                 const webviewUri = webview.asWebviewUri(vscode.Uri.file(destPath)).toString();
 
                 // Generate path for Markdown (absolute if configured with absolute path)
-                const useAbsolute = imageDirectoryManager.shouldUseAbsolutePath(document.uri);
-                const forceRelative = imageDirectoryManager.shouldForceRelativePath(document.uri, document.getText());
-                const markdownPath = toMarkdownPath(destPath, document.uri.fsPath, useAbsolute, forceRelative);
+                const useAbsolute = imageDirectoryManager.shouldUseAbsolutePath(documentUri);
+                const forceRelative = imageDirectoryManager.shouldForceRelativePath(documentUri, documentContent);
+                const markdownPath = toMarkdownPath(destPath, documentUri.fsPath, useAbsolute, forceRelative);
 
-                // Generate data URL for side panel iframe (can't access vscode-resource URIs)
+                // Generate data URL for side panel (can't access vscode-resource URIs)
                 const imgBuffer = fs.readFileSync(destPath);
                 const imgExt = path.extname(destPath).slice(1) || 'png';
                 const mimeType = imgExt === 'jpg' ? 'image/jpeg' : `image/${imgExt}`;
@@ -1284,12 +1404,12 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
         }
     }
 
-    private async handleSaveImage(document: vscode.TextDocument, webview: vscode.Webview, dataUrl: string, fileName?: string) {
+    private async handleSaveImage(documentUri: vscode.Uri, documentContent: string, webview: vscode.Webview, dataUrl: string, fileName?: string) {
         const path = require('path');
         const fs = require('fs');
-        
+
         // Get the image directory from settings/directive
-        const imageDir = imageDirectoryManager.getImageDirectory(document.uri, document.getText());
+        const imageDir = imageDirectoryManager.getImageDirectory(documentUri, documentContent);
 
         try {
         // Ensure the directory exists
@@ -1306,16 +1426,16 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
             // Write the file
             fs.writeFileSync(imagePath, imageBuffer);
             console.log('[DEBUG] Image saved to:', imagePath);
-            
+
             // Get webview URI for display
             const webviewUri = webview.asWebviewUri(vscode.Uri.file(imagePath)).toString();
 
             // Generate path for Markdown (absolute if configured with absolute path)
-            const useAbsolute = imageDirectoryManager.shouldUseAbsolutePath(document.uri);
-            const forceRelative = imageDirectoryManager.shouldForceRelativePath(document.uri, document.getText());
-            const markdownPath = toMarkdownPath(imagePath, document.uri.fsPath, useAbsolute, forceRelative);
+            const useAbsolute = imageDirectoryManager.shouldUseAbsolutePath(documentUri);
+            const forceRelative = imageDirectoryManager.shouldForceRelativePath(documentUri, documentContent);
+            const markdownPath = toMarkdownPath(imagePath, documentUri.fsPath, useAbsolute, forceRelative);
 
-            // Send to webview (include dataUri for side panel iframe)
+            // Send to webview (include dataUri for side panel)
             webview.postMessage({
                 type: 'insertImageHtml',
                 markdownPath: markdownPath,
@@ -1336,40 +1456,40 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
         return 'png'; // Default to png
     }
 
-    private async handleReadAndInsertImage(document: vscode.TextDocument, webview: vscode.Webview, filePath: string) {
+    private async handleReadAndInsertImage(documentUri: vscode.Uri, documentContent: string, webview: vscode.Webview, filePath: string) {
         const path = require('path');
         const fs = require('fs');
-        
+
         try {
             // Check if file exists
             if (!fs.existsSync(filePath)) {
                 vscode.window.showErrorMessage(`${t('imageFileNotFound')}${filePath}`);
                 return;
             }
-            
+
             // Get the image directory from settings/directive
-            const imageDir = imageDirectoryManager.getImageDirectory(document.uri, document.getText());
-            
+            const imageDir = imageDirectoryManager.getImageDirectory(documentUri, documentContent);
+
             // Ensure the directory exists
             ensureDirectoryExists(imageDir);
-            
+
             // Always generate unique filename using timestamp format
             const ext = path.extname(filePath).slice(1) || 'png'; // Remove leading dot
             const fileName = generateUniqueFileName(imageDir, ext);
             const destPath = path.join(imageDir, fileName);
-            
+
             // Copy the file with new name
             fs.copyFileSync(filePath, destPath);
-            
+
             // Get webview URI for display
             const webviewUri = webview.asWebviewUri(vscode.Uri.file(destPath)).toString();
 
             // Generate path for Markdown (absolute if configured with absolute path)
-            const useAbsolute = imageDirectoryManager.shouldUseAbsolutePath(document.uri);
-            const forceRelative = imageDirectoryManager.shouldForceRelativePath(document.uri, document.getText());
-            const markdownPath = toMarkdownPath(destPath, document.uri.fsPath, useAbsolute, forceRelative);
+            const useAbsolute = imageDirectoryManager.shouldUseAbsolutePath(documentUri);
+            const forceRelative = imageDirectoryManager.shouldForceRelativePath(documentUri, documentContent);
+            const markdownPath = toMarkdownPath(destPath, documentUri.fsPath, useAbsolute, forceRelative);
 
-            // Generate data URL for side panel iframe (can't access vscode-resource URIs)
+            // Generate data URL for side panel (can't access vscode-resource URIs)
             const imgBuffer = fs.readFileSync(destPath);
             const imgExt = path.extname(destPath).slice(1) || 'png';
             const mimeType = imgExt === 'jpg' ? 'image/jpeg' : `image/${imgExt}`;

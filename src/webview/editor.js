@@ -20,16 +20,18 @@ class SidePanelHostBridge {
     requestInsertLink(text) { /* not used in side panel */ }
     requestInsertImage() {
         if (this._onImageRequest) this._onImageRequest();
-        this._mainHost.requestInsertImage();
+        this._mainHost.requestInsertImage(this.filePath);
     }
-    requestSetImageDir() {}
+    requestSetImageDir() {
+        this._mainHost.requestSetImageDir(this.filePath);
+    }
     saveImageAndInsert(dataUrl, fileName) {
         if (this._onImageRequest) this._onImageRequest();
-        this._mainHost.saveImageAndInsert(dataUrl, fileName);
+        this._mainHost.saveImageAndInsert(dataUrl, fileName, this.filePath);
     }
     readAndInsertImage(filePath) {
         if (this._onImageRequest) this._onImageRequest();
-        this._mainHost.readAndInsertImage(filePath);
+        this._mainHost.readAndInsertImage(filePath, this.filePath);
     }
     openInTextEditor() {}
     sendToChat() {}
@@ -217,7 +219,8 @@ class EditorInstance {
         quote: i18n.blockquote, codeblock: i18n.codeBlock, mermaid: i18n.mermaidBlock,
         math: i18n.mathBlock, hr: i18n.horizontalRule, link: i18n.insertLink,
         image: i18n.insertImage, table: i18n.insertTable, source: i18n.toggleSourceMode,
-        openInTextEditor: i18n.openInTextEditor, openOutline: i18n.openOutline
+        openInTextEditor: i18n.openInTextEditor, openOutline: i18n.openOutline,
+        imageDir: i18n.setImageDir
     };
     if (toolbar) {
         toolbar.querySelectorAll('button[data-action]').forEach(function(btn) {
@@ -13127,6 +13130,17 @@ class EditorInstance {
             imageDirDisplayPath = message.displayPath;
             imageDirSource = message.source;
             updateStatus();
+        } else if (message.type === 'sidePanelImageDirStatus') {
+            updateSidePanelImageDir(message.displayPath, message.source);
+        } else if (message.type === 'sidePanelSetImageDir') {
+            // Route setImageDir response to side panel instance
+            if (sidePanelHostBridge) {
+                sidePanelHostBridge._sendMessage({
+                    type: 'setImageDir',
+                    dirPath: message.dirPath,
+                    forceRelativePath: message.forceRelativePath
+                });
+            }
         } else if (message.type === 'insertImageHtml') {
             logger.log('insertImageHtml received, sidePanelImagePending:', sidePanelImagePending, 'markdownPath:', message.markdownPath);
             // If image was requested from side panel, dispatch to side panel instance
@@ -13283,8 +13297,13 @@ class EditorInstance {
     var sidePanelClose = container.querySelector('.side-panel-close');
     var sidePanelOverlay = container.querySelector('.side-panel-overlay');
     var sidePanelIframeContainer = container.querySelector('.side-panel-iframe-container');
+    var sidePanelTocColumn = container.querySelector('.side-panel-toc-column');
     var sidePanelToc = container.querySelector('.side-panel-toc');
     var sidePanelTocToggle = container.querySelector('.side-panel-toc-toggle');
+    var sidePanelImageDirEl = container.querySelector('.side-panel-imagedir');
+    var sidePanelImageDirPath = container.querySelector('#sidePanelImageDirPath');
+    var sidePanelImageDirSource = container.querySelector('#sidePanelImageDirSource');
+    var sidePanelImageDirBtn = container.querySelector('#sidePanelImageDirBtn');
     var sidePanelInstance = null;
     var sidePanelHostBridge = null;
     var sidePanelFilePath = null;
@@ -13329,6 +13348,9 @@ class EditorInstance {
 
         // Render TOC
         renderSidePanelToc(toc);
+
+        // Setup image dir display in side panel body
+        setupSidePanelImageDir();
 
         // Show panel with animation
         if (sidePanel) sidePanel.style.display = 'flex';
@@ -13385,14 +13407,14 @@ class EditorInstance {
                     escapeHtml(item.text) + '</a>';
             }).join('');
             bindSidePanelTocClicks();
-            // Show TOC if it was previously visible or if this is the first open with content
+            // Show TOC column if it was previously visible or if this is the first open with content
             if (sidePanelTocVisible) {
-                sidePanelToc.classList.add('visible');
+                if (sidePanelTocColumn) sidePanelTocColumn.classList.add('visible');
                 if (sidePanelTocToggle) sidePanelTocToggle.classList.add('active');
             }
         } else {
             sidePanelToc.innerHTML = '';
-            sidePanelToc.classList.remove('visible');
+            if (sidePanelTocColumn) sidePanelTocColumn.classList.remove('visible');
             if (sidePanelTocToggle) sidePanelTocToggle.classList.remove('active');
         }
     }
@@ -13433,6 +13455,32 @@ class EditorInstance {
             }
         }
         renderSidePanelToc(toc);
+    }
+
+    function setupSidePanelImageDir() {
+        // Settings button click handler
+        if (sidePanelImageDirBtn) {
+            sidePanelImageDirBtn.onclick = function() {
+                if (sidePanelHostBridge) sidePanelHostBridge.requestSetImageDir();
+            };
+        }
+        // Request initial image dir status from host
+        host.getSidePanelImageDir(sidePanelFilePath);
+    }
+
+    function updateSidePanelImageDir(displayPath, source) {
+        if (sidePanelImageDirPath) {
+            sidePanelImageDirPath.textContent = displayPath || '';
+            sidePanelImageDirPath.title = displayPath || '';
+        }
+        if (sidePanelImageDirSource) {
+            var labels = {
+                file: i18n.imageDirSourceFile || 'File',
+                settings: i18n.imageDirSourceSettings || 'Settings',
+                default: i18n.imageDirSourceDefault || 'Default'
+            };
+            sidePanelImageDirSource.textContent = labels[source] || source || '';
+        }
     }
 
     function closeSidePanel() {
@@ -13501,10 +13549,10 @@ class EditorInstance {
             if (!sidePanelToc) return;
             sidePanelTocVisible = !sidePanelTocVisible;
             if (sidePanelTocVisible && sidePanelToc.children.length > 0) {
-                sidePanelToc.classList.add('visible');
+                if (sidePanelTocColumn) sidePanelTocColumn.classList.add('visible');
                 sidePanelTocToggle.classList.add('active');
             } else {
-                sidePanelToc.classList.remove('visible');
+                if (sidePanelTocColumn) sidePanelTocColumn.classList.remove('visible');
                 sidePanelTocToggle.classList.remove('active');
                 if (sidePanelToc.children.length === 0) {
                     sidePanelTocVisible = false;

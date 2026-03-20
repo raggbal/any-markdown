@@ -20,15 +20,16 @@ export interface HostBridge {
     openLink(href: string): void;
     openLinkInTab(href: string): void;
     requestInsertLink(text: string): void;
-    requestInsertImage(): void;
-    requestSetImageDir(): void;
-    saveImageAndInsert(dataUrl: string, fileName?: string): void;
-    readAndInsertImage(filePath: string): void;
+    requestInsertImage(sidePanelFilePath?: string): void;
+    requestSetImageDir(sidePanelFilePath?: string): void;
+    saveImageAndInsert(dataUrl: string, fileName?: string, sidePanelFilePath?: string): void;
+    readAndInsertImage(filePath: string, sidePanelFilePath?: string): void;
     openInTextEditor(): void;
     sendToChat(startLine: number, endLine: number, selectedMarkdown: string): void;
     saveSidePanelFile(filePath: string, content: string): void;
     sidePanelOpenLink(href: string, sidePanelFilePath: string): void;
     notifySidePanelClosed(): void;
+    getSidePanelImageDir(sidePanelFilePath: string): void;
 
     // ページ追加 (Action Panel)
     searchFiles(query: string): void;
@@ -53,6 +54,8 @@ export type HostMessage =
     | { type: 'scrollToAnchor'; anchor: string }
     | { type: 'imageDirInfo'; fileImageDir: string; defaultImageDir: string }
     | { type: 'imageDirStatus'; displayPath: string; source: 'file' | 'settings' | 'default' }
+    | { type: 'sidePanelImageDirStatus'; displayPath: string; source: 'file' | 'settings' | 'default' }
+    | { type: 'sidePanelSetImageDir'; dirPath: string; forceRelativePath: boolean | null }
     | { type: 'openSidePanel'; content: string; filePath: string; fileName: string }
     | { type: 'fileSearchResults'; results: string[]; query: string }
     | { type: 'pageCreatedAtPath'; relativePath: string };

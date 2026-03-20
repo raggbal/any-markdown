@@ -37,17 +37,17 @@
         requestInsertLink: function(text) {
             api.postMessage({ type: 'insertLink', text: text });
         },
-        requestInsertImage: function() {
-            api.postMessage({ type: 'insertImage', position: 0 });
+        requestInsertImage: function(sidePanelFilePath) {
+            api.postMessage({ type: 'insertImage', position: 0, sidePanelFilePath: sidePanelFilePath });
         },
-        requestSetImageDir: function() {
-            api.postMessage({ type: 'setImageDir' });
+        requestSetImageDir: function(sidePanelFilePath) {
+            api.postMessage({ type: 'setImageDir', sidePanelFilePath: sidePanelFilePath });
         },
-        saveImageAndInsert: function(dataUrl, fileName) {
-            api.postMessage({ type: 'saveImageAndInsert', dataUrl: dataUrl, fileName: fileName });
+        saveImageAndInsert: function(dataUrl, fileName, sidePanelFilePath) {
+            api.postMessage({ type: 'saveImageAndInsert', dataUrl: dataUrl, fileName: fileName, sidePanelFilePath: sidePanelFilePath });
         },
-        readAndInsertImage: function(filePath) {
-            api.postMessage({ type: 'readAndInsertImage', filePath: filePath });
+        readAndInsertImage: function(filePath, sidePanelFilePath) {
+            api.postMessage({ type: 'readAndInsertImage', filePath: filePath, sidePanelFilePath: sidePanelFilePath });
         },
         openInTextEditor: function() {
             api.postMessage({ type: 'openInTextEditor' });
@@ -63,6 +63,9 @@
         },
         notifySidePanelClosed: function() {
             api.postMessage({ type: 'sidePanelClosed' });
+        },
+        getSidePanelImageDir: function(sidePanelFilePath) {
+            api.postMessage({ type: 'getSidePanelImageDir', sidePanelFilePath: sidePanelFilePath });
         },
         searchFiles: function(query) {
             api.postMessage({ type: 'searchFiles', query: query });

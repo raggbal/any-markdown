@@ -44,17 +44,17 @@
         requestInsertLink: function(text) {
             window.__testApi.messages.push({ type: 'insertLink', text: text });
         },
-        requestInsertImage: function() {
-            window.__testApi.messages.push({ type: 'insertImage', position: 0 });
+        requestInsertImage: function(sidePanelFilePath) {
+            window.__testApi.messages.push({ type: 'insertImage', position: 0, sidePanelFilePath: sidePanelFilePath });
         },
-        requestSetImageDir: function() {
-            window.__testApi.messages.push({ type: 'setImageDir' });
+        requestSetImageDir: function(sidePanelFilePath) {
+            window.__testApi.messages.push({ type: 'setImageDir', sidePanelFilePath: sidePanelFilePath });
         },
-        saveImageAndInsert: function(dataUrl, fileName) {
-            window.__testApi.messages.push({ type: 'saveImageAndInsert', dataUrl: dataUrl, fileName: fileName });
+        saveImageAndInsert: function(dataUrl, fileName, sidePanelFilePath) {
+            window.__testApi.messages.push({ type: 'saveImageAndInsert', dataUrl: dataUrl, fileName: fileName, sidePanelFilePath: sidePanelFilePath });
         },
-        readAndInsertImage: function(filePath) {
-            window.__testApi.messages.push({ type: 'readAndInsertImage', filePath: filePath });
+        readAndInsertImage: function(filePath, sidePanelFilePath) {
+            window.__testApi.messages.push({ type: 'readAndInsertImage', filePath: filePath, sidePanelFilePath: sidePanelFilePath });
         },
         openInTextEditor: function() {
             window.__testApi.messages.push({ type: 'openInTextEditor' });
@@ -70,6 +70,9 @@
         },
         notifySidePanelClosed: function() {
             window.__testApi.messages.push({ type: 'sidePanelClosed' });
+        },
+        getSidePanelImageDir: function(sidePanelFilePath) {
+            window.__testApi.messages.push({ type: 'getSidePanelImageDir', sidePanelFilePath: sidePanelFilePath });
         },
         searchFiles: function(query) {
             window.__testApi.messages.push({ type: 'searchFiles', query: query });

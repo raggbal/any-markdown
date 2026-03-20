@@ -12,12 +12,12 @@ contextBridge.exposeInMainWorld('hostBridge', {
     reportBlur: () => ipcRenderer.send('blur'),
     openLink: (href: string) => ipcRenderer.send('open-link', href),
     requestInsertLink: (text: string) => ipcRenderer.send('insert-link', text),
-    requestInsertImage: () => ipcRenderer.send('insert-image'),
-    requestSetImageDir: () => ipcRenderer.send('set-image-dir'),
-    saveImageAndInsert: (dataUrl: string, fileName?: string) =>
-        ipcRenderer.send('save-image', dataUrl, fileName),
-    readAndInsertImage: (filePath: string) =>
-        ipcRenderer.send('read-insert-image', filePath),
+    requestInsertImage: (sidePanelFilePath?: string) => ipcRenderer.send('insert-image', sidePanelFilePath),
+    requestSetImageDir: (sidePanelFilePath?: string) => ipcRenderer.send('set-image-dir', sidePanelFilePath),
+    saveImageAndInsert: (dataUrl: string, fileName?: string, sidePanelFilePath?: string) =>
+        ipcRenderer.send('save-image', dataUrl, fileName, sidePanelFilePath),
+    readAndInsertImage: (filePath: string, sidePanelFilePath?: string) =>
+        ipcRenderer.send('read-insert-image', filePath, sidePanelFilePath),
     openInTextEditor: () => ipcRenderer.send('open-in-text-editor'),
     sendToChat: () => { /* no-op in Electron */ },
 
@@ -28,6 +28,8 @@ contextBridge.exposeInMainWorld('hostBridge', {
     sidePanelOpenLink: (href: string, sidePanelFilePath: string) =>
         ipcRenderer.send('side-panel-open-link', href, sidePanelFilePath),
     notifySidePanelClosed: () => ipcRenderer.send('side-panel-closed'),
+    getSidePanelImageDir: (sidePanelFilePath: string) =>
+        ipcRenderer.send('get-side-panel-image-dir', sidePanelFilePath),
 
     // Action Panel
     searchFiles: (query: string) => ipcRenderer.send('search-files', query),
