@@ -564,16 +564,19 @@ var Outliner = (function() {
         var lines = text.split('\n');
         if (lines.length === 0) { return; }
 
-        // 各行のインデントレベルを計算 (タブ or 2/4スペース)
+        // 各行のインデントレベルを計算
+        // 内部コピー形式はタブ区切り。外部ペースト(スペースのみ)にも対応。
+        // タブの後のスペースはテキストの一部として扱う。
         var parsed = [];
         for (var i = 0; i < lines.length; i++) {
             var line = lines[i];
             var tabs = 0;
             var j = 0;
+            var sawTab = false;
             while (j < line.length) {
-                if (line[j] === '\t') { tabs++; j++; }
-                else if (line[j] === ' ') {
-                    // 2〜4スペースを1レベルとして扱う
+                if (line[j] === '\t') { tabs++; j++; sawTab = true; }
+                else if (line[j] === ' ' && !sawTab) {
+                    // スペースのみの行（外部ペースト）: 2〜4スペースを1レベルとして扱う
                     var spaceCount = 0;
                     while (j < line.length && line[j] === ' ') { spaceCount++; j++; }
                     tabs += Math.max(1, Math.round(spaceCount / 2));
@@ -742,7 +745,19 @@ var Outliner = (function() {
                 break;
 
             case 'Backspace':
-                if (isAtStart) {
+                // 先頭に空白がある場合: contenteditableでは先頭空白をBackspaceで消せないため
+                // カーソルが先頭空白内(offset ≤ 空白長)にいればtrim処理
+                var nodeText = node.text || '';
+                var leadingSpaceLen = nodeText.length - nodeText.replace(/^\s+/, '').length;
+                if (leadingSpaceLen > 0 && offset <= leadingSpaceLen) {
+                    e.preventDefault();
+                    saveSnapshot();
+                    var trimmed = nodeText.replace(/^\s+/, '');
+                    model.updateText(nodeId, trimmed);
+                    textEl.innerHTML = renderInlineText(trimmed);
+                    setCursorAtOffset(textEl, 0);
+                    scheduleSyncToHost();
+                } else if (isAtStart) {
                     e.preventDefault();
                     saveSnapshot();
                     handleBackspaceAtStart(node, textEl);
