@@ -1,59 +1,39 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Inline pattern conversion - Space removal', () => {
-    test('Bold pattern: **text** + Space should not leave trailing space', async ({ page }) => {
+    test('Bold pattern: **text** + Space should convert and insert space', async ({ page }) => {
         await page.goto('http://localhost:3000/standalone-editor.html');
-        
-        const consoleLogs: string[] = [];
-        page.on('console', msg => {
-            if (msg.text().includes('[DEBUG]') || msg.text().includes('[PATTERN]')) {
-                consoleLogs.push(msg.text());
-            }
-        });
-        
+
         // Wait for editor to be ready
         await page.waitForSelector('#editor');
-        
+
         // Focus editor and type using Playwright's keyboard
         await page.click('#editor');
         await page.keyboard.type('**bold**');
-        
-        // Get HTML before space
-        const beforeSpace = await page.evaluate(() => {
-            const editor = document.getElementById('editor') as HTMLDivElement;
-            return editor.innerHTML;
-        });
-        
+
         // Press Space to trigger conversion
         await page.keyboard.press('Space');
-        
+
         // Wait for conversion
         await page.waitForTimeout(300);
-        
+
         const result = await page.evaluate(() => {
             const editor = document.getElementById('editor') as HTMLDivElement;
             const textContent = editor.textContent || '';
-            
+
             return {
                 html: editor.innerHTML,
                 textContent,
-                hasTrailingSpace: textContent.endsWith(' ') || textContent.includes('bold '),
+                hasSpaceAfter: textContent.replace(/\u200B/g, '').includes('bold '),
                 hasBoldTag: editor.innerHTML.includes('<strong>') || editor.innerHTML.includes('<b>')
             };
         });
-        
-        console.log('Console logs:', consoleLogs);
-        console.log('Before Space:', beforeSpace);
-        console.log('After Space:', result.html);
-        console.log('Text content:', JSON.stringify(result.textContent));
-        console.log('Has trailing space:', result.hasTrailingSpace);
-        console.log('Has bold tag:', result.hasBoldTag);
-        
+
         // Verify bold conversion happened
         expect(result.hasBoldTag).toBe(true);
-        
-        // Verify no trailing space after conversion
-        expect(result.hasTrailingSpace).toBe(false);
+
+        // Verify space is inserted after conversion (escape + space in one keypress)
+        expect(result.hasSpaceAfter).toBe(true);
     });
     
     test('Bold pattern: typing after conversion should be normal text', async ({ page }) => {
@@ -96,32 +76,29 @@ test.describe('Inline pattern conversion - Space removal', () => {
         expect(result.strongText).toBe('bold');
     });
     
-    test('Italic pattern: *text* + Space should not leave trailing space', async ({ page }) => {
+    test('Italic pattern: *text* + Space should convert and insert space', async ({ page }) => {
         await page.goto('http://localhost:3000/standalone-editor.html');
-        
+
         await page.waitForSelector('#editor');
         await page.click('#editor');
         await page.keyboard.type('*italic*');
         await page.keyboard.press('Space');
         await page.waitForTimeout(300);
-        
+
         const result = await page.evaluate(() => {
             const editor = document.getElementById('editor') as HTMLDivElement;
             const textContent = editor.textContent || '';
-            
+
             return {
                 html: editor.innerHTML,
                 textContent,
-                hasTrailingSpace: textContent.endsWith(' ') || textContent.includes('italic '),
+                hasSpaceAfter: textContent.replace(/\u200B/g, '').includes('italic '),
                 hasItalicTag: editor.innerHTML.includes('<em>') || editor.innerHTML.includes('<i>')
             };
         });
-        
-        console.log('HTML:', result.html);
-        console.log('Text content:', JSON.stringify(result.textContent));
-        
+
         expect(result.hasItalicTag).toBe(true);
-        expect(result.hasTrailingSpace).toBe(false);
+        expect(result.hasSpaceAfter).toBe(true);
     });
     
     test('Italic pattern: typing after conversion should be normal text', async ({ page }) => {
@@ -156,32 +133,29 @@ test.describe('Inline pattern conversion - Space removal', () => {
         expect(result.emText).toBe('italic');
     });
     
-    test('Inline code pattern: `code` + Space should not leave trailing space', async ({ page }) => {
+    test('Inline code pattern: `code` + Space should convert and insert space', async ({ page }) => {
         await page.goto('http://localhost:3000/standalone-editor.html');
-        
+
         await page.waitForSelector('#editor');
         await page.click('#editor');
         await page.keyboard.type('`code`');
         await page.keyboard.press('Space');
         await page.waitForTimeout(300);
-        
+
         const result = await page.evaluate(() => {
             const editor = document.getElementById('editor') as HTMLDivElement;
             const textContent = editor.textContent || '';
-            
+
             return {
                 html: editor.innerHTML,
                 textContent,
-                hasTrailingSpace: textContent.endsWith(' ') || textContent.includes('code '),
+                hasSpaceAfter: textContent.replace(/\u200B/g, '').includes('code '),
                 hasCodeTag: editor.innerHTML.includes('<code>')
             };
         });
-        
-        console.log('HTML:', result.html);
-        console.log('Text content:', JSON.stringify(result.textContent));
-        
+
         expect(result.hasCodeTag).toBe(true);
-        expect(result.hasTrailingSpace).toBe(false);
+        expect(result.hasSpaceAfter).toBe(true);
     });
     
     test('Inline code pattern: typing after conversion should be normal text', async ({ page }) => {
@@ -216,32 +190,29 @@ test.describe('Inline pattern conversion - Space removal', () => {
         expect(result.codeText).toBe('code');
     });
     
-    test('Strikethrough pattern: ~~text~~ + Space should not leave trailing space', async ({ page }) => {
+    test('Strikethrough pattern: ~~text~~ + Space should convert and insert space', async ({ page }) => {
         await page.goto('http://localhost:3000/standalone-editor.html');
-        
+
         await page.waitForSelector('#editor');
         await page.click('#editor');
         await page.keyboard.type('~~strike~~');
         await page.keyboard.press('Space');
         await page.waitForTimeout(300);
-        
+
         const result = await page.evaluate(() => {
             const editor = document.getElementById('editor') as HTMLDivElement;
             const textContent = editor.textContent || '';
-            
+
             return {
                 html: editor.innerHTML,
                 textContent,
-                hasTrailingSpace: textContent.endsWith(' ') || textContent.includes('strike '),
+                hasSpaceAfter: textContent.replace(/\u200B/g, '').includes('strike '),
                 hasStrikeTag: editor.innerHTML.includes('<del>') || editor.innerHTML.includes('<s>')
             };
         });
-        
-        console.log('HTML:', result.html);
-        console.log('Text content:', JSON.stringify(result.textContent));
-        
+
         expect(result.hasStrikeTag).toBe(true);
-        expect(result.hasTrailingSpace).toBe(false);
+        expect(result.hasSpaceAfter).toBe(true);
     });
     
     test('Strikethrough pattern: typing after conversion should be normal text', async ({ page }) => {

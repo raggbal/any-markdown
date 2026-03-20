@@ -1,0 +1,432 @@
+/* =============================================
+ * Outliner Styles
+ * ============================================= */
+
+:root {
+    --outliner-bg: var(--vscode-editor-background, #1e1e1e);
+    --outliner-fg: var(--vscode-editor-foreground, #cccccc);
+    --outliner-indent: 24px;
+    --outliner-bullet-size: 6px;
+    --outliner-line-height: 1.6;
+    --outliner-font-size: 14px;
+    --outliner-border: var(--vscode-panel-border, #333);
+    --outliner-hover-bg: var(--vscode-list-hoverBackground, rgba(255,255,255,0.05));
+    --outliner-focus-bg: var(--vscode-list-activeSelectionBackground, rgba(0,120,212,0.15));
+    --outliner-tag-color: #569cd6;
+    --outliner-tag-bg: rgba(86,156,214,0.15);
+    --outliner-page-icon-color: #4ec9b0;
+    --outliner-search-bg: var(--vscode-input-background, #3c3c3c);
+    --outliner-search-border: var(--vscode-input-border, #555);
+    --outliner-search-fg: var(--vscode-input-foreground, #ccc);
+    --outliner-match-bg: rgba(255,200,0,0.2);
+    --outliner-placeholder: var(--vscode-input-placeholderForeground, #888);
+    --outliner-checkbox-accent: #569cd6;
+}
+
+/* --- Container --- */
+.outliner-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    background: var(--outliner-bg);
+    color: var(--outliner-fg);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    font-size: var(--outliner-font-size);
+    line-height: var(--outliner-line-height);
+    overflow: hidden;
+}
+
+/* --- Search Bar --- */
+.outliner-search-bar {
+    display: flex;
+    align-items: center;
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--outliner-border);
+    flex-shrink: 0;
+}
+
+.outliner-search-input {
+    flex: 1;
+    background: var(--outliner-search-bg);
+    border: 1px solid var(--outliner-search-border);
+    border-radius: 4px;
+    color: var(--outliner-search-fg);
+    padding: 6px 10px;
+    font-size: 13px;
+    outline: none;
+    font-family: inherit;
+}
+
+.outliner-search-input:focus {
+    border-color: var(--vscode-focusBorder, #007acc);
+}
+
+.outliner-search-input::placeholder {
+    color: var(--outliner-placeholder);
+}
+
+.outliner-scope-badge {
+    margin-left: 8px;
+    font-size: 11px;
+    color: var(--outliner-placeholder);
+    white-space: nowrap;
+}
+
+.outliner-scope-badge:empty {
+    display: none;
+}
+
+/* --- Tree --- */
+.outliner-tree {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 8px 0;
+}
+
+/* --- Node --- */
+.outliner-node {
+    display: flex;
+    align-items: flex-start;
+    padding: 1px 16px 1px 0;
+    position: relative;
+    min-height: 28px;
+}
+
+.outliner-node:hover {
+    background: var(--outliner-hover-bg);
+}
+
+.outliner-node.is-focused {
+    background: var(--outliner-focus-bg);
+}
+
+.outliner-node.is-search-match {
+    background: var(--outliner-match-bg);
+}
+
+.outliner-node.is-dragging {
+    opacity: 0.4;
+}
+
+/* インデント */
+.outliner-node-indent {
+    flex-shrink: 0;
+    width: calc(var(--depth, 0) * var(--outliner-indent));
+}
+
+/* --- Bullet --- */
+.outliner-bullet {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 28px;
+    flex-shrink: 0;
+    cursor: pointer;
+    position: relative;
+}
+
+.outliner-bullet::before {
+    content: '';
+    width: var(--outliner-bullet-size);
+    height: var(--outliner-bullet-size);
+    border-radius: 50%;
+    background: var(--outliner-fg);
+    opacity: 0.5;
+    transition: all 0.15s ease;
+}
+
+.outliner-bullet[data-has-children="true"]::before {
+    opacity: 0.8;
+}
+
+.outliner-bullet[data-has-children="true"]:hover::before {
+    opacity: 1;
+    transform: scale(1.3);
+}
+
+/* 折りたたみ時: 三角 */
+.outliner-bullet[data-collapsed="true"]::before {
+    width: 0;
+    height: 0;
+    border-radius: 0;
+    background: transparent;
+    border-left: 5px solid var(--outliner-fg);
+    border-top: 4px solid transparent;
+    border-bottom: 4px solid transparent;
+    opacity: 0.6;
+}
+
+/* 子ノード数バッジ */
+.outliner-child-count {
+    position: absolute;
+    right: -4px;
+    top: 2px;
+    font-size: 9px;
+    color: var(--outliner-placeholder);
+    pointer-events: none;
+}
+
+/* --- Page Icon --- */
+.outliner-page-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 28px;
+    flex-shrink: 0;
+    cursor: pointer;
+    color: var(--outliner-page-icon-color);
+    font-size: 14px;
+    opacity: 0.8;
+}
+
+.outliner-page-icon:hover {
+    opacity: 1;
+}
+
+/* --- Checkbox (task node) --- */
+.outliner-checkbox {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 28px;
+    flex-shrink: 0;
+}
+
+.outliner-checkbox input[type="checkbox"] {
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+    accent-color: var(--outliner-checkbox-accent);
+}
+
+/* --- Text --- */
+.outliner-text {
+    flex: 1;
+    min-height: 28px;
+    line-height: 28px;
+    outline: none;
+    word-break: break-word;
+    padding: 0 4px;
+    border-radius: 2px;
+}
+
+.outliner-text:focus {
+    background: rgba(255,255,255,0.03);
+}
+
+.outliner-text:empty::before {
+    content: '';
+    display: inline-block;
+}
+
+/* checked task: テキスト打消し */
+.outliner-node[data-checked="true"] .outliner-text {
+    text-decoration: line-through;
+    opacity: 0.5;
+}
+
+/* --- Tags --- */
+.outliner-tag {
+    color: var(--outliner-tag-color);
+    background: var(--outliner-tag-bg);
+    border-radius: 3px;
+    padding: 0 4px;
+    margin: 0 1px;
+    cursor: pointer;
+    font-size: 0.9em;
+}
+
+.outliner-tag:hover {
+    background: rgba(86,156,214,0.3);
+}
+
+/* --- Inline elements --- */
+.outliner-text strong { font-weight: 600; }
+.outliner-text em { font-style: italic; }
+.outliner-text del { text-decoration: line-through; opacity: 0.6; }
+.outliner-text code {
+    background: rgba(255,255,255,0.08);
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 0.9em;
+}
+.outliner-text a {
+    color: var(--outliner-tag-color);
+    text-decoration: underline;
+}
+
+/* --- Children container --- */
+.outliner-children {
+    /* 折りたたみ時は display: none */
+}
+
+.outliner-children.is-collapsed {
+    display: none;
+}
+
+/* 接続線 (optional visual guide) */
+.outliner-node::after {
+    content: '';
+    position: absolute;
+    left: calc(var(--line-left, 0) * 1px);
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: var(--outliner-border);
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* --- Make Page button (context menu style) --- */
+.outliner-context-menu {
+    position: fixed;
+    background: var(--outliner-search-bg);
+    border: 1px solid var(--outliner-border);
+    border-radius: 6px;
+    padding: 4px 0;
+    min-width: 160px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    z-index: 1000;
+}
+
+.outliner-context-menu-item {
+    padding: 6px 16px;
+    cursor: pointer;
+    font-size: 13px;
+}
+
+.outliner-context-menu-item:hover {
+    background: var(--outliner-hover-bg);
+}
+
+.outliner-context-menu-separator {
+    height: 1px;
+    background: var(--outliner-border);
+    margin: 4px 0;
+}
+
+/* --- Drop indicator --- */
+.outliner-drop-indicator {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--vscode-focusBorder, #007acc);
+    pointer-events: none;
+    z-index: 100;
+}
+
+/* --- Side Panel (right half) --- */
+.outliner-layout {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+.outliner-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-width: 200px;
+}
+
+.outliner-side-panel {
+    width: 0;
+    overflow: hidden;
+    border-left: 1px solid var(--outliner-border);
+    transition: width 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    background: var(--outliner-bg);
+}
+
+.outliner-side-panel.is-open {
+    width: 50%;
+    min-width: 300px;
+}
+
+.outliner-side-panel-header {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--outliner-border);
+    flex-shrink: 0;
+}
+
+.outliner-side-panel-title {
+    flex: 1;
+    font-size: 13px;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.outliner-side-panel-close {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border-radius: 4px;
+    background: none;
+    border: none;
+    color: var(--outliner-fg);
+    font-size: 16px;
+}
+
+.outliner-side-panel-close:hover {
+    background: var(--outliner-hover-bg);
+}
+
+.outliner-side-panel-content {
+    flex: 1;
+    overflow: hidden;
+}
+
+/* サイドパネル内の editor container */
+.outliner-side-panel-content .container {
+    height: 100%;
+}
+
+/* --- Empty state --- */
+.outliner-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 200px;
+    color: var(--outliner-placeholder);
+    font-size: 14px;
+}
+
+.outliner-empty-hint {
+    margin-top: 8px;
+    font-size: 12px;
+    opacity: 0.7;
+}
+
+/* --- Scrollbar --- */
+.outliner-tree::-webkit-scrollbar {
+    width: 8px;
+}
+
+.outliner-tree::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.outliner-tree::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.15);
+    border-radius: 4px;
+}
+
+.outliner-tree::-webkit-scrollbar-thumb:hover {
+    background: rgba(255,255,255,0.25);
+}

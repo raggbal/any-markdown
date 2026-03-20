@@ -5,6 +5,12 @@ All notable changes to the "Any Markdown Editor" extension will be documented in
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.195.449] - 2026-03-21
+
+### Fixed
+
+- **Outliner: Tag escape requires two spaces** — Fixed `#tag`/`@tag` requiring two Space presses to escape and insert a space (now works in one press)
+
 ## [0.195.435] - 2026-03-17
 
 ### Fixed

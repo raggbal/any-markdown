@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { AnyMarkdownEditorProvider } from './editorProvider';
+import { OutlinerProvider } from './outlinerProvider';
 import { initLocale, t } from './i18n/messages';
 
 export function activate(context: vscode.ExtensionContext) {
@@ -21,6 +22,21 @@ export function activate(context: vscode.ExtensionContext) {
                     // Note: retainContextWhenHidden can cause issues after extension updates
                     // because VSCode may try to restore old webview state with new extension code.
                     // We handle this by always clearing webview.html first in resolveCustomTextEditor.
+                    retainContextWhenHidden: true,
+                },
+                supportsMultipleEditorsPerDocument: false,
+            }
+        )
+    );
+
+    // Register the outliner provider for .mmd files
+    const outlinerProvider = new OutlinerProvider(context);
+    context.subscriptions.push(
+        vscode.window.registerCustomEditorProvider(
+            'any-markdown.outliner',
+            outlinerProvider,
+            {
+                webviewOptions: {
                     retainContextWhenHidden: true,
                 },
                 supportsMultipleEditorsPerDocument: false,

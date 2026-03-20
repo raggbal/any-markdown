@@ -5248,21 +5248,24 @@ class EditorInstance {
         element.textContent = innerText;
         parent.insertBefore(element, textNode);
         
-        // Create text node after the element with remaining text (no extra space - space was already consumed as trigger)
+        // Create text node after the element with remaining text
+        // When triggered by space, include a visible space after ZWSP so the user
+        // gets escape + space in a single keypress
         const afterContent = after + remaining;
-        
+
         // Use zero-width space to ensure cursor is positioned outside the inline element
         // This prevents the browser from placing the cursor inside the inline element
         const ZWSP = '\u200B';
-        const afterNode = document.createTextNode(ZWSP + afterContent);
+        const spaceAfter = hasSpaceAfter ? ' ' : '';
+        const afterNode = document.createTextNode(ZWSP + spaceAfter + afterContent);
         parent.insertBefore(afterNode, textNode);
-        
+
         parent.removeChild(textNode);
 
-        // Set cursor after the zero-width space (position 1)
+        // Set cursor after the zero-width space (and space if present)
         const newRange = document.createRange();
         const sel = window.getSelection();
-        newRange.setStart(afterNode, 1); // After the ZWSP
+        newRange.setStart(afterNode, hasSpaceAfter ? 2 : 1); // After ZWSP + optional space
         newRange.collapse(true);
         sel.removeAllRanges();
         sel.addRange(newRange);
@@ -5271,30 +5274,30 @@ class EditorInstance {
     }
 
     // ========== INLINE ELEMENT ESCAPE ==========
-    
-    // Check if cursor is inside an inline element and user typed ending marker + space
-    // Returns true if escape was performed
-    function checkInlineEscape() {
+
+    // Check if cursor is inside an inline element and text before cursor ends with closing marker.
+    // Called SYNCHRONOUSLY from keydown (before browser inserts space).
+    // If matched, preventDefault + remove marker + insert space outside element.
+    // Returns true if escape was performed.
+    function checkInlineEscapeBeforeSpace() {
         const sel = window.getSelection();
         if (!sel || !sel.rangeCount) return false;
-        
+
         const range = sel.getRangeAt(0);
         if (!range.collapsed) return false;
-        
+
         // Check if we're inside a code block (pre element)
         // If so, skip all inline escape - code blocks should preserve literal text
         let node = range.startContainer;
         const startElement = node.nodeType === 3 ? node.parentElement : node;
         if (startElement && startElement.closest && startElement.closest('pre')) {
-            logger.log('checkInlineEscape: Inside code block, skipping');
             return false;
         }
-        
+
         // Find the inline element we might be inside
         let inlineElement = null;
         let markerInfo = null;
-        
-        // Check if we're in a text node inside an inline element
+
         while (node && node !== editor) {
             if (node.nodeType === 1) {
                 const tag = node.tagName.toLowerCase();
@@ -5311,7 +5314,6 @@ class EditorInstance {
                     markerInfo = { marker: '~~', tag: tag };
                     break;
                 } else if (tag === 'code') {
-                    // Only inline code, not code inside pre
                     if (!node.closest('pre')) {
                         inlineElement = node;
                         markerInfo = { marker: '\`', tag: tag };
@@ -5321,29 +5323,28 @@ class EditorInstance {
             }
             node = node.parentNode;
         }
-        
+
         if (!inlineElement || !markerInfo) return false;
-        
-        // Get text content and check if it ends with the marker + space
+
+        // Get text content and check if it ends with the marker (before space is inserted)
         const textNode = range.startContainer;
         if (textNode.nodeType !== 3) return false;
-        
+
         const text = textNode.textContent;
         const offset = range.startOffset;
-        
-        // Check if text before cursor ends with marker + space (space was just typed)
+
+        // Check if text before cursor ends with marker
         const beforeCursor = text.substring(0, offset);
-        const expectedEnding = markerInfo.marker + ' ';
-        
-        if (!beforeCursor.endsWith(expectedEnding)) return false;
-        
-        // Remove the marker + space from the text
-        const newText = beforeCursor.slice(0, -expectedEnding.length) + text.substring(offset);
+
+        if (!beforeCursor.endsWith(markerInfo.marker)) return false;
+
+        // Remove the marker from the text
+        const newText = beforeCursor.slice(0, -markerInfo.marker.length) + text.substring(offset);
         textNode.textContent = newText;
-        
+
         // Move cursor outside the inline element (after it)
         const parent = inlineElement.parentNode;
-        
+
         // Create a space text node after the inline element
         const spaceNode = document.createTextNode(' ');
         if (inlineElement.nextSibling) {
@@ -5351,14 +5352,14 @@ class EditorInstance {
         } else {
             parent.appendChild(spaceNode);
         }
-        
+
         // Set cursor after the space
         const newRange = document.createRange();
         newRange.setStart(spaceNode, 1);
         newRange.collapse(true);
         sel.removeAllRanges();
         sel.addRange(newRange);
-        
+
         syncMarkdown();
         return true;
     }
@@ -7817,7 +7818,7 @@ class EditorInstance {
 
         }
 
-        // Space key - check for inline escape first, then all conversions
+        // Space key - check for inline escape first (synchronously), then pattern conversions
         // Skip all conversions if inside a code block
         if (e.key === ' ') {
             undoManager.saveSnapshot();
@@ -7832,11 +7833,14 @@ class EditorInstance {
                     return; // Don't process any conversions in code blocks or inline code
                 }
             }
-            
+
+            // Synchronous check: escape from inline element BEFORE browser inserts space
+            if (checkInlineEscapeBeforeSpace()) {
+                e.preventDefault();
+                return;
+            }
+
             setTimeout(() => {
-                // First check if we should escape from an inline element
-                if (checkInlineEscape()) return;
-                // Then check for pattern conversions
                 checkAllPatterns('space');
             }, 0);
         }

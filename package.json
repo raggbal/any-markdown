@@ -2,7 +2,7 @@
   "name": "any-markdown",
   "displayName": "Any Markdown Editor",
   "description": "A WYSIWYG markdown editor for VS Code with seamless live preview",
-  "version": "0.195.440",
+  "version": "0.195.449",
   "publisher": "imaken",
   "icon": "media/icon.png",
   "license": "MIT",
@@ -97,6 +97,16 @@
           }
         ],
         "priority": "option"
+      },
+      {
+        "viewType": "any-markdown.outliner",
+        "displayName": "Any Markdown Outliner",
+        "selector": [
+          {
+            "filenamePattern": "*.mmd"
+          }
+        ],
+        "priority": "default"
       }
     ],
     "configuration": {
