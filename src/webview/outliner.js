@@ -675,7 +675,12 @@ var Outliner = (function() {
                     return;
                 }
                 saveSnapshot();
-                handleEnter(node, textEl, offset);
+                if (e.shiftKey) {
+                    // Shift+Enter: 子ノードとして追加 (既に子がいれば先頭に)
+                    handleShiftEnter(node, textEl, offset);
+                } else {
+                    handleEnter(node, textEl, offset);
+                }
                 break;
 
             case ' ':
@@ -919,6 +924,32 @@ var Outliner = (function() {
         // タスクノードの継承
         if (node.checked !== null && node.checked !== undefined) {
             newNode.checked = false;
+        }
+
+        renderTree();
+        focusNodeAtStart(newNode.id);
+        scheduleSyncToHost();
+    }
+
+    function handleShiftEnter(node, textEl, offset) {
+        var text = node.text;
+        var beforeText = text.slice(0, offset);
+        var afterText = text.slice(offset);
+
+        // 現在のテキストを前半に更新
+        model.updateText(node.id, beforeText);
+
+        // 子ノードとして先頭に追加
+        var newNode = model.addNodeAtStart(node.id, afterText);
+
+        // タスクノードの継承
+        if (node.checked !== null && node.checked !== undefined) {
+            newNode.checked = false;
+        }
+
+        // 折りたたまれている場合は展開
+        if (node.collapsed) {
+            node.collapsed = false;
         }
 
         renderTree();
