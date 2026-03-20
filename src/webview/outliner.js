@@ -529,7 +529,14 @@ var Outliner = (function() {
 
         // 単一行: 現在ノードのカーソル位置に挿入
         if (!clipText.includes('\n')) {
-            document.execCommand('insertText', false, clipText);
+            saveSnapshot();
+            var curOff = getCursorOffset(textEl);
+            var curText = node.text || '';
+            var newSingleText = curText.slice(0, curOff) + clipText + curText.slice(curOff);
+            model.updateText(nodeId, newSingleText);
+            textEl.innerHTML = renderInlineText(newSingleText);
+            setCursorAtOffset(textEl, curOff + clipText.length);
+            scheduleSyncToHost();
             return;
         }
 
@@ -862,21 +869,39 @@ var Outliner = (function() {
                     toggleCollapse(nodeId);
                     break;
                 case 'c':
-                    // 複数選択時はノードテキストをコピー
                     if (selectedNodeIds.size > 0) {
+                        // 複数選択時はノードテキストをコピー
                         e.preventDefault();
                         navigator.clipboard.writeText(getSelectedText());
+                    } else {
+                        // 単一ノード: テキスト選択があればブラウザデフォルト、
+                        // なければノード全体のテキストをコピー
+                        var selC = window.getSelection();
+                        if (!selC || selC.isCollapsed) {
+                            e.preventDefault();
+                            navigator.clipboard.writeText(node.text || '');
+                        }
                     }
-                    // 単一ノード内の選択はブラウザデフォルトに任せる
                     break;
                 case 'x':
-                    // 複数選択時はカット
                     if (selectedNodeIds.size > 0) {
+                        // 複数選択時はカット
                         e.preventDefault();
                         navigator.clipboard.writeText(getSelectedText());
                         deleteSelectedNodes();
+                    } else {
+                        // 単一ノード: テキスト選択があればブラウザデフォルト、
+                        // なければノード全体をカット（空にする）
+                        var selX = window.getSelection();
+                        if (!selX || selX.isCollapsed) {
+                            e.preventDefault();
+                            navigator.clipboard.writeText(node.text || '');
+                            saveSnapshot();
+                            model.updateText(nodeId, '');
+                            textEl.innerHTML = '';
+                            scheduleSyncToHost();
+                        }
                     }
-                    // 単一ノード内の選択はブラウザデフォルトに任せる
                     break;
                 // case 'v': paste イベントで処理するため keydown では不要
                 case 'a':
