@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Inline pattern conversion - Space removal', () => {
-    test('Bold pattern: **text** + Space should convert and insert space', async ({ page }) => {
+    test('Bold pattern: **text** + Space should convert without inserting space', async ({ page }) => {
         await page.goto('http://localhost:3000/standalone-editor.html');
 
         // Wait for editor to be ready
@@ -32,8 +32,8 @@ test.describe('Inline pattern conversion - Space removal', () => {
         // Verify bold conversion happened
         expect(result.hasBoldTag).toBe(true);
 
-        // Verify space is inserted after conversion (escape + space in one keypress)
-        expect(result.hasSpaceAfter).toBe(true);
+        // Space should NOT be inserted after inline pattern conversion
+        expect(result.hasSpaceAfter).toBe(false);
     });
     
     test('Bold pattern: typing after conversion should be normal text', async ({ page }) => {
@@ -76,7 +76,7 @@ test.describe('Inline pattern conversion - Space removal', () => {
         expect(result.strongText).toBe('bold');
     });
     
-    test('Italic pattern: *text* + Space should convert and insert space', async ({ page }) => {
+    test('Italic pattern: *text* + Space should convert without inserting space', async ({ page }) => {
         await page.goto('http://localhost:3000/standalone-editor.html');
 
         await page.waitForSelector('#editor');
@@ -98,7 +98,7 @@ test.describe('Inline pattern conversion - Space removal', () => {
         });
 
         expect(result.hasItalicTag).toBe(true);
-        expect(result.hasSpaceAfter).toBe(true);
+        expect(result.hasSpaceAfter).toBe(false);
     });
     
     test('Italic pattern: typing after conversion should be normal text', async ({ page }) => {
@@ -133,7 +133,7 @@ test.describe('Inline pattern conversion - Space removal', () => {
         expect(result.emText).toBe('italic');
     });
     
-    test('Inline code pattern: `code` + Space should convert and insert space', async ({ page }) => {
+    test('Inline code pattern: `code` + Space should convert without inserting space', async ({ page }) => {
         await page.goto('http://localhost:3000/standalone-editor.html');
 
         await page.waitForSelector('#editor');
@@ -155,7 +155,7 @@ test.describe('Inline pattern conversion - Space removal', () => {
         });
 
         expect(result.hasCodeTag).toBe(true);
-        expect(result.hasSpaceAfter).toBe(true);
+        expect(result.hasSpaceAfter).toBe(false);
     });
     
     test('Inline code pattern: typing after conversion should be normal text', async ({ page }) => {
@@ -190,7 +190,7 @@ test.describe('Inline pattern conversion - Space removal', () => {
         expect(result.codeText).toBe('code');
     });
     
-    test('Strikethrough pattern: ~~text~~ + Space should convert and insert space', async ({ page }) => {
+    test('Strikethrough pattern: ~~text~~ + Space should convert without inserting space', async ({ page }) => {
         await page.goto('http://localhost:3000/standalone-editor.html');
 
         await page.waitForSelector('#editor');
@@ -212,7 +212,7 @@ test.describe('Inline pattern conversion - Space removal', () => {
         });
 
         expect(result.hasStrikeTag).toBe(true);
-        expect(result.hasSpaceAfter).toBe(true);
+        expect(result.hasSpaceAfter).toBe(false);
     });
     
     test('Strikethrough pattern: typing after conversion should be normal text', async ({ page }) => {

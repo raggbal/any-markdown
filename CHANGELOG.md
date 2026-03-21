@@ -5,6 +5,12 @@ All notable changes to the "Any Markdown Editor" extension will be documented in
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.195.466] - 2026-03-21
+
+### Fixed
+
+- **Markdown: Block pattern conversion fails with existing text** — Typing input patterns (##, [ ], -, 1., >) at the beginning of a line with existing text and pressing space now correctly converts the block
+
 ## [0.195.464] - 2026-03-21
 
 ### Fixed

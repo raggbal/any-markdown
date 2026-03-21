@@ -4141,7 +4141,8 @@ class EditorInstance {
             };
 
             // 1. Task list conversion: [ ] or [x] at beginning
-            const taskInListMatch = liDirectText.match(/^\[([ xX])\] (.*)$/);
+            // Space is preventDefault'd, so text is "[x]" or "[x] existing text"
+            const taskInListMatch = liDirectText.match(/^\[([ xX])\]\s?(.*)$/);
             if (taskInListMatch) {
                 if (hasCheckbox) return false; // Already a task item
 
@@ -4183,7 +4184,8 @@ class EditorInstance {
             }
 
             // 2. Bullet list conversion: - or * or + at beginning
-            const bulletMatch = liDirectText.match(/^[-*+] (.*)$/);
+            // Space is preventDefault'd, so text is "-" or "- existing text"
+            const bulletMatch = liDirectText.match(/^[-*+]\s?(.*)$/);
             if (bulletMatch) {
                 // Skip if already a regular bullet (ul without checkbox)
                 if (parentTag === 'ul' && !hasCheckbox) return false;
@@ -4210,7 +4212,8 @@ class EditorInstance {
             }
 
             // 3. Ordered list conversion: N. at beginning
-            const orderedMatch = liDirectText.match(/^(\d+)\. (.*)$/);
+            // Space is preventDefault'd, so text is "1." or "1. existing text"
+            const orderedMatch = liDirectText.match(/^(\d+)\.\s?(.*)$/);
             if (orderedMatch) {
                 if (parentTag === 'ol') return false; // Already ordered
 
@@ -4243,9 +4246,9 @@ class EditorInstance {
         const text = node.textContent || '';
 
         // Heading: # + space (with optional existing text)
-        // Matches: "# ", "## ", ..., "# existing text", "## existing text", etc.
+        // Space is preventDefault'd, so text may be just "#" or "# existing text" (if text was already there)
         // This is allowed even when inside a heading (heading-to-heading conversion)
-        const headingMatch = text.match(/^(#{1,6}) (.*)$/);
+        const headingMatch = text.match(/^(#{1,6})\s?(.*)$/);
         if (headingMatch && trigger === 'space') {
             const level = headingMatch[1].length;
             const existingText = headingMatch[2] || '';
@@ -4270,7 +4273,8 @@ class EditorInstance {
 
         // Task list: - [ ] + space (with optional existing text)
         // MUST be checked BEFORE unordered list to avoid matching "- " first
-        const taskMatch = text.match(/^[-*+] \[([ xX])\] (.*)$/);
+        // Space is preventDefault'd, so text is "- [x]" or "- [x] existing text"
+        const taskMatch = text.match(/^[-*+] \[([ xX])\]\s?(.*)$/);
         if (taskMatch && trigger === 'space') {
             const existingText = taskMatch[2] || '';
             const li = document.createElement('li');
@@ -4313,7 +4317,8 @@ class EditorInstance {
         }
 
         // Unordered list: - + space or * + space (with optional existing text)
-        const ulMatch = text.match(/^[-*+] (.*)$/);
+        // Space is preventDefault'd, so text is "-" or "- existing text"
+        const ulMatch = text.match(/^[-*+]\s?(.*)$/);
         if (ulMatch && trigger === 'space') {
             const existingText = ulMatch[1] || '';
             const li = document.createElement('li');
@@ -4355,7 +4360,8 @@ class EditorInstance {
         }
 
         // Ordered list: 1. + space (with optional existing text)
-        const olMatch = text.match(/^(\d+)\. (.*)$/);
+        // Space is preventDefault'd, so text is "1." or "1. existing text"
+        const olMatch = text.match(/^(\d+)\.\s?(.*)$/);
         if (olMatch && trigger === 'space') {
             const existingText = olMatch[2] || '';
             const li = document.createElement('li');
@@ -4389,7 +4395,8 @@ class EditorInstance {
         }
 
         // Blockquote: > + space (with optional existing text)
-        const bqMatch = text.match(/^> (.*)$/);
+        // Space is preventDefault'd, so text is ">" or "> existing text"
+        const bqMatch = text.match(/^>\s?(.*)$/);
         if (bqMatch && trigger === 'space') {
             const existingText = bqMatch[1] || '';
             const blockquote = document.createElement('blockquote');
@@ -4632,8 +4639,8 @@ class EditorInstance {
 
         const text = node.textContent;
         const offset = range.startOffset;
-        // Check text before the trigger character (space/enter adds a char, so check before that)
-        const checkOffset = trigger === 'space' ? offset - 1 : offset;
+        // Space is now preventDefault'd so offset is correct as-is (no browser-inserted space to skip)
+        const checkOffset = offset;
         if (checkOffset < 0) return false;
         
         const beforeCursor = text.substring(0, checkOffset);
@@ -4642,28 +4649,28 @@ class EditorInstance {
         // Must be processed before bold/italic/strikethrough to prevent `**text**` from becoming bold
         const codeMatch = beforeCursor.match(/\`([^\`]+)\`/);
         if (codeMatch) {
-            replaceInlinePatternAnywhere(node, codeMatch, 'code', checkOffset, trigger === 'space');
+            replaceInlinePatternAnywhere(node, codeMatch, 'code', checkOffset, false);
             return true;
         }
 
         // Bold **text** + space/enter (anywhere in text)
         const boldMatch = beforeCursor.match(/\*\*([^*]+)\*\*/);
         if (boldMatch) {
-            replaceInlinePatternAnywhere(node, boldMatch, 'strong', checkOffset, trigger === 'space');
+            replaceInlinePatternAnywhere(node, boldMatch, 'strong', checkOffset, false);
             return true;
         }
 
         // Italic *text* + space/enter (but not **text**)
         const italicMatch = beforeCursor.match(/(?<!\*)\*([^*]+)\*(?!\*)/);
         if (italicMatch) {
-            replaceInlinePatternAnywhere(node, italicMatch, 'em', checkOffset, trigger === 'space');
+            replaceInlinePatternAnywhere(node, italicMatch, 'em', checkOffset, false);
             return true;
         }
 
         // Strikethrough ~~text~~ + space/enter
         const strikeMatch = beforeCursor.match(/~~([^~]+)~~/);
         if (strikeMatch) {
-            replaceInlinePatternAnywhere(node, strikeMatch, 'del', checkOffset, trigger === 'space');
+            replaceInlinePatternAnywhere(node, strikeMatch, 'del', checkOffset, false);
             return true;
         }
 
@@ -4677,41 +4684,38 @@ class EditorInstance {
 
         const text = textNode.textContent;
         const before = text.substring(0, matchIndex);
-        // Get text between the pattern and cursor (excluding the trigger space if present)
+        // Get text between the pattern and cursor
         const after = text.substring(matchIndex + fullMatch.length, cursorOffset);
-        // Get remaining text after cursor (and after the trigger space if present)
-        const remaining = text.substring(hasSpaceAfter ? cursorOffset + 1 : cursorOffset);
+        // Get remaining text after cursor
+        const remaining = text.substring(cursorOffset);
 
         const parent = textNode.parentNode;
-        
+
         // Create new nodes
         if (before) {
             const beforeNode = document.createTextNode(before);
             parent.insertBefore(beforeNode, textNode);
         }
-        
+
         const element = document.createElement(tagName);
         element.textContent = innerText;
         parent.insertBefore(element, textNode);
-        
+
         // Create text node after the element with remaining text
-        // When triggered by space, include a visible space after ZWSP so the user
-        // gets escape + space in a single keypress
         const afterContent = after + remaining;
 
         // Use zero-width space to ensure cursor is positioned outside the inline element
         // This prevents the browser from placing the cursor inside the inline element
         const ZWSP = '\u200B';
-        const spaceAfter = hasSpaceAfter ? ' ' : '';
-        const afterNode = document.createTextNode(ZWSP + spaceAfter + afterContent);
+        const afterNode = document.createTextNode(ZWSP + afterContent);
         parent.insertBefore(afterNode, textNode);
 
         parent.removeChild(textNode);
 
-        // Set cursor after the zero-width space (and space if present)
+        // Set cursor after the zero-width space
         const newRange = document.createRange();
         const sel = window.getSelection();
-        newRange.setStart(afterNode, hasSpaceAfter ? 2 : 1); // After ZWSP + optional space
+        newRange.setStart(afterNode, 1); // After ZWSP
         newRange.collapse(true);
         sel.removeAllRanges();
         sel.addRange(newRange);
@@ -7264,11 +7268,15 @@ class EditorInstance {
 
         }
 
-        // Space key - check for inline escape first (synchronously), then pattern conversions
-        // Skip all conversions if inside a code block
+        // Space key - preventDefault + synchronous pattern check
         if (e.key === ' ') {
+            // Skip during IME composition (e.g. Japanese input space for candidate selection)
+            if (e.isComposing || e.keyCode === 229) {
+                return;
+            }
+
             undoManager.saveSnapshot();
-            // Check if inside code block or inline code - if so, skip all conversions
+            // Check if inside code block or inline code - if so, let browser handle space
             const sel = window.getSelection();
             if (sel && sel.rangeCount) {
                 const range = sel.getRangeAt(0);
@@ -7276,7 +7284,7 @@ class EditorInstance {
                 const startElement = node.nodeType === 3 ? node.parentElement : node;
                 if (startElement && startElement.closest && startElement.closest('pre, code')) {
                     logger.log('Space key: Inside code block or inline code, skipping all conversions');
-                    return; // Don't process any conversions in code blocks or inline code
+                    return; // Let browser handle space in code blocks
                 }
             }
 
@@ -7286,9 +7294,16 @@ class EditorInstance {
                 return;
             }
 
-            setTimeout(() => {
-                checkAllPatterns('space');
-            }, 0);
+            // preventDefault to control space insertion
+            e.preventDefault();
+
+            // Synchronous pattern check (before space is in DOM)
+            if (checkAllPatterns('space')) {
+                return; // Pattern matched and converted, no space needed
+            }
+
+            // No pattern matched - manually insert space
+            document.execCommand('insertText', false, ' ');
         }
 
         // Tab key - table cell navigation or list indent

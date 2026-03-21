@@ -510,10 +510,18 @@ var Outliner = (function() {
 
             // トグル: すでにマーカーで囲まれている場合は除去
             if (before.endsWith(marker) && after.startsWith(marker)) {
+                // ケース1: マーカーが選択範囲の外側にある (例: **|text|**)
                 var newText = before.slice(0, -marker.length) + selected + after.slice(marker.length);
                 model.updateText(nodeId, newText);
                 textEl.innerHTML = renderEditingText(newText);
                 setCursorAtOffset(textEl, endOff - marker.length);
+            } else if (selected.startsWith(marker) && selected.endsWith(marker) && selected.length > 2 * marker.length) {
+                // ケース2: マーカーが選択範囲の内側にある (例: |**text**| を選択してCmd+B)
+                var stripped = selected.slice(marker.length, -marker.length);
+                var newText1b = before + stripped + after;
+                model.updateText(nodeId, newText1b);
+                textEl.innerHTML = renderEditingText(newText1b);
+                setCursorAtOffset(textEl, startOff + stripped.length);
             } else {
                 var newText2 = before + marker + selected + marker + after;
                 model.updateText(nodeId, newText2);
