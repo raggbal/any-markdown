@@ -30,12 +30,44 @@
         },
 
         // サイドパネル (ページ表示用)
+        openPageInSidePanel: function(nodeId, pageId) {
+            api.postMessage({ type: 'openPageInSidePanel', nodeId: nodeId, pageId: pageId });
+        },
         saveSidePanelFile: function(filePath, content) {
             api.postMessage({ type: 'saveSidePanelFile', filePath: filePath, content: content });
         },
         notifySidePanelClosed: function() {
             api.postMessage({ type: 'sidePanelClosed' });
         },
+        sidePanelOpenLink: function(href, sidePanelFilePath) {
+            api.postMessage({ type: 'sidePanelOpenLink', href: href, sidePanelFilePath: sidePanelFilePath });
+        },
+        openLinkInTab: function(href) {
+            api.postMessage({ type: 'openLinkInTab', href: href });
+        },
+        getSidePanelImageDir: function(sidePanelFilePath) {
+            api.postMessage({ type: 'getSidePanelImageDir', sidePanelFilePath: sidePanelFilePath });
+        },
+        requestInsertImage: function(sidePanelFilePath) {
+            api.postMessage({ type: 'insertImage', position: 0, sidePanelFilePath: sidePanelFilePath });
+        },
+        requestSetImageDir: function(sidePanelFilePath) {
+            api.postMessage({ type: 'setImageDir', sidePanelFilePath: sidePanelFilePath });
+        },
+        saveImageAndInsert: function(dataUrl, fileName, sidePanelFilePath) {
+            api.postMessage({ type: 'saveImageAndInsert', dataUrl: dataUrl, fileName: fileName, sidePanelFilePath: sidePanelFilePath });
+        },
+        readAndInsertImage: function(filePath, sidePanelFilePath) {
+            api.postMessage({ type: 'readAndInsertImage', filePath: filePath, sidePanelFilePath: sidePanelFilePath });
+        },
+        searchFiles: function(query) {
+            api.postMessage({ type: 'searchFiles', query: query });
+        },
+
+        // ページ管理 (サイドパネル内EditorInstanceから呼ばれる — outlinerでは未使用)
+        createPageAtPath: function() { /* no-op in outliner */ },
+        createPageAuto: function() { /* no-op in outliner */ },
+        updatePageH1: function() { /* no-op in outliner */ },
 
         // リンク
         openLink: function(href) {

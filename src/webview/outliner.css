@@ -28,8 +28,17 @@
     --outliner-scrollbar-thumb-hover: rgba(255,255,255,0.25);
 }
 
+/* --- Body (side panel positioning context) --- */
+body {
+    position: relative;
+    overflow: hidden;
+    height: 100vh;
+    margin: 0;
+}
+
 /* --- Container --- */
 .outliner-container {
+    position: relative;
     display: flex;
     flex-direction: column;
     height: 100vh;

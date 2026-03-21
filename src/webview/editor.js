@@ -15426,6 +15426,9 @@ class EditorInstance {
 
 // Expose class globally
 window.EditorInstance = EditorInstance;
+window.SidePanelHostBridge = SidePanelHostBridge;
 
-// Auto-create main instance
-new EditorInstance(document.body, window.hostBridge);
+// Auto-create main instance (skipped when loaded as library in outliner webview)
+if (!window.__SKIP_EDITOR_AUTO_INIT__) {
+    new EditorInstance(document.body, window.hostBridge);
+}

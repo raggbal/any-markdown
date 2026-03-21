@@ -112,6 +112,7 @@ var Outliner = (function() {
         setupKeyHandlers();
         setupContextMenu();
         setupHostMessages();
+        initSidePanel();
 
         // 初期スナップショット
         saveSnapshot();
@@ -1574,11 +1575,11 @@ var Outliner = (function() {
         scheduleSyncToHost();
     }
 
-    /** ページノードクリック → ホストに openPage 送信 → VSCode が any-markdown.editor を Beside で開く */
+    /** ページノードクリック → ホストにサイドパネルで開くよう要求 */
     function openPage(nodeId) {
         var node = model.getNode(nodeId);
         if (!node || !node.isPage || !node.pageId) { return; }
-        host.openPage(nodeId, node.pageId);
+        host.openPageInSidePanel(nodeId, node.pageId);
     }
 
     // --- 検索 ---
@@ -1860,6 +1861,282 @@ var Outliner = (function() {
         }
     }
 
+    // --- サイドパネル (editor.js の EditorInstance / SidePanelHostBridge を使用) ---
+
+    var sidePanelEl = null;
+    var sidePanelFilename = null;
+    var sidePanelClose = null;
+    var sidePanelOverlay = null;
+    var sidePanelIframeContainer = null;
+    var sidePanelSidebar = null;
+    var sidePanelTocEl = null;
+    var sidePanelOpenOutlineBtn = null;
+    var sidePanelSidebarCloseBtn = null;
+    var sidePanelImageDirEl = null;
+    var sidePanelImageDirPath = null;
+    var sidePanelImageDirSource = null;
+    var sidePanelImageDirBtn = null;
+    var sidePanelInstance = null;
+    var sidePanelHostBridge = null;
+    var sidePanelFilePath = null;
+    var sidePanelTocVisible = true;
+    var sidePanelExpanded = false;
+    var sidePanelImagePending = false;
+
+    function initSidePanel() {
+        sidePanelEl = document.querySelector('.side-panel');
+        sidePanelFilename = document.querySelector('.side-panel-filename');
+        sidePanelClose = document.querySelector('.side-panel-close');
+        sidePanelOverlay = document.querySelector('.side-panel-overlay');
+        sidePanelIframeContainer = document.querySelector('.side-panel-iframe-container');
+        sidePanelSidebar = document.querySelector('.side-panel-sidebar');
+        sidePanelTocEl = document.querySelector('.side-panel-toc');
+        sidePanelOpenOutlineBtn = document.querySelector('.side-panel-outline-btn');
+        sidePanelSidebarCloseBtn = document.querySelector('#sidePanelSidebarClose');
+        sidePanelImageDirEl = document.querySelector('.side-panel-imagedir');
+        sidePanelImageDirPath = document.querySelector('#sidePanelImageDirPath');
+        sidePanelImageDirSource = document.querySelector('#sidePanelImageDirSource');
+        sidePanelImageDirBtn = document.querySelector('#sidePanelImageDirBtn');
+
+        if (sidePanelClose) {
+            sidePanelClose.addEventListener('click', closeSidePanel);
+        }
+        if (sidePanelOverlay) {
+            sidePanelOverlay.addEventListener('click', closeSidePanel);
+        }
+
+        // Expand toggle
+        var sidePanelExpandBtn = document.querySelector('.side-panel-expand');
+        if (sidePanelExpandBtn) {
+            sidePanelExpandBtn.addEventListener('click', function() {
+                sidePanelExpanded = !sidePanelExpanded;
+                if (sidePanelExpanded) {
+                    sidePanelEl.classList.add('expanded');
+                    sidePanelExpandBtn.classList.add('active');
+                } else {
+                    sidePanelEl.classList.remove('expanded');
+                    sidePanelExpandBtn.classList.remove('active');
+                }
+            });
+        }
+
+        // Open in tab
+        var sidePanelOpenTabBtn = document.querySelector('.side-panel-open-tab');
+        if (sidePanelOpenTabBtn) {
+            sidePanelOpenTabBtn.addEventListener('click', function() {
+                if (sidePanelFilePath) {
+                    host.openLinkInTab(sidePanelFilePath);
+                    closeSidePanelImmediate();
+                }
+            });
+        }
+
+        // Outline sidebar open/close
+        if (sidePanelOpenOutlineBtn) {
+            sidePanelOpenOutlineBtn.addEventListener('click', function() {
+                if (!sidePanelTocEl || sidePanelTocEl.children.length === 0) { return; }
+                sidePanelTocVisible = true;
+                openSidePanelSidebar();
+            });
+        }
+        if (sidePanelSidebarCloseBtn) {
+            sidePanelSidebarCloseBtn.addEventListener('click', function() {
+                sidePanelTocVisible = false;
+                closeSidePanelSidebar();
+            });
+        }
+
+        // ESC to close side panel
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && sidePanelEl && sidePanelEl.classList.contains('open')) {
+                e.preventDefault();
+                e.stopPropagation();
+                closeSidePanel();
+            }
+        });
+    }
+
+    function openSidePanel(markdown, filePath, fileName, toc, spDocumentBaseUri) {
+        if (sidePanelInstance) {
+            closeSidePanelImmediate();
+        }
+        sidePanelFilePath = filePath;
+        if (sidePanelFilename) { sidePanelFilename.textContent = fileName; }
+
+        // Create EditorInstance container and instance
+        var spContainer = window.EditorInstance.createSidePanelContainer();
+        if (sidePanelIframeContainer) {
+            sidePanelIframeContainer.innerHTML = '';
+            sidePanelIframeContainer.appendChild(spContainer);
+        }
+
+        var LUCIDE_ICONS = window.__editorUtils ? window.__editorUtils.LUCIDE_ICONS : {};
+        var escapeHtml = window.__editorUtils ? window.__editorUtils.escapeHtml : function(s) { return s; };
+
+        sidePanelHostBridge = new window.SidePanelHostBridge(host, filePath, {
+            onTocUpdate: updateSidePanelTocFromMarkdown,
+            onImageRequest: function() { sidePanelImagePending = true; }
+        });
+
+        sidePanelInstance = new window.EditorInstance(spContainer, sidePanelHostBridge, {
+            initialContent: markdown,
+            documentBaseUri: spDocumentBaseUri || '',
+            isSidePanel: true
+        });
+
+        // Setup header buttons (undo/redo/source)
+        if (sidePanelEl) {
+            var header = sidePanelEl.querySelector('.side-panel-header');
+            if (header) {
+                header.querySelectorAll('button[data-action]').forEach(function(btn) {
+                    var icon = LUCIDE_ICONS[btn.dataset.action];
+                    if (icon) { btn.innerHTML = icon; }
+                });
+                var undoBtn = header.querySelector('[data-action="undo"]');
+                var redoBtn = header.querySelector('[data-action="redo"]');
+                var sourceBtn = header.querySelector('[data-action="source"]');
+
+                if (undoBtn) { undoBtn.addEventListener('click', function() { if (sidePanelInstance) sidePanelInstance._undo(); }); }
+                if (redoBtn) { redoBtn.addEventListener('click', function() { if (sidePanelInstance) sidePanelInstance._redo(); }); }
+                if (sourceBtn) { sourceBtn.addEventListener('click', function() { if (sidePanelInstance) sidePanelInstance._toggleSourceMode(); }); }
+
+                sidePanelInstance._setUndoUpdateCallback(function(undoDisabled, redoDisabled) {
+                    if (undoBtn) { undoBtn.disabled = undoDisabled; undoBtn.style.opacity = undoDisabled ? '0.3' : '1'; }
+                    if (redoBtn) { redoBtn.disabled = redoDisabled; redoBtn.style.opacity = redoDisabled ? '0.3' : '1'; }
+                });
+                if (undoBtn) { undoBtn.disabled = true; undoBtn.style.opacity = '0.3'; }
+                if (redoBtn) { redoBtn.disabled = true; redoBtn.style.opacity = '0.3'; }
+            }
+        }
+
+        // Render TOC
+        renderSidePanelToc(toc);
+
+        // Setup image dir display
+        setupSidePanelImageDir();
+
+        // Show panel with animation
+        if (sidePanelEl) { sidePanelEl.style.display = 'flex'; }
+        if (sidePanelOverlay) { sidePanelOverlay.style.display = 'block'; }
+        requestAnimationFrame(function() {
+            if (sidePanelEl) { sidePanelEl.classList.add('open'); }
+            if (sidePanelOverlay) { sidePanelOverlay.classList.add('open'); }
+        });
+    }
+
+    function closeSidePanel() {
+        if (sidePanelEl) { sidePanelEl.classList.remove('open'); }
+        if (sidePanelOverlay) { sidePanelOverlay.classList.remove('open'); }
+        setTimeout(function() { closeSidePanelImmediate(); }, 200);
+    }
+
+    function closeSidePanelImmediate() {
+        if (sidePanelEl) { sidePanelEl.style.display = 'none'; }
+        if (sidePanelOverlay) { sidePanelOverlay.style.display = 'none'; }
+        if (sidePanelExpanded) {
+            if (sidePanelEl) { sidePanelEl.classList.remove('expanded'); }
+            sidePanelExpanded = false;
+            var expandBtn = document.querySelector('.side-panel-expand');
+            if (expandBtn) { expandBtn.classList.remove('active'); }
+        }
+        if (sidePanelInstance) {
+            sidePanelInstance.destroy();
+            sidePanelInstance = null;
+        }
+        sidePanelHostBridge = null;
+        if (sidePanelIframeContainer) { sidePanelIframeContainer.innerHTML = ''; }
+        sidePanelFilePath = null;
+        host.notifySidePanelClosed();
+    }
+
+    function renderSidePanelToc(toc) {
+        if (!sidePanelTocEl) { return; }
+        var escapeHtml = window.__editorUtils ? window.__editorUtils.escapeHtml : function(s) { return s; };
+        if (toc && toc.length > 0) {
+            sidePanelTocEl.innerHTML = toc.map(function(item) {
+                return '<a class="side-panel-toc-item" data-level="' + item.level +
+                    '" data-anchor="' + escapeHtml(item.anchor) + '" title="' + escapeHtml(item.text) + '">' +
+                    escapeHtml(item.text) + '</a>';
+            }).join('');
+            bindSidePanelTocClicks();
+            if (sidePanelTocVisible) { openSidePanelSidebar(); }
+        } else {
+            sidePanelTocEl.innerHTML = '';
+            closeSidePanelSidebar();
+        }
+    }
+
+    function bindSidePanelTocClicks() {
+        if (!sidePanelTocEl) { return; }
+        sidePanelTocEl.querySelectorAll('.side-panel-toc-item').forEach(function(item) {
+            item.addEventListener('click', function() {
+                var anchor = item.dataset.anchor;
+                if (sidePanelHostBridge) {
+                    sidePanelHostBridge._sendMessage({ type: 'scrollToAnchor', anchor: anchor });
+                }
+                sidePanelTocEl.querySelectorAll('.side-panel-toc-item').forEach(function(i) {
+                    i.classList.remove('active');
+                });
+                item.classList.add('active');
+            });
+        });
+    }
+
+    function updateSidePanelTocFromMarkdown(markdown) {
+        if (!sidePanelTocEl) { return; }
+        var lines = markdown.split('\n');
+        var toc = [];
+        var inCodeBlock = false;
+        for (var k = 0; k < lines.length; k++) {
+            var line = lines[k];
+            if (line.startsWith('```')) { inCodeBlock = !inCodeBlock; continue; }
+            if (inCodeBlock) { continue; }
+            var match = line.match(/^(#{1,2})\s+(.+)$/);
+            if (match) {
+                var text = match[2].trim();
+                var anchor = text.toLowerCase()
+                    .replace(/[^\w\s\u3000-\u9fff\u{20000}-\u{2fa1f}\-]/gu, '')
+                    .replace(/\s+/g, '-');
+                toc.push({ level: match[1].length, text: text, anchor: anchor });
+            }
+        }
+        renderSidePanelToc(toc);
+    }
+
+    function setupSidePanelImageDir() {
+        if (sidePanelImageDirBtn) {
+            sidePanelImageDirBtn.onclick = function() {
+                if (sidePanelHostBridge) { sidePanelHostBridge.requestSetImageDir(); }
+            };
+        }
+        host.getSidePanelImageDir(sidePanelFilePath);
+    }
+
+    function updateSidePanelImageDir(displayPath, source) {
+        if (sidePanelImageDirPath) {
+            sidePanelImageDirPath.textContent = displayPath || '';
+            sidePanelImageDirPath.title = displayPath || '';
+        }
+        if (sidePanelImageDirSource) {
+            var labels = {
+                file: i18n.imageDirSourceFile || 'File',
+                settings: i18n.imageDirSourceSettings || 'Settings',
+                'default': i18n.imageDirSourceDefault || 'Default'
+            };
+            sidePanelImageDirSource.textContent = labels[source] || source || '';
+        }
+    }
+
+    function openSidePanelSidebar() {
+        if (sidePanelSidebar) { sidePanelSidebar.classList.add('visible'); }
+        if (sidePanelOpenOutlineBtn) { sidePanelOpenOutlineBtn.classList.add('hidden'); }
+    }
+
+    function closeSidePanelSidebar() {
+        if (sidePanelSidebar) { sidePanelSidebar.classList.remove('visible'); }
+        if (sidePanelOpenOutlineBtn) { sidePanelOpenOutlineBtn.classList.remove('hidden'); }
+    }
+
     // --- ホスト通信 ---
 
     function scheduleSyncToHost() {
@@ -1903,6 +2180,36 @@ var Outliner = (function() {
                     if (pageNode) {
                         renderTree();
                         focusNode(msg.nodeId);
+                    }
+                    break;
+
+                // --- サイドパネル関連メッセージ ---
+                case 'openSidePanel':
+                    openSidePanel(msg.markdown, msg.filePath, msg.fileName, msg.toc, msg.documentBaseUri);
+                    break;
+
+                case 'sidePanelMessage':
+                    if (sidePanelHostBridge) {
+                        sidePanelHostBridge._sendMessage(msg.data);
+                    }
+                    break;
+
+                case 'sidePanelImageDirStatus':
+                    updateSidePanelImageDir(msg.displayPath, msg.source);
+                    break;
+
+                case 'sidePanelSetImageDir':
+                    updateSidePanelImageDir(msg.displayPath, msg.source);
+                    break;
+
+                case 'insertImageHtml':
+                    if (sidePanelInstance && sidePanelHostBridge) {
+                        sidePanelHostBridge._sendMessage({
+                            type: 'insertImageHtml',
+                            markdownPath: msg.markdownPath,
+                            displayUri: msg.displayUri,
+                            dataUri: msg.dataUri
+                        });
                     }
                     break;
             }
