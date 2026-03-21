@@ -366,8 +366,65 @@ var Outliner = (function() {
             handleNodeKeydown(e, node.id, textEl);
         });
 
-        el.appendChild(textEl);
+        // コンテンツラッパー (テキスト + サブテキスト)
+        var contentEl = document.createElement('div');
+        contentEl.className = 'outliner-node-content';
+        contentEl.appendChild(textEl);
+
+        // サブテキスト
+        var subtextEl = document.createElement('div');
+        subtextEl.className = 'outliner-subtext';
+        subtextEl.dataset.nodeId = node.id;
+        if (node.subtext) {
+            subtextEl.classList.add('has-content');
+            subtextEl.textContent = getSubtextPreview(node.subtext);
+        }
+
+        subtextEl.addEventListener('focus', function() {
+            // 編集モード: 全文表示
+            subtextEl.classList.add('is-editing');
+            subtextEl.classList.add('has-content');
+            subtextEl.textContent = node.subtext || '';
+        });
+
+        subtextEl.addEventListener('blur', function() {
+            // モデル更新
+            var raw = subtextEl.textContent || '';
+            model.updateSubtext(node.id, raw);
+            // 省略表示に切替
+            subtextEl.classList.remove('is-editing');
+            if (raw) {
+                subtextEl.classList.add('has-content');
+                subtextEl.textContent = getSubtextPreview(raw);
+            } else {
+                subtextEl.classList.remove('has-content');
+                subtextEl.textContent = '';
+            }
+            scheduleSyncToHost();
+        });
+
+        subtextEl.addEventListener('input', function() {
+            // リアルタイムでモデル更新
+            var raw = subtextEl.textContent || '';
+            model.updateSubtext(node.id, raw);
+            scheduleSyncToHost();
+        });
+
+        subtextEl.addEventListener('keydown', function(e) {
+            handleSubtextKeydown(e, node.id, subtextEl, textEl);
+        });
+
+        contentEl.appendChild(subtextEl);
+        el.appendChild(contentEl);
         return el;
+    }
+
+    /** サブテキストの省略表示テキストを生成 */
+    function getSubtextPreview(subtext) {
+        if (!subtext) { return ''; }
+        var firstLine = subtext.split('\n')[0];
+        var hasMore = subtext.indexOf('\n') >= 0;
+        return hasMore ? firstLine + ' ...' : firstLine;
     }
 
     /** プレーンテキストからインラインMarkdownをHTMLに変換 */
@@ -900,9 +957,12 @@ var Outliner = (function() {
                     return;
                 }
                 saveSnapshot();
-                if (e.shiftKey) {
-                    // Shift+Enter: 子ノードとして追加 (既に子がいれば先頭に)
+                if (e.altKey) {
+                    // Option+Enter: 子ノードとして追加 (既に子がいれば先頭に)
                     handleShiftEnter(node, textEl, offset);
+                } else if (e.shiftKey) {
+                    // Shift+Enter: サブテキスト追加/フォーカス
+                    openSubtext(nodeId);
                 } else {
                     handleEnter(node, textEl, offset);
                 }
@@ -1241,6 +1301,90 @@ var Outliner = (function() {
         scheduleSyncToHost();
     }
 
+    /** サブテキストを開いてフォーカス */
+    function openSubtext(nodeId) {
+        var nodeEl = treeEl.querySelector('.outliner-node[data-id="' + nodeId + '"]');
+        if (!nodeEl) { return; }
+        var subtextEl = nodeEl.querySelector('.outliner-subtext');
+        if (!subtextEl) { return; }
+
+        var node = model.getNode(nodeId);
+        if (!node) { return; }
+
+        // 編集モードに切替
+        subtextEl.contentEditable = 'true';
+        subtextEl.classList.add('is-editing');
+        subtextEl.classList.add('has-content');
+        subtextEl.textContent = node.subtext || '';
+        subtextEl.focus();
+
+        // カーソルを末尾に
+        var range = document.createRange();
+        var sel = window.getSelection();
+        range.selectNodeContents(subtextEl);
+        range.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(range);
+    }
+
+    /** サブテキストから抜ける */
+    function closeSubtext(nodeId, subtextEl) {
+        var node = model.getNode(nodeId);
+        if (!node) { return; }
+
+        // テキスト保存
+        var raw = subtextEl.textContent || '';
+        model.updateSubtext(nodeId, raw);
+
+        // 省略表示に切替
+        subtextEl.contentEditable = 'false';
+        subtextEl.classList.remove('is-editing');
+        if (raw) {
+            subtextEl.classList.add('has-content');
+            subtextEl.textContent = getSubtextPreview(raw);
+        } else {
+            subtextEl.classList.remove('has-content');
+            subtextEl.textContent = '';
+        }
+        scheduleSyncToHost();
+
+        // メインテキストにフォーカス戻す
+        focusNode(nodeId);
+    }
+
+    /** サブテキスト用キーハンドラ */
+    function handleSubtextKeydown(e, nodeId, subtextEl, textEl) {
+        if (e.isComposing || e.keyCode === 229) { return; }
+
+        if (e.key === 'Enter' && e.shiftKey) {
+            // Shift+Enter: サブテキストから抜ける
+            e.preventDefault();
+            closeSubtext(nodeId, subtextEl);
+            return;
+        }
+
+        if (e.key === 'Enter' && !e.shiftKey) {
+            // Enter: サブテキスト内で改行 (デフォルト動作を許可)
+            // ただし contenteditable の改行は insertLineBreak で処理
+            return;
+        }
+
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            closeSubtext(nodeId, subtextEl);
+            return;
+        }
+
+        // Cmd+S: 保存
+        if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+            e.preventDefault();
+            var raw = subtextEl.textContent || '';
+            model.updateSubtext(nodeId, raw);
+            syncToHostImmediate();
+            host.save();
+        }
+    }
+
     function handleBackspaceAtStart(node, textEl) {
         var prevId = model.getPreviousVisibleId(node.id);
 
@@ -1522,6 +1666,15 @@ var Outliner = (function() {
                 hideContextMenu();
             });
         }
+
+        addMenuSeparator(contextMenuEl);
+
+        // サブテキスト
+        var subtextLabel = (node.subtext) ? 'Edit Subtext' : 'Add Subtext';
+        addMenuItem(contextMenuEl, subtextLabel, function() {
+            hideContextMenu();
+            openSubtext(nodeId);
+        });
 
         addMenuSeparator(contextMenuEl);
 

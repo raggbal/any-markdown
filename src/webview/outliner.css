@@ -234,9 +234,16 @@
     accent-color: var(--outliner-checkbox-accent);
 }
 
+/* --- Node Content Wrapper --- */
+.outliner-node-content {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
 /* --- Text --- */
 .outliner-text {
-    flex: 1;
     min-height: 28px;
     line-height: 28px;
     outline: none;
@@ -258,6 +265,36 @@
 .outliner-node[data-checked="true"] .outliner-text {
     text-decoration: line-through;
     opacity: 0.5;
+}
+
+/* --- Subtext --- */
+.outliner-subtext {
+    display: none;
+    font-size: 12px;
+    color: var(--outliner-placeholder);
+    line-height: 1.4;
+    padding: 0 4px 2px;
+    outline: none;
+    word-break: break-word;
+    /* 省略表示 (デフォルト) */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.outliner-subtext.has-content {
+    display: block;
+}
+
+.outliner-subtext.is-editing {
+    display: block;
+    white-space: pre-wrap;
+    overflow: visible;
+    text-overflow: unset;
+    background: rgba(255,255,255,0.03);
+    border-radius: 3px;
+    padding: 4px;
+    min-height: 1.4em;
 }
 
 /* --- Tags --- */

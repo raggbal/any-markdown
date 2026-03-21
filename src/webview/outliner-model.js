@@ -84,10 +84,13 @@ var OutlinerModel = (function() {
     }
 
     Model.prototype._ensureChildren = function() {
-        // 全ノードの children を初期化
+        // 全ノードの children を初期化 + subtext デフォルト設定
         for (var id in this.nodes) {
             if (!this.nodes[id].children) {
                 this.nodes[id].children = [];
+            }
+            if (this.nodes[id].subtext === undefined) {
+                this.nodes[id].subtext = '';
             }
         }
         // parentId ベースで children を構築 (children が空のノードのみ)
@@ -131,7 +134,8 @@ var OutlinerModel = (function() {
             isPage: false,
             pageId: null,
             collapsed: false,
-            checked: null
+            checked: null,
+            subtext: ''
         };
 
         this.nodes[id] = node;
@@ -166,7 +170,8 @@ var OutlinerModel = (function() {
             isPage: false,
             pageId: null,
             collapsed: false,
-            checked: null
+            checked: null,
+            subtext: ''
         };
         this.nodes[id] = node;
         if (parentId === null || parentId === undefined) {
@@ -209,6 +214,12 @@ var OutlinerModel = (function() {
         node.text = text;
         node.tags = parseTags(text);
         return { triggerMakePage: false, node: node };
+    };
+
+    Model.prototype.updateSubtext = function(nodeId, subtext) {
+        var node = this.nodes[nodeId];
+        if (!node) { return; }
+        node.subtext = subtext || '';
     };
 
     /**

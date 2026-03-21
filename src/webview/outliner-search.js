@@ -177,10 +177,14 @@ var OutlinerSearch = (function() {
 
         switch (query.type) {
             case 'text':
-                return node.text.toLowerCase().indexOf(query.value.toLowerCase()) >= 0;
+                var tq = query.value.toLowerCase();
+                return node.text.toLowerCase().indexOf(tq) >= 0
+                    || (node.subtext && node.subtext.toLowerCase().indexOf(tq) >= 0);
 
             case 'phrase':
-                return node.text.toLowerCase().indexOf(query.value.toLowerCase()) >= 0;
+                var pq = query.value.toLowerCase();
+                return node.text.toLowerCase().indexOf(pq) >= 0
+                    || (node.subtext && node.subtext.toLowerCase().indexOf(pq) >= 0);
 
             case 'tag':
                 var tagLower = query.value.toLowerCase();
