@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { getOutlinerWebviewContent } from './outlinerWebviewContent';
+import { getWebviewMessages } from './i18n/messages';
 
 /**
  * OutlinerProvider — .mmd ファイル用 Custom Text Editor Provider
@@ -14,6 +15,9 @@ export class OutlinerProvider implements vscode.CustomTextEditorProvider {
 
     // アクティブな webview パネルを追跡（undo/redo forwarding用）
     private activeWebviewPanel: vscode.WebviewPanel | undefined;
+
+    // outlinerから開いたページファイルの追跡 (key: ファイルパス, value: ページディレクトリパス)
+    static outlinerPagePaths: Map<string, string> = new Map();
 
 
     constructor(context: vscode.ExtensionContext) {
@@ -51,7 +55,8 @@ export class OutlinerProvider implements vscode.CustomTextEditorProvider {
                     content,
                     {
                         theme: config.get<string>('theme', 'github'),
-                        fontSize: config.get<number>('fontSize', 16)
+                        fontSize: config.get<number>('fontSize', 16),
+                        webviewMessages: getWebviewMessages() as unknown as Record<string, string>
                     }
                 );
             } catch (error) {
@@ -104,6 +109,33 @@ export class OutlinerProvider implements vscode.CustomTextEditorProvider {
                             vscode.env.openExternal(vscode.Uri.parse(message.href));
                         }
                         break;
+
+                    case 'setPageDir': {
+                        const currentDir = this.getPagesDirPath(document);
+                        const relCurrent = path.relative(path.dirname(document.uri.fsPath), currentDir);
+                        const input = await vscode.window.showInputBox({
+                            prompt: 'Enter page directory (relative to .mmd file or absolute)',
+                            value: relCurrent || './pages'
+                        });
+                        if (input !== undefined) {
+                            // mmd JSONにpageDirフィールドを追加
+                            try {
+                                const data = JSON.parse(document.getText());
+                                data.pageDir = input || undefined;
+                                const jsonStr = JSON.stringify(data, null, 2);
+                                isApplyingOwnEdit = true;
+                                await this.applyEdit(document, jsonStr);
+                                isApplyingOwnEdit = false;
+                                webviewPanel.webview.postMessage({
+                                    type: 'pageDirChanged',
+                                    pageDir: input
+                                });
+                            } catch {
+                                vscode.window.showErrorMessage('Failed to update page directory setting');
+                            }
+                        }
+                        break;
+                    }
                 }
             })
         );
@@ -172,7 +204,24 @@ export class OutlinerProvider implements vscode.CustomTextEditorProvider {
     // --- ページ管理 ---
 
     private getPagesDirPath(document: vscode.TextDocument): string {
-        return path.join(path.dirname(document.uri.fsPath), 'pages');
+        // 1. mmd JSON内のpageDirフィールドを優先
+        try {
+            const data = JSON.parse(document.getText());
+            if (data.pageDir) {
+                if (path.isAbsolute(data.pageDir)) {
+                    return data.pageDir;
+                }
+                return path.resolve(path.dirname(document.uri.fsPath), data.pageDir);
+            }
+        } catch { /* ignore parse errors */ }
+
+        // 2. VSCode設定
+        const config = vscode.workspace.getConfiguration('any-markdown');
+        const configDir = config.get<string>('outlinerPageDir', './pages');
+        if (path.isAbsolute(configDir)) {
+            return configDir;
+        }
+        return path.resolve(path.dirname(document.uri.fsPath), configDir);
     }
 
     private getPageFilePath(document: vscode.TextDocument, pageId: string): string {
@@ -217,6 +266,10 @@ export class OutlinerProvider implements vscode.CustomTextEditorProvider {
             vscode.window.showWarningMessage(`Page file not found: ${filePath}`);
             return;
         }
+
+        // outlinerページとして登録 (editorProviderで制約適用のため)
+        const pagesDir = this.getPagesDirPath(document);
+        OutlinerProvider.outlinerPagePaths.set(filePath, pagesDir);
 
         // any-markdown エディタでサイドに開く
         const fileUri = vscode.Uri.file(filePath);

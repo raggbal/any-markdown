@@ -173,6 +173,7 @@ class EditorInstance {
     _legacyInit() {
     // Debug logging configuration
     const DEBUG_MODE = __DEBUG_MODE__;
+    const IS_OUTLINER_PAGE = __IS_OUTLINER_PAGE__;
     const logger = {
         log: DEBUG_MODE ? (...args) => console.log('[DEBUG]', ...args) : () => {},
         warn: DEBUG_MODE ? (...args) => console.warn('[DEBUG]', ...args) : () => {},
@@ -11234,6 +11235,13 @@ class EditorInstance {
         { group: 'insert', action: 'table',   i18nKey: 'insertTable', icon: 'table' },
     ];
 
+    // outlinerページではaddPageを非表示
+    if (IS_OUTLINER_PAGE) {
+        COMMAND_PALETTE_ITEMS = COMMAND_PALETTE_ITEMS.filter(function(item) {
+            return item.action !== 'addPage';
+        });
+    }
+
     var COMMAND_PALETTE_GROUPS = {
         page:     function() { return i18n.commandPalettePage     || 'Page'; },
         inline:   function() { return i18n.commandPaletteInline   || 'Inline'; },
@@ -12019,9 +12027,14 @@ class EditorInstance {
     // Image directory settings button handler
     const imageDirSettingsBtn = container.querySelector('.imagedir-settings-btn');
     if (imageDirSettingsBtn) {
-        imageDirSettingsBtn.addEventListener('click', function() {
-            host.requestSetImageDir();
-        });
+        if (IS_OUTLINER_PAGE) {
+            // outlinerページでは画像ディレクトリ変更ボタンを非表示
+            imageDirSettingsBtn.style.display = 'none';
+        } else {
+            imageDirSettingsBtn.addEventListener('click', function() {
+                host.requestSetImageDir();
+            });
+        }
     }
 
     // Sidebar resize functionality

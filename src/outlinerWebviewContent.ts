@@ -6,6 +6,7 @@ import { getNonce } from './webviewContent';
 interface OutlinerConfig {
     theme: string;
     fontSize: number;
+    webviewMessages?: Record<string, string>;
 }
 
 export function getOutlinerWebviewContent(
@@ -52,14 +53,17 @@ export function getOutlinerWebviewContent(
 </head>
 <body>
     <div class="outliner-container">
+        <div class="outliner-breadcrumb"></div>
         <div class="outliner-search-bar">
-            <button class="outliner-search-mode-toggle" title="Toggle search mode: Tree / Focus">🌲</button>
+            <button class="outliner-search-mode-toggle" title="Toggle search mode: Tree / Focus"></button>
             <input type="text" class="outliner-search-input" placeholder="Search... (e.g. #tag, keyword, is:page)" />
-            <span class="outliner-scope-badge"></span>
         </div>
         <div class="outliner-tree" role="tree"></div>
     </div>
 
+    <script nonce="${nonce}">
+        window.__outlinerMessages = ${JSON.stringify(config.webviewMessages || {})};
+    </script>
     <script nonce="${nonce}">
         ${hostBridgeScript}
     </script>

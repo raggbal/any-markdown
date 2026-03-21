@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { getWebviewContent, getNonce } from './webviewContent';
 import { t, getWebviewMessages, initLocale } from './i18n/messages';
+import { OutlinerProvider } from './outlinerProvider';
 
 // ============================================
 // DocumentParser: IMAGE_DIR ディレクティブの解析
@@ -450,6 +451,16 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
         // nonce を保持（サイドパネル iframe で再利用するため）
         const webviewNonce = { value: getNonce() };
 
+        // outlinerページ判定
+        const isOutlinerPage = OutlinerProvider.outlinerPagePaths.has(document.uri.fsPath);
+        const outlinerPageDir = OutlinerProvider.outlinerPagePaths.get(document.uri.fsPath);
+
+        // outlinerページの場合、画像ディレクトリを強制設定
+        if (isOutlinerPage && outlinerPageDir) {
+            const imagesDir = path.join(outlinerPageDir, 'images');
+            imageDirectoryManager.setFileImageDir(document.uri, imagesDir);
+        }
+
         const updateWebview = () => {
             try {
                 const config = vscode.workspace.getConfiguration('any-markdown');
@@ -464,7 +475,8 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
                         toolbarMode: config.get<string>('toolbarMode', 'full'),
                         documentBaseUri: documentBaseUri,
                         webviewMessages: getWebviewMessages(),
-                        enableDebugLogging: config.get<boolean>('enableDebugLogging', false)
+                        enableDebugLogging: config.get<boolean>('enableDebugLogging', false),
+                        isOutlinerPage: isOutlinerPage
                     },
                     webviewNonce
                 );
@@ -1093,6 +1105,8 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
                     break;
 
                 case 'setImageDir': {
+                    // outlinerページでは画像ディレクトリ変更を拒否
+                    if (isOutlinerPage) { break; }
                     // Set IMAGE_DIR and FORCE_RELATIVE_PATH directives via toolbar button
                     // Resolve target document: side panel or main
                     const isSpSetImageDir = !!message.sidePanelFilePath;
@@ -1295,6 +1309,8 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
             if (this.activeWebviewPanel === webviewPanel) {
                 this.activeWebviewPanel = undefined;
             }
+            // outlinerページ追跡をクリーンアップ
+            OutlinerProvider.outlinerPagePaths.delete(document.uri.fsPath);
             changeDocumentSubscription.dispose();
             changeConfigSubscription.dispose();
             fileChangeSubscription.dispose();

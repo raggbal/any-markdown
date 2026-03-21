@@ -22,6 +22,7 @@ interface EditorConfig {
     documentBaseUri?: string;
     webviewMessages?: WebviewMessages;
     enableDebugLogging?: boolean;
+    isOutlinerPage?: boolean;
 }
 
 export function getWebviewContent(
@@ -56,7 +57,8 @@ export function getWebviewContent(
         toolbarMode: config?.toolbarMode ?? 'full',
         documentBaseUri: config?.documentBaseUri ?? '',
         webviewMessages: config?.webviewMessages,
-        enableDebugLogging: config?.enableDebugLogging ?? false
+        enableDebugLogging: config?.enableDebugLogging ?? false,
+        isOutlinerPage: config?.isOutlinerPage ?? false
     };
 
     const nonce = getNonce();
@@ -99,6 +101,7 @@ export function getWebviewContent(
         .replace('__DEBUG_MODE__', String(safeConfig.enableDebugLogging ?? false))
         .replace('__I18N__', JSON.stringify(msg))
         .replace('__DOCUMENT_BASE_URI__', safeConfig.documentBaseUri || '')
+        .replace('__IS_OUTLINER_PAGE__', String(safeConfig.isOutlinerPage ?? false))
         .replace('__CONTENT__', `'${base64Content}'`);
 
     return `<!DOCTYPE html>

@@ -5,6 +5,25 @@ All notable changes to the "Any Markdown Editor" extension will be documented in
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.195.468] - 2026-03-21
+
+### Added
+
+- **Outliner: Breadcrumb navigation** — Shows ancestor chain above search bar when scoped; click any ancestor to re-scope, click TOP to return to full document
+- **Outliner: Scope keyboard shortcuts** — Cmd+] to scope into focused node, Cmd+[ to clear scope
+- **Outliner: Scope context menu** — Right-click "Scope" and "Clear Scope" options
+- **Outliner: Tag click search** — Click a #tag or @tag on a non-focused node to auto-search
+- **Outliner: 7 theme support** — github, sepia, night, dark, minimal, things, perplexity themes now applied to outliner
+- **Outliner: i18n support** — 7 languages (en, ja, ko, es, fr, zh-cn, zh-tw) for all outliner UI strings
+- **Outliner: Page directory setting** — `any-markdown.outlinerPageDir` setting + per-file override via mmd JSON `pageDir` field
+- **Outliner: Page display constraints** — Pages opened from outliner have forced image directory and hidden addPage feature
+
+### Fixed
+
+- **Outliner: ESC clears scope** — ESC now only clears search, not scope
+- **Outliner: Search clear resets scope** — Empty search or clearSearch no longer resets scope
+- **Outliner: Scope becomes stale after node deletion** — Added safety checks on all 5 node deletion paths
+
 ## [0.195.466] - 2026-03-21
 
 ### Fixed

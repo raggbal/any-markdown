@@ -2,7 +2,7 @@
   "name": "any-markdown",
   "displayName": "Any Markdown Editor",
   "description": "A WYSIWYG markdown editor for VS Code with seamless live preview",
-  "version": "0.195.467",
+  "version": "0.195.470",
   "publisher": "imaken",
   "icon": "media/icon.png",
   "license": "MIT",
@@ -155,6 +155,11 @@
           ],
           "default": "default",
           "description": "UI language. 'default' uses VS Code's display language. / UI言語。'default'はVS Codeの表示言語を使用します。"
+        },
+        "any-markdown.outlinerPageDir": {
+          "type": "string",
+          "default": "./pages",
+          "description": "Outliner page files directory. Relative to .mmd file or absolute path. / アウトライナのページファイルディレクトリ。.mmdファイルからの相対パスまたは絶対パス。"
         },
         "any-markdown.toolbarMode": {
           "type": "string",

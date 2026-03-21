@@ -49,6 +49,7 @@ editorScript = editorScript
     .replace('__DEBUG_MODE__', 'false')
     .replace('__I18N__', '{}')
     .replace('__DOCUMENT_BASE_URI__', '')
+    .replace('__IS_OUTLINER_PAGE__', 'false')
     .replace('__CONTENT__', '``');
 
 // HTMLテンプレート
