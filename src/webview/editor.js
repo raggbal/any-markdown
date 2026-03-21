@@ -13215,10 +13215,45 @@ class EditorInstance {
                         nextSib.remove();
                     }
                 }
-                range.setStartAfter(img);
-                range.setEndAfter(img);
-                sel.removeAllRanges();
-                sel.addRange(range);
+                // If the image is in a block element (p, div) that contains only images (no real text),
+                // create a new empty paragraph after it and move cursor there.
+                // This ensures consecutive pastes go into separate paragraphs.
+                const parentBlock = img.closest('p, div');
+                if (parentBlock && parentBlock.closest('.editor') === editor) {
+                    // Check if parentBlock has any real text nodes (not just whitespace)
+                    const walker = document.createTreeWalker(parentBlock, NodeFilter.SHOW_TEXT, null);
+                    let hasRealText = false;
+                    let textNode;
+                    while ((textNode = walker.nextNode())) {
+                        if (textNode.textContent.trim() !== '') {
+                            hasRealText = true;
+                            break;
+                        }
+                    }
+                    if (!hasRealText) {
+                        // Remove leftover <br> in image-only paragraph (was block closer)
+                        for (const br of Array.from(parentBlock.querySelectorAll('br'))) {
+                            br.remove();
+                        }
+                        const newP = document.createElement('p');
+                        newP.innerHTML = '<br>';
+                        parentBlock.after(newP);
+                        range.setStart(newP, 0);
+                        range.setEnd(newP, 0);
+                        sel.removeAllRanges();
+                        sel.addRange(range);
+                    } else {
+                        range.setStartAfter(img);
+                        range.setEndAfter(img);
+                        sel.removeAllRanges();
+                        sel.addRange(range);
+                    }
+                } else {
+                    range.setStartAfter(img);
+                    range.setEndAfter(img);
+                    sel.removeAllRanges();
+                    sel.addRange(range);
+                }
             } else {
                 editor.appendChild(img);
             }
@@ -13809,7 +13844,7 @@ class EditorInstance {
                 }
             }
         }
-        
+
         // Check for file URI drop (from Finder/Explorer via VS Code)
         const uriList = e.dataTransfer?.getData('text/uri-list');
         const plainText = e.dataTransfer?.getData('text/plain');
