@@ -68,7 +68,7 @@ test.describe('コマンドパレット', () => {
 
         // 全アイテム数を確認
         const allItems = await page.locator('.command-palette-item').count();
-        expect(allItems).toBe(21); // 21アイテム (mermaid, math追加)
+        expect(allItems).toBe(22); // 22アイテム (addPage, mermaid, math追加)
 
         // "heading" でフィルタ
         const input = page.locator('.command-palette-input');
@@ -82,7 +82,7 @@ test.describe('コマンドパレット', () => {
         await input.fill('');
         await page.waitForTimeout(100);
         const restoredItems = await page.locator('.command-palette-item').count();
-        expect(restoredItems).toBe(21);
+        expect(restoredItems).toBe(22);
     });
 
     test('↑↓でアイテム選択が移動する', async ({ page }) => {
@@ -203,7 +203,7 @@ test.describe('コマンドパレット', () => {
         await page.waitForTimeout(100);
 
         const groupLabels = page.locator('.command-palette-group-label');
-        expect(await groupLabels.count()).toBe(5); // Inline, Headings, Lists, Blocks, Insert
+        expect(await groupLabels.count()).toBe(6); // Page, Inline, Headings, Lists, Blocks, Insert
     });
 
     test('各アイテムにアイコンとラベルが表示される', async ({ page }) => {
