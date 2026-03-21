@@ -5,6 +5,15 @@ All notable changes to the "Any Markdown Editor" extension will be documented in
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.195.464] - 2026-03-21
+
+### Fixed
+
+- **Outliner: Cmd+B toggles VSCode sidebar** — Added stopPropagation to prevent Cmd+B/I/E/Shift+S from triggering VSCode shortcuts
+- **Outliner: `**text*` incorrectly rendered as italic** — Fixed italic regex to not match `*` that is part of `**` bold markers
+- **Outliner: Cursor jumps to end after inline formatting** — Fixed offset mismatch between rendered text and source text by separating editing mode (raw markers) and display mode (formatted)
+- **Outliner: Enter splits text incorrectly with inline markers** — Same root cause as cursor jump; editing mode now uses source text offsets directly
+
 ## [0.195.463] - 2026-03-21
 
 ### Added

@@ -308,6 +308,18 @@ var Outliner = (function() {
 
         textEl.addEventListener('focus', function() {
             setFocusedNode(node.id);
+            // 編集モードに切替: マーカーを生テキストで表示 (フォーマットは非適用)
+            var sourceText = node.text || '';
+            var renderedOff = getCursorOffset(textEl);
+            textEl.innerHTML = renderEditingText(sourceText);
+            if (renderedOff > 0) {
+                var sourceOff = renderedOffsetToSource(sourceText, renderedOff);
+                setCursorAtOffset(textEl, sourceOff);
+            }
+        });
+        textEl.addEventListener('blur', function() {
+            // 表示モードに切替: フルフォーマット適用
+            textEl.innerHTML = renderInlineText(node.text || '');
         });
 
         textEl.addEventListener('mousedown', function(e) {
@@ -326,11 +338,11 @@ var Outliner = (function() {
         textEl.addEventListener('compositionstart', function() { isComposing = true; });
         textEl.addEventListener('compositionend', function() {
             isComposing = false;
-            // IME確定後にインライン再描画
+            // IME確定後に編集モード再描画 (タグのみ)
             var plainText = getPlainText(textEl);
             model.updateText(node.id, plainText);
             var off = getCursorOffset(textEl);
-            textEl.innerHTML = renderInlineText(plainText);
+            textEl.innerHTML = renderEditingText(plainText);
             setCursorAtOffset(textEl, off);
             scheduleSyncToHost();
         });
@@ -338,9 +350,9 @@ var Outliner = (function() {
             var plainText = getPlainText(textEl);
             model.updateText(node.id, plainText);
             if (!isComposing) {
-                // インライン装飾をリアルタイム再描画 (カーソル位置を保持)
+                // 編集モード再描画 (タグのみハイライト、マーカーは生表示)
                 var off = getCursorOffset(textEl);
-                textEl.innerHTML = renderInlineText(plainText);
+                textEl.innerHTML = renderEditingText(plainText);
                 setCursorAtOffset(textEl, off);
             }
             scheduleSyncToHost();
@@ -374,8 +386,8 @@ var Outliner = (function() {
         // 太字
         html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
 
-        // 斜体
-        html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+        // 斜体 — **の一部である*にマッチしないよう lookbehind/lookahead を使用
+        html = html.replace(/(?<!\*)\*(?!\*)([^*]+)\*(?!\*)/g, '<em>$1</em>');
 
         // 取り消し線
         html = html.replace(/~~([^~]+)~~/g, '<del>$1</del>');
@@ -390,6 +402,80 @@ var Outliner = (function() {
         html = html.replace(/ $/, '\u00A0');
 
         return html;
+    }
+
+    /**
+     * ソーステキスト（マーカー付き）からマーカーを除去してレンダリング後テキストを返す。
+     * renderInlineText と同じ正規表現順序で処理する。
+     */
+    function stripInlineMarkers(text) {
+        if (!text) { return ''; }
+        text = text.replace(/`([^`]+)`/g, '$1');
+        text = text.replace(/\*\*([^*]+)\*\*/g, '$1');
+        text = text.replace(/(?<!\*)\*(?!\*)([^*]+)\*(?!\*)/g, '$1');
+        text = text.replace(/~~([^~]+)~~/g, '$1');
+        return text;
+    }
+
+    /**
+     * 編集モード用のテキストレンダリング。
+     * マーカー(*、**、~~、`)はそのまま表示し、タグのみハイライトする。
+     * textContent がソーステキストと一致するため、オフセット計算が安全。
+     */
+    function renderEditingText(text) {
+        if (!text) { return ''; }
+        var html = text
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+        // タグのみハイライト (テキスト内容を変えないのでオフセットに影響なし)
+        html = html.replace(/(?<![&#\w\p{L}])([#@][\w\p{L}][\w\p{L}-]*)/gu, '<span class="outliner-tag">$1</span>');
+        // 末尾スペースをNBSPに変換
+        html = html.replace(/ $/, '\u00A0');
+        return html;
+    }
+
+    /**
+     * レンダリング後テキストのオフセットをソーステキストのオフセットに変換する。
+     * sourceText: マーカー付きテキスト, renderedOffset: マーカー除去後のオフセット
+     */
+    function renderedOffsetToSource(sourceText, renderedOffset) {
+        var rendered = stripInlineMarkers(sourceText);
+        var map = buildRenderedToSourceMap(sourceText, rendered);
+        if (renderedOffset >= map.length) { return sourceText.length; }
+        return map[renderedOffset];
+    }
+
+    /**
+     * ソーステキストのオフセットをレンダリング後テキストのオフセットに変換する。
+     */
+    function sourceOffsetToRendered(sourceText, sourceOffset) {
+        var rendered = stripInlineMarkers(sourceText);
+        var map = buildRenderedToSourceMap(sourceText, rendered);
+        // mapの中からsourceOffset以上の最初のエントリのインデックスを返す
+        for (var i = 0; i < map.length; i++) {
+            if (map[i] >= sourceOffset) { return i; }
+        }
+        return rendered.length;
+    }
+
+    /**
+     * レンダリング後テキストの各位置がソーステキストのどの位置に対応するかのマップを構築。
+     * map[renderedPos] = sourcePos
+     */
+    function buildRenderedToSourceMap(sourceText, renderedText) {
+        var map = [];
+        var si = 0;
+        for (var ri = 0; ri < renderedText.length; ri++) {
+            while (si < sourceText.length && sourceText[si] !== renderedText[ri]) {
+                si++;
+            }
+            map.push(si);
+            si++;
+        }
+        // 末尾位置
+        map.push(sourceText.length);
+        return map;
     }
 
     /** contenteditable からプレーンテキストを取得 (NBSPは通常スペースに正規化) */
@@ -410,7 +496,7 @@ var Outliner = (function() {
         var off = getCursorOffset(textEl);
 
         if (sel && !sel.isCollapsed) {
-            // 選択範囲あり
+            // 選択範囲あり (編集モードなのでオフセットはソーステキスト空間)
             var range = sel.getRangeAt(0);
             var preRange = range.cloneRange();
             preRange.selectNodeContents(textEl);
@@ -426,20 +512,20 @@ var Outliner = (function() {
             if (before.endsWith(marker) && after.startsWith(marker)) {
                 var newText = before.slice(0, -marker.length) + selected + after.slice(marker.length);
                 model.updateText(nodeId, newText);
-                textEl.innerHTML = renderInlineText(newText);
-                // カーソルを選択範囲の末尾に
+                textEl.innerHTML = renderEditingText(newText);
                 setCursorAtOffset(textEl, endOff - marker.length);
             } else {
                 var newText2 = before + marker + selected + marker + after;
                 model.updateText(nodeId, newText2);
-                textEl.innerHTML = renderInlineText(newText2);
-                setCursorAtOffset(textEl, endOff + marker.length);
+                textEl.innerHTML = renderEditingText(newText2);
+                // カーソルを閉じマーカーの直後に配置
+                setCursorAtOffset(textEl, endOff + 2 * marker.length);
             }
         } else {
             // 選択なし: マーカーペア挿入
             var newText3 = text.slice(0, off) + marker + marker + text.slice(off);
             model.updateText(nodeId, newText3);
-            textEl.innerHTML = renderInlineText(newText3);
+            textEl.innerHTML = renderEditingText(newText3);
             setCursorAtOffset(textEl, off + marker.length);
         }
         scheduleSyncToHost();
@@ -643,7 +729,7 @@ var Outliner = (function() {
             var curText = node.text || '';
             var newSingleText = curText.slice(0, curOff) + clipText + curText.slice(curOff);
             model.updateText(nodeId, newSingleText);
-            textEl.innerHTML = renderInlineText(newSingleText);
+            textEl.innerHTML = renderEditingText(newSingleText);
             setCursorAtOffset(textEl, curOff + clipText.length);
             scheduleSyncToHost();
             return;
@@ -863,7 +949,7 @@ var Outliner = (function() {
                     saveSnapshot();
                     var trimmed = nodeText.replace(/^\s+/, '');
                     model.updateText(nodeId, trimmed);
-                    textEl.innerHTML = renderInlineText(trimmed);
+                    textEl.innerHTML = renderEditingText(trimmed);
                     setCursorAtOffset(textEl, 0);
                     scheduleSyncToHost();
                 } else if (isAtStart) {
@@ -1050,18 +1136,21 @@ var Outliner = (function() {
                     }
                     break;
                 case 'b':
-                    // Cmd+B: 太字
+                    // Cmd+B: 太字 (stopPropagationでVSCodeのサイドバー切替を防止)
                     e.preventDefault();
+                    e.stopPropagation();
                     applyInlineFormat(nodeId, textEl, '**');
                     return;
                 case 'i':
                     // Cmd+I: 斜体
                     e.preventDefault();
+                    e.stopPropagation();
                     applyInlineFormat(nodeId, textEl, '*');
                     return;
                 case 'e':
                     // Cmd+E: インラインコード
                     e.preventDefault();
+                    e.stopPropagation();
                     applyInlineFormat(nodeId, textEl, '`');
                     return;
             }
@@ -1072,6 +1161,7 @@ var Outliner = (function() {
             if (e.key === 's' || e.key === 'S') {
                 // Cmd+Shift+S: 取り消し線
                 e.preventDefault();
+                e.stopPropagation();
                 applyInlineFormat(nodeId, textEl, '~~');
                 return;
             }
