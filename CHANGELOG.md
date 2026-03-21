@@ -5,6 +5,12 @@ All notable changes to the "Any Markdown Editor" extension will be documented in
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.195.475] - 2026-03-22
+
+### Changed
+
+- **Internal: SidePanelManager shared class** — Extracted duplicated side panel logic (file watcher, save, link handling, TOC) from both editor and outliner providers into a single shared class
+
 ## [0.195.468] - 2026-03-21
 
 ### Added

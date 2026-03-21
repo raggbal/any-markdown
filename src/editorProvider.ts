@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { getWebviewContent, getNonce } from './webviewContent';
 import { t, getWebviewMessages, initLocale } from './i18n/messages';
 import { OutlinerProvider } from './outlinerProvider';
+import { SidePanelManager } from './shared/sidePanelManager';
 
 // ============================================
 // DocumentParser: IMAGE_DIR ディレクティブの解析
@@ -368,25 +369,6 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
      * The blob: iframe can't access file:// or vscode-resource URIs,
      * so all images must be provided as data URLs.
      */
-    private extractToc(markdown: string): Array<{level: number, text: string, anchor: string}> {
-        const lines = markdown.split('\n');
-        const toc: Array<{level: number, text: string, anchor: string}> = [];
-        let inCodeBlock = false;
-        for (const line of lines) {
-            if (line.startsWith('```')) { inCodeBlock = !inCodeBlock; continue; }
-            if (inCodeBlock) continue;
-            const match = line.match(/^(#{1,2})\s+(.+)$/);
-            if (match) {
-                const text = match[2].trim();
-                const anchor = text.toLowerCase()
-                    .replace(/[^\w\s\u3000-\u9fff\u{20000}-\u{2fa1f}\-]/gu, '')
-                    .replace(/\s+/g, '-');
-                toc.push({ level: match[1].length, text, anchor });
-            }
-        }
-        return toc;
-    }
-
     public async resolveCustomTextEditor(
         document: vscode.TextDocument,
         webviewPanel: vscode.WebviewPanel,
@@ -546,10 +528,10 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
             const spUri = vscode.Uri.file(spFilePath);
             const spDir = path.dirname(spFilePath);
 
-            // Read content from sidePanelDocument or disk
+            // Read content from sidePanel.document or disk
             let spContent = '';
-            if (sidePanelDocument && !sidePanelDocument.isClosed) {
-                spContent = sidePanelDocument.getText();
+            if (sidePanel.document && !sidePanel.document.isClosed) {
+                spContent = sidePanel.document.getText();
             } else {
                 try { spContent = fs.readFileSync(spFilePath, 'utf-8'); } catch { /* empty */ }
             }
@@ -683,102 +665,14 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
             }
         });
 
-        // Side panel document — uses TextDocument buffer (same architecture as main editor)
-        let sidePanelDocument: vscode.TextDocument | undefined;
-        let sidePanelFileWatcher: vscode.FileSystemWatcher | undefined;
-        let sidePanelFileChangeSubscription: vscode.Disposable | undefined;
-        let sidePanelDocChangeSubscription: vscode.Disposable | undefined;
-        let sidePanelWatchedPath: string | undefined;
-        let isApplyingSidePanelEdit = false;
-
-        const setupSidePanelFileWatcher = async (filePath: string) => {
-            disposeSidePanelFileWatcher();
-            sidePanelWatchedPath = filePath;
-            const fileUri = vscode.Uri.file(filePath);
-
-            // Open as TextDocument — creates an in-memory buffer (does not open a visible tab)
-            sidePanelDocument = await vscode.workspace.openTextDocument(fileUri);
-
-            // Watch for external file changes → sync TextDocument (same pattern as main editor)
-            sidePanelFileWatcher = vscode.workspace.createFileSystemWatcher(
-                new vscode.RelativePattern(vscode.Uri.joinPath(fileUri, '..'), path.basename(filePath))
-            );
-            sidePanelFileChangeSubscription = sidePanelFileWatcher.onDidChange(async (uri) => {
-                if (uri.fsPath !== filePath) return;
-                console.log('[Any MD][SP-FSW] FileSystemWatcher fired, isApplyingSidePanelEdit=', isApplyingSidePanelEdit);
-                if (isApplyingSidePanelEdit) { console.log('[Any MD][SP-FSW] SKIPPED (isApplyingSidePanelEdit)'); return; }
-                setTimeout(async () => {
-                    try {
-                        if (!sidePanelDocument) { console.log('[Any MD][SP-FSW] SKIPPED (no sidePanelDocument)'); return; }
-                        // Re-open if VSCode auto-closed the document
-                        if (sidePanelDocument.isClosed) {
-                            console.log('[Any MD][SP-FSW] Document was closed, re-opening');
-                            sidePanelDocument = await vscode.workspace.openTextDocument(uri);
-                        }
-                        const fileContent = await vscode.workspace.fs.readFile(uri);
-                        const newContent = new TextDecoder().decode(fileContent);
-                        const currentContent = sidePanelDocument.getText();
-                        console.log('[Any MD][SP-FSW] disk len=', newContent.length, 'doc len=', currentContent.length, 'same=', newContent === currentContent);
-                        if (newContent !== currentContent) {
-                            // Sync TextDocument with disk
-                            isApplyingSidePanelEdit = true;
-                            const fullRange = new vscode.Range(
-                                sidePanelDocument.positionAt(0),
-                                sidePanelDocument.positionAt(currentContent.length)
-                            );
-                            const edit = new vscode.WorkspaceEdit();
-                            edit.replace(sidePanelDocument.uri, fullRange, newContent);
-                            const editResult = await vscode.workspace.applyEdit(edit);
-                            console.log('[Any MD][SP-FSW] applyEdit result=', editResult);
-                            isApplyingSidePanelEdit = false;
-                            // Re-check after applyEdit
-                            if (sidePanelDocument.isClosed) {
-                                sidePanelDocument = await vscode.workspace.openTextDocument(uri);
-                            }
-                            // Save to clear dirty state — file on disk is already up to date
-                            await sidePanelDocument.save();
-                            console.log('[Any MD][SP-FSW] Relaying update to iframe, content len=', newContent.length);
-                            // Relay to iframe — onDidChangeTextDocument is skipped during isApplyingSidePanelEdit
-                            webviewPanel.webview.postMessage({
-                                type: 'sidePanelMessage',
-                                data: { type: 'update', content: newContent }
-                            });
-                        }
-                    } catch (error) {
-                        isApplyingSidePanelEdit = false;
-                        console.error('[Any MD][SP-FSW] Error:', error);
-                    }
-                }, 100);
-            });
-
-            // Watch TextDocument changes → relay to iframe (both external and own edits trigger this)
-            sidePanelDocChangeSubscription = vscode.workspace.onDidChangeTextDocument(e => {
-                if (!sidePanelDocument) return;
-                if (e.document.uri.toString() !== sidePanelDocument.uri.toString()) return;
-                if (e.contentChanges.length === 0) return;
-                console.log('[Any MD][SP-DocChange] onDidChangeTextDocument fired, isApplyingSidePanelEdit=', isApplyingSidePanelEdit, 'changes=', e.contentChanges.length);
-                // Skip our own edits — already reflected in the iframe
-                if (isApplyingSidePanelEdit) { console.log('[Any MD][SP-DocChange] SKIPPED (isApplyingSidePanelEdit)'); return; }
-                // External change: send update to iframe
-                const content = e.document.getText();
-                console.log('[Any MD][SP-DocChange] Relaying update to iframe, content len=', content.length);
-                webviewPanel.webview.postMessage({
-                    type: 'sidePanelMessage',
-                    data: { type: 'update', content: content }
-                });
-            });
-        };
-
-        const disposeSidePanelFileWatcher = () => {
-            sidePanelDocChangeSubscription?.dispose();
-            sidePanelDocChangeSubscription = undefined;
-            sidePanelFileChangeSubscription?.dispose();
-            sidePanelFileChangeSubscription = undefined;
-            sidePanelFileWatcher?.dispose();
-            sidePanelFileWatcher = undefined;
-            sidePanelDocument = undefined;
-            sidePanelWatchedPath = undefined;
-        };
+        // --- サイドパネル管理 (SidePanelManager で共通化) ---
+        const sidePanel = new SidePanelManager(
+            {
+                postMessage: (msg: any) => webviewPanel.webview.postMessage(msg),
+                asWebviewUri: (uri: vscode.Uri) => webviewPanel.webview.asWebviewUri(uri)
+            },
+            { logPrefix: '[Any MD]' }
+        );
 
         // Listen for configuration changes
         const changeConfigSubscription = vscode.workspace.onDidChangeConfiguration(e => {
@@ -861,24 +755,24 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
                     break;
 
                 case 'insertImage': {
-                    const imgDocUri = this.resolveImageDocumentUri(message.sidePanelFilePath, sidePanelWatchedPath, document);
-                    const imgDocContent = await this.resolveImageDocumentContent(message.sidePanelFilePath, sidePanelWatchedPath, sidePanelDocument, document);
+                    const imgDocUri = this.resolveImageDocumentUri(message.sidePanelFilePath, sidePanel.watchedPath, document);
+                    const imgDocContent = await this.resolveImageDocumentContent(message.sidePanelFilePath, sidePanel.watchedPath, sidePanel.document, document);
                     await this.handleImageInsert(imgDocUri, imgDocContent, webviewPanel.webview);
                     break;
                 }
 
                 case 'saveImageAndInsert': {
                     // Save pasted/dropped image to file
-                    const saveDocUri = this.resolveImageDocumentUri(message.sidePanelFilePath, sidePanelWatchedPath, document);
-                    const saveDocContent = await this.resolveImageDocumentContent(message.sidePanelFilePath, sidePanelWatchedPath, sidePanelDocument, document);
+                    const saveDocUri = this.resolveImageDocumentUri(message.sidePanelFilePath, sidePanel.watchedPath, document);
+                    const saveDocContent = await this.resolveImageDocumentContent(message.sidePanelFilePath, sidePanel.watchedPath, sidePanel.document, document);
                     await this.handleSaveImage(saveDocUri, saveDocContent, webviewPanel.webview, message.dataUrl, message.fileName);
                     break;
                 }
 
                 case 'readAndInsertImage': {
                     // Read an existing image file and insert it
-                    const readDocUri = this.resolveImageDocumentUri(message.sidePanelFilePath, sidePanelWatchedPath, document);
-                    const readDocContent = await this.resolveImageDocumentContent(message.sidePanelFilePath, sidePanelWatchedPath, sidePanelDocument, document);
+                    const readDocUri = this.resolveImageDocumentUri(message.sidePanelFilePath, sidePanel.watchedPath, document);
+                    const readDocContent = await this.resolveImageDocumentContent(message.sidePanelFilePath, sidePanel.watchedPath, sidePanel.document, document);
                     await this.handleReadAndInsertImage(readDocUri, readDocContent, webviewPanel.webview, message.filePath);
                     break;
                 }
@@ -924,26 +818,7 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
                             if (linkOpenMode === 'tab') {
                                 vscode.commands.executeCommand('vscode.openWith', resolvedUri, 'any-markdown.editor');
                             } else {
-                                // sidePanel mode: send markdown to webview for EditorInstance creation
-                                try {
-                                    const fileContent = await vscode.workspace.fs.readFile(resolvedUri);
-                                    const text = Buffer.from(fileContent).toString('utf8');
-                                    const fileName = resolvedUri.path.split('/').pop() || 'untitled.md';
-                                    const spBaseUri = webviewPanel.webview.asWebviewUri(
-                                        resolvedUri.with({ path: resolvedUri.path.replace(/\/[^/]+$/, '/') })
-                                    ).toString();
-                                    webviewPanel.webview.postMessage({
-                                        type: 'openSidePanel',
-                                        markdown: text,
-                                        filePath: resolvedUri.fsPath,
-                                        fileName: fileName,
-                                        toc: this.extractToc(text),
-                                        documentBaseUri: spBaseUri
-                                    });
-                                    await setupSidePanelFileWatcher(resolvedUri.fsPath);
-                                } catch (e) {
-                                    vscode.window.showErrorMessage(`Cannot open file: ${resolvedUri.fsPath}`);
-                                }
+                                await sidePanel.openFile(resolvedUri.fsPath);
                             }
                         } else {
                             vscode.commands.executeCommand('vscode.open', resolvedUri);
@@ -978,100 +853,16 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
                     break;
 
                 case 'saveSidePanelFile':
-                    try {
-                        console.log('[Any MD][SP-Save] saveSidePanelFile called, hasDoc=', !!sidePanelDocument, 'pathMatch=', sidePanelDocument?.uri.fsPath === message.filePath);
-                        if (sidePanelDocument && sidePanelDocument.uri.fsPath === message.filePath) {
-                            // Re-open document if VSCode has closed it (no visible tab = auto-close)
-                            if (sidePanelDocument.isClosed) {
-                                console.log('[Any MD][SP-Save] Document was closed, re-opening');
-                                sidePanelDocument = await vscode.workspace.openTextDocument(vscode.Uri.file(message.filePath));
-                            }
-                            // Use TextDocument buffer (same architecture as main editor)
-                            const normalize = (s: string) => s.replace(/\r\n/g, '\n');
-                            const msgNorm = normalize(message.content);
-                            const docNorm = normalize(sidePanelDocument.getText());
-                            console.log('[Any MD][SP-Save] msg len=', msgNorm.length, 'doc len=', docNorm.length, 'same=', msgNorm === docNorm);
-                            if (msgNorm === docNorm) { console.log('[Any MD][SP-Save] SKIPPED (same content)'); break; }
-                            isApplyingSidePanelEdit = true;
-                            const spEdit = new vscode.WorkspaceEdit();
-                            spEdit.replace(
-                                sidePanelDocument.uri,
-                                new vscode.Range(0, 0, sidePanelDocument.lineCount, 0),
-                                message.content
-                            );
-                            const spEditResult = await vscode.workspace.applyEdit(spEdit);
-                            console.log('[Any MD][SP-Save] applyEdit result=', spEditResult);
-                            isApplyingSidePanelEdit = false;
-                            // Re-check after applyEdit — VSCode may close the document between async operations
-                            if (sidePanelDocument.isClosed) {
-                                console.log('[Any MD][SP-Save] Document closed after applyEdit, re-opening for save');
-                                sidePanelDocument = await vscode.workspace.openTextDocument(vscode.Uri.file(message.filePath));
-                            }
-                            await sidePanelDocument.save();
-                            console.log('[Any MD][SP-Save] save() completed');
-                        } else {
-                            console.log('[Any MD][SP-Save] Fallback: direct file write');
-                            // Fallback: direct file write (side panel document not yet opened)
-                            const spUri = vscode.Uri.file(message.filePath);
-                            const spContent = Buffer.from(message.content, 'utf8');
-                            await vscode.workspace.fs.writeFile(spUri, spContent);
-                        }
-                    } catch (e) {
-                        isApplyingSidePanelEdit = false;
-                        console.error('[Any MD][SP-Save] Error:', e);
-                        vscode.window.showErrorMessage(`Failed to save: ${message.filePath} — ${e instanceof Error ? e.message : String(e)}`);
-                    }
+                    await sidePanel.handleSave(message.filePath, message.content);
                     break;
 
                 case 'sidePanelClosed':
-                    disposeSidePanelFileWatcher();
+                    sidePanel.handleClose();
                     break;
 
-                case 'sidePanelOpenLink': {
-                    // Link clicked inside side panel iframe — open in same side panel
-                    const spLinkHref: string = message.href;
-                    const spFilePath: string = message.sidePanelFilePath;
-                    if (spLinkHref.startsWith('http')) {
-                        vscode.env.openExternal(vscode.Uri.parse(spLinkHref));
-                    } else if (spLinkHref.startsWith('#')) {
-                        // Scroll inside iframe — relay back to iframe
-                        webviewPanel.webview.postMessage({
-                            type: 'sidePanelMessage',
-                            data: { type: 'scrollToAnchor', anchor: spLinkHref.substring(1) }
-                        });
-                    } else {
-                        // Resolve relative to the side panel file's directory
-                        const spBaseUri = vscode.Uri.file(spFilePath);
-                        const spResolvedUri = spLinkHref.startsWith('/')
-                            ? vscode.Uri.file(spLinkHref)
-                            : vscode.Uri.joinPath(spBaseUri, '..', spLinkHref);
-                        const spResolvedPath = spResolvedUri.fsPath.toLowerCase();
-                        if (spResolvedPath.endsWith('.md') || spResolvedPath.endsWith('.markdown')) {
-                            try {
-                                const spFileContent = await vscode.workspace.fs.readFile(spResolvedUri);
-                                const spText = Buffer.from(spFileContent).toString('utf8');
-                                const spFileName = spResolvedUri.path.split('/').pop() || 'untitled.md';
-                                const spBaseUri = webviewPanel.webview.asWebviewUri(
-                                    spResolvedUri.with({ path: spResolvedUri.path.replace(/\/[^/]+$/, '/') })
-                                ).toString();
-                                webviewPanel.webview.postMessage({
-                                    type: 'openSidePanel',
-                                    markdown: spText,
-                                    filePath: spResolvedUri.fsPath,
-                                    fileName: spFileName,
-                                    toc: this.extractToc(spText),
-                                    documentBaseUri: spBaseUri
-                                });
-                                await setupSidePanelFileWatcher(spResolvedUri.fsPath);
-                            } catch (e) {
-                                vscode.window.showErrorMessage(`Cannot open file: ${spResolvedUri.fsPath}`);
-                            }
-                        } else {
-                            vscode.commands.executeCommand('vscode.open', spResolvedUri);
-                        }
-                    }
+                case 'sidePanelOpenLink':
+                    await sidePanel.handleOpenLink(message.href, message.sidePanelFilePath);
                     break;
-                }
 
                 case 'sendToChat':
                     // Open text editor with selection based on line numbers from webview
@@ -1110,8 +901,8 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
                     // Set IMAGE_DIR and FORCE_RELATIVE_PATH directives via toolbar button
                     // Resolve target document: side panel or main
                     const isSpSetImageDir = !!message.sidePanelFilePath;
-                    const setImgDirUri = this.resolveImageDocumentUri(message.sidePanelFilePath, sidePanelWatchedPath, document);
-                    const setImgDirContent = await this.resolveImageDocumentContent(message.sidePanelFilePath, sidePanelWatchedPath, sidePanelDocument, document);
+                    const setImgDirUri = this.resolveImageDocumentUri(message.sidePanelFilePath, sidePanel.watchedPath, document);
+                    const setImgDirContent = await this.resolveImageDocumentContent(message.sidePanelFilePath, sidePanel.watchedPath, sidePanel.document, document);
                     const inputDir = await vscode.window.showInputBox({
                         prompt: t('enterImageDir'),
                         placeHolder: './images',
@@ -1315,7 +1106,7 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
             changeConfigSubscription.dispose();
             fileChangeSubscription.dispose();
             fileWatcher.dispose();
-            disposeSidePanelFileWatcher();
+            sidePanel.disposeFileWatcher();
         });
     }
 
