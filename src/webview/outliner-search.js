@@ -126,14 +126,16 @@ var OutlinerSearch = (function() {
      * 検索実行
      * @param {Object} query - parseQuery() の戻り値
      * @param {Object} scope - { type: 'document' } or { type: 'subtree', rootId: '...' }
+     * @param {Object} [options] - { focusMode: false }
      * @returns {Set<string>} - 表示すべきノードIDのSet
      */
-    SearchEngine.prototype.search = function(query, scope) {
+    SearchEngine.prototype.search = function(query, scope, options) {
         if (!query) {
             // クエリなし → 全ノード表示
             return null;
         }
 
+        options = options || {};
         scope = scope || { type: 'document' };
         var candidates = this._getCandidates(scope);
         var matchedIds = new Set();
@@ -148,11 +150,13 @@ var OutlinerSearch = (function() {
                 for (var j = 0; j < descendants.length; j++) {
                     matchedIds.add(descendants[j]);
                 }
-                // 祖先も追加（ツリー表示のため）
-                var current = model.getNode(nodeId);
-                while (current && current.parentId) {
-                    matchedIds.add(current.parentId);
-                    current = model.getNode(current.parentId);
+                if (!options.focusMode) {
+                    // ツリーモード: 祖先も追加（ツリー表示のため）
+                    var current = model.getNode(nodeId);
+                    while (current && current.parentId) {
+                        matchedIds.add(current.parentId);
+                        current = model.getNode(current.parentId);
+                    }
                 }
             }
         }

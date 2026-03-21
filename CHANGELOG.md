@@ -5,6 +5,13 @@ All notable changes to the "Any Markdown Editor" extension will be documented in
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.195.463] - 2026-03-21
+
+### Added
+
+- **Outliner: Search mode toggle** — Toggle between Tree mode (shows ancestors to root) and Focus mode (shows matched node as top + children only)
+- **Outliner: Inline formatting shortcuts** — Cmd+B (bold), Cmd+I (italic), Cmd+E (code), Cmd+Shift+S (strikethrough) for outliner text
+
 ## [0.195.449] - 2026-03-21
 
 ### Fixed

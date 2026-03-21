@@ -21,6 +21,8 @@ var Outliner = (function() {
     var focusedNodeId = null;
     var currentScope = { type: 'document' };
     var currentSearchResult = null;  // Set<string> or null
+    var searchFocusMode = false;     // true: マッチノード頂点+子のみ, false: ルートまで表示
+    var searchModeToggleBtn = null;  // toggle button element
     var contextMenuEl = null;
 
     var syncDebounceTimer = null;
@@ -87,6 +89,7 @@ var Outliner = (function() {
         treeEl = document.querySelector('.outliner-tree');
         searchInput = document.querySelector('.outliner-search-input');
         scopeBadge = document.querySelector('.outliner-scope-badge');
+        searchModeToggleBtn = document.querySelector('.outliner-search-mode-toggle');
 
         renderTree();
         setupSearchBar();
@@ -125,13 +128,19 @@ var Outliner = (function() {
         }
 
         var fragment = document.createDocumentFragment();
-        var rootIds;
-        if (currentScope.type === 'subtree' && currentScope.rootId) {
-            rootIds = [currentScope.rootId];
+
+        if (searchFocusMode && currentSearchResult) {
+            // フォーカスモード: マッチノードをフラットに頂点として表示
+            renderFocusNodes(fragment, searchQuery);
         } else {
-            rootIds = model.rootIds;
+            var rootIds;
+            if (currentScope.type === 'subtree' && currentScope.rootId) {
+                rootIds = [currentScope.rootId];
+            } else {
+                rootIds = model.rootIds;
+            }
+            renderNodes(rootIds, fragment, 0, searchQuery);
         }
-        renderNodes(rootIds, fragment, 0, searchQuery);
         treeEl.appendChild(fragment);
     }
 
@@ -158,6 +167,58 @@ var Outliner = (function() {
                     childrenEl.classList.add('is-collapsed');
                 }
                 renderNodes(node.children, childrenEl, depth + 1, searchQuery);
+                parentEl.appendChild(childrenEl);
+            }
+        }
+    }
+
+    /** フォーカスモード: マッチノードを頂点として、その子孫のみ表示 */
+    function renderFocusNodes(parentEl, searchQuery) {
+        // マッチノード（子孫でも祖先でもなく、直接マッチしたもの）を検索で再判定
+        var query = OutlinerSearch.parseQuery(searchInput.value || '');
+        if (!query) { return; }
+        var allNodeIds = Object.keys(model.nodes);
+        var directMatches = [];
+        for (var i = 0; i < allNodeIds.length; i++) {
+            var nid = allNodeIds[i];
+            if (searchEngine._matches(nid, query)) {
+                directMatches.push(nid);
+            }
+        }
+        // 各マッチノードを頂点 (depth=0) として描画
+        for (var m = 0; m < directMatches.length; m++) {
+            var matchId = directMatches[m];
+            var node = model.getNode(matchId);
+            if (!node) { continue; }
+            var nodeEl = createNodeElement(node, 0, searchQuery);
+            parentEl.appendChild(nodeEl);
+            // 子孫を通常描画 (フィルタなし、全子を表示)
+            if (node.children && node.children.length > 0) {
+                var childrenEl = document.createElement('div');
+                childrenEl.className = 'outliner-children';
+                childrenEl.dataset.parent = matchId;
+                renderFocusChildren(node.children, childrenEl, 1, searchQuery);
+                parentEl.appendChild(childrenEl);
+            }
+        }
+    }
+
+    /** フォーカスモード用: 子孫を全て表示 (検索フィルタなし) */
+    function renderFocusChildren(nodeIds, parentEl, depth, searchQuery) {
+        for (var i = 0; i < nodeIds.length; i++) {
+            var nodeId = nodeIds[i];
+            var node = model.getNode(nodeId);
+            if (!node) { continue; }
+            var nodeEl = createNodeElement(node, depth, searchQuery);
+            parentEl.appendChild(nodeEl);
+            if (node.children && node.children.length > 0) {
+                var childrenEl = document.createElement('div');
+                childrenEl.className = 'outliner-children';
+                childrenEl.dataset.parent = nodeId;
+                if (node.collapsed) {
+                    childrenEl.classList.add('is-collapsed');
+                }
+                renderFocusChildren(node.children, childrenEl, depth + 1, searchQuery);
                 parentEl.appendChild(childrenEl);
             }
         }
@@ -334,6 +395,54 @@ var Outliner = (function() {
     /** contenteditable からプレーンテキストを取得 (NBSPは通常スペースに正規化) */
     function getPlainText(el) {
         return (el.textContent || '').replace(/\u00A0/g, ' ');
+    }
+
+    /**
+     * インラインフォーマット適用 (Cmd+B/I/E, Cmd+Shift+S)
+     * テキスト選択中: 選択範囲をマーカーで囲む / すでに囲まれていたら除去
+     * 選択なし: カーソル位置にマーカーペアを挿入してその間にカーソル配置
+     */
+    function applyInlineFormat(nodeId, textEl, marker) {
+        var node = model.getNode(nodeId);
+        if (!node) { return; }
+        var text = node.text;
+        var sel = window.getSelection();
+        var off = getCursorOffset(textEl);
+
+        if (sel && !sel.isCollapsed) {
+            // 選択範囲あり
+            var range = sel.getRangeAt(0);
+            var preRange = range.cloneRange();
+            preRange.selectNodeContents(textEl);
+            preRange.setEnd(range.startContainer, range.startOffset);
+            var startOff = preRange.toString().length;
+            var endOff = startOff + range.toString().length;
+
+            var selected = text.slice(startOff, endOff);
+            var before = text.slice(0, startOff);
+            var after = text.slice(endOff);
+
+            // トグル: すでにマーカーで囲まれている場合は除去
+            if (before.endsWith(marker) && after.startsWith(marker)) {
+                var newText = before.slice(0, -marker.length) + selected + after.slice(marker.length);
+                model.updateText(nodeId, newText);
+                textEl.innerHTML = renderInlineText(newText);
+                // カーソルを選択範囲の末尾に
+                setCursorAtOffset(textEl, endOff - marker.length);
+            } else {
+                var newText2 = before + marker + selected + marker + after;
+                model.updateText(nodeId, newText2);
+                textEl.innerHTML = renderInlineText(newText2);
+                setCursorAtOffset(textEl, endOff + marker.length);
+            }
+        } else {
+            // 選択なし: マーカーペア挿入
+            var newText3 = text.slice(0, off) + marker + marker + text.slice(off);
+            model.updateText(nodeId, newText3);
+            textEl.innerHTML = renderInlineText(newText3);
+            setCursorAtOffset(textEl, off + marker.length);
+        }
+        scheduleSyncToHost();
     }
 
     // --- カーソル操作 ---
@@ -940,6 +1049,31 @@ var Outliner = (function() {
                         selectRange(allIds[0], allIds[allIds.length - 1]);
                     }
                     break;
+                case 'b':
+                    // Cmd+B: 太字
+                    e.preventDefault();
+                    applyInlineFormat(nodeId, textEl, '**');
+                    return;
+                case 'i':
+                    // Cmd+I: 斜体
+                    e.preventDefault();
+                    applyInlineFormat(nodeId, textEl, '*');
+                    return;
+                case 'e':
+                    // Cmd+E: インラインコード
+                    e.preventDefault();
+                    applyInlineFormat(nodeId, textEl, '`');
+                    return;
+            }
+        }
+
+        // Cmd+Shift ショートカット
+        if ((e.metaKey || e.ctrlKey) && e.shiftKey) {
+            if (e.key === 's' || e.key === 'S') {
+                // Cmd+Shift+S: 取り消し線
+                e.preventDefault();
+                applyInlineFormat(nodeId, textEl, '~~');
+                return;
             }
         }
     }
@@ -1175,6 +1309,21 @@ var Outliner = (function() {
                 }
             }
         });
+
+        // 検索モード切替ボタン
+        if (searchModeToggleBtn) {
+            searchModeToggleBtn.addEventListener('click', function() {
+                searchFocusMode = !searchFocusMode;
+                searchModeToggleBtn.textContent = searchFocusMode ? '\uD83D\uDD0D' : '\uD83C\uDF32';
+                searchModeToggleBtn.title = searchFocusMode
+                    ? 'Focus mode: matched node + children only'
+                    : 'Tree mode: show ancestors to root';
+                searchModeToggleBtn.classList.toggle('is-focus-mode', searchFocusMode);
+                if (searchInput.value.trim()) {
+                    executeSearch();
+                }
+            });
+        }
     }
 
     function executeSearch() {
@@ -1184,7 +1333,7 @@ var Outliner = (function() {
             return;
         }
         var query = OutlinerSearch.parseQuery(queryStr);
-        currentSearchResult = searchEngine.search(query, currentScope);
+        currentSearchResult = searchEngine.search(query, currentScope, { focusMode: searchFocusMode });
         renderTree();
     }
 
