@@ -25,6 +25,14 @@ export class OutlinerProvider implements vscode.CustomTextEditorProvider {
         this.context = context;
     }
 
+    public sendScopeIn(): void {
+        this.activeWebviewPanel?.webview.postMessage({ type: 'scopeIn' });
+    }
+
+    public sendScopeOut(): void {
+        this.activeWebviewPanel?.webview.postMessage({ type: 'scopeOut' });
+    }
+
     public async resolveCustomTextEditor(
         document: vscode.TextDocument,
         webviewPanel: vscode.WebviewPanel,

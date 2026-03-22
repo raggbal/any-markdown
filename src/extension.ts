@@ -131,6 +131,18 @@ export function activate(context: vscode.ExtensionContext) {
         })
     );
 
+    // Outliner scope commands - forwarded to webview
+    context.subscriptions.push(
+        vscode.commands.registerCommand('any-markdown.scopeIn', () => {
+            outlinerProvider.sendScopeIn();
+        })
+    );
+    context.subscriptions.push(
+        vscode.commands.registerCommand('any-markdown.scopeOut', () => {
+            outlinerProvider.sendScopeOut();
+        })
+    );
+
     // Open markdown file in standard text editor
     context.subscriptions.push(
         vscode.commands.registerCommand('any-markdown.openAsText', async (uri?: vscode.Uri) => {

@@ -2,7 +2,7 @@
   "name": "any-markdown",
   "displayName": "Any Markdown Editor",
   "description": "A WYSIWYG markdown editor for VS Code with seamless live preview",
-  "version": "0.195.483",
+  "version": "0.195.489",
   "publisher": "imaken",
   "icon": "media/icon.png",
   "license": "MIT",
@@ -81,6 +81,16 @@
       {
         "command": "any-markdown.redo",
         "title": "Redo",
+        "category": "Any MD"
+      },
+      {
+        "command": "any-markdown.scopeIn",
+        "title": "Scope Into Node",
+        "category": "Any MD"
+      },
+      {
+        "command": "any-markdown.scopeOut",
+        "title": "Clear Scope",
         "category": "Any MD"
       }
     ],
@@ -249,6 +259,18 @@
         "key": "ctrl+shift+.",
         "mac": "cmd+shift+.",
         "when": "activeCustomEditorId == 'any-markdown.editor'"
+      },
+      {
+        "command": "any-markdown.scopeOut",
+        "key": "ctrl+shift+]",
+        "mac": "cmd+shift+]",
+        "when": "activeCustomEditorId == 'any-markdown.outliner'"
+      },
+      {
+        "command": "any-markdown.scopeIn",
+        "key": "ctrl+]",
+        "mac": "cmd+]",
+        "when": "activeCustomEditorId == 'any-markdown.outliner'"
       }
     ]
   },

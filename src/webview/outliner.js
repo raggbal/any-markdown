@@ -981,6 +981,16 @@ var Outliner = (function() {
 
         switch (e.key) {
             case 'Enter':
+                // Cmd+Enter: ページを開く (ページノードのみ)
+                if (e.metaKey || e.ctrlKey) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    var pageNode = model.getNode(nodeId);
+                    if (pageNode && pageNode.isPage) {
+                        openPage(nodeId);
+                    }
+                    return;
+                }
                 e.preventDefault();
                 // @page チェック (Enter確定時)
                 if (model.checkPageTrigger(nodeId)) {
@@ -1173,20 +1183,16 @@ var Outliner = (function() {
             return;
         }
 
-        // Cmd+]/[ スコープ操作 (e.code で判定 — JISキーボード等で e.key が異なるため)
-        if ((e.metaKey || e.ctrlKey) && !e.shiftKey) {
-            if (e.key === ']' || e.code === 'BracketRight') {
-                e.preventDefault();
-                e.stopPropagation();
-                if (focusedNodeId) { setScope({ type: 'subtree', rootId: focusedNodeId }); }
-                return;
-            }
-            if (e.key === '[' || e.code === 'BracketLeft') {
-                e.preventDefault();
-                e.stopPropagation();
+        // Cmd+] スコープイン / Cmd+Shift+] スコープアウト (e.code で判定 — JISキーボード等で e.key が異なるため)
+        if ((e.metaKey || e.ctrlKey) && (e.key === ']' || e.code === 'BracketRight')) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (e.shiftKey) {
                 setScope({ type: 'document' });
-                return;
+            } else {
+                if (focusedNodeId) { setScope({ type: 'subtree', rootId: focusedNodeId }); }
             }
+            return;
         }
 
         // その他ショートカット
@@ -2212,6 +2218,14 @@ var Outliner = (function() {
                         });
                     }
                     break;
+
+                case 'scopeIn':
+                    if (focusedNodeId) { setScope({ type: 'subtree', rootId: focusedNodeId }); }
+                    break;
+
+                case 'scopeOut':
+                    setScope({ type: 'document' });
+                    break;
             }
         });
     }
@@ -2220,20 +2234,16 @@ var Outliner = (function() {
 
     function setupKeyHandlers() {
         document.addEventListener('keydown', function(e) {
-            // グローバル Cmd+]/[ スコープ操作 (ノード内keydownで未処理の場合)
-            if ((e.metaKey || e.ctrlKey) && !e.shiftKey) {
-                if (e.key === ']' || e.code === 'BracketRight') {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    if (focusedNodeId) { setScope({ type: 'subtree', rootId: focusedNodeId }); }
-                    return;
-                }
-                if (e.key === '[' || e.code === 'BracketLeft') {
-                    e.preventDefault();
-                    e.stopPropagation();
+            // グローバル Cmd+] スコープイン / Cmd+Shift+] スコープアウト (ノード内keydownで未処理の場合)
+            if ((e.metaKey || e.ctrlKey) && (e.key === ']' || e.code === 'BracketRight')) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (e.shiftKey) {
                     setScope({ type: 'document' });
-                    return;
+                } else {
+                    if (focusedNodeId) { setScope({ type: 'subtree', rootId: focusedNodeId }); }
                 }
+                return;
             }
             // Ctrl/Cmd+N: 新規ノード
             if ((e.metaKey || e.ctrlKey) && e.key === 'n') {
