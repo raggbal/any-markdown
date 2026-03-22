@@ -6,7 +6,7 @@ import { getWebviewMessages } from './i18n/messages';
 import { SidePanelManager } from './shared/sidePanelManager';
 
 /**
- * OutlinerProvider — .mmd ファイル用 Custom Text Editor Provider
+ * OutlinerProvider — .out ファイル用 Custom Text Editor Provider
  *
  * JSON ベースのアウトライナデータを管理し、
  * ページ機能（pages/{pageId}.md）とサイドパネル連携を提供する。
@@ -146,7 +146,7 @@ export class OutlinerProvider implements vscode.CustomTextEditorProvider {
                         const currentDir = this.getPagesDirPath(document);
                         const relCurrent = path.relative(path.dirname(document.uri.fsPath), currentDir);
                         const input = await vscode.window.showInputBox({
-                            prompt: 'Enter page directory (relative to .mmd file or absolute)',
+                            prompt: 'Enter page directory (relative to .out file or absolute)',
                             value: relCurrent || './pages'
                         });
                         if (input !== undefined) {
@@ -366,7 +366,7 @@ export class OutlinerProvider implements vscode.CustomTextEditorProvider {
     // --- ページ管理 ---
 
     private getPagesDirPath(document: vscode.TextDocument): string {
-        // 1. mmd JSON内のpageDirフィールドを優先
+        // 1. out JSON内のpageDirフィールドを優先
         try {
             const data = JSON.parse(document.getText());
             if (data.pageDir) {

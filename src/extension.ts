@@ -29,7 +29,7 @@ export function activate(context: vscode.ExtensionContext) {
         )
     );
 
-    // Register the outliner provider for .mmd files
+    // Register the outliner provider for .out files
     const outlinerProvider = new OutlinerProvider(context);
     context.subscriptions.push(
         vscode.window.registerCustomEditorProvider(
@@ -140,6 +140,52 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.commands.registerCommand('any-markdown.scopeOut', () => {
             outlinerProvider.sendScopeOut();
+        })
+    );
+
+    // New outliner file
+    context.subscriptions.push(
+        vscode.commands.registerCommand('any-markdown.newOutliner', async () => {
+            const name = await vscode.window.showInputBox({
+                prompt: 'Enter outliner file name (without .out extension)',
+                placeHolder: 'my-notes',
+                validateInput: (value) => {
+                    if (!value || !value.trim()) { return 'File name is required'; }
+                    if (/[/\\:*?"<>|]/.test(value)) { return 'Invalid characters in file name'; }
+                    return null;
+                }
+            });
+            if (!name) { return; }
+
+            const folders = vscode.workspace.workspaceFolders;
+            let targetDir: vscode.Uri;
+            if (folders && folders.length > 0) {
+                targetDir = folders[0].uri;
+            } else {
+                const selected = await vscode.window.showOpenDialog({
+                    canSelectFiles: false,
+                    canSelectFolders: true,
+                    canSelectMany: false,
+                    title: 'Select folder for outliner file'
+                });
+                if (!selected || !selected[0]) { return; }
+                targetDir = selected[0];
+            }
+
+            const fileName = name.trim().endsWith('.out') ? name.trim() : `${name.trim()}.out`;
+            const fileUri = vscode.Uri.joinPath(targetDir, fileName);
+
+            try {
+                await vscode.workspace.fs.stat(fileUri);
+                vscode.window.showWarningMessage(`File "${fileName}" already exists.`);
+                return;
+            } catch {
+                // File doesn't exist — good
+            }
+
+            const emptyData = JSON.stringify({ rootIds: [], nodes: {} }, null, 2);
+            await vscode.workspace.fs.writeFile(fileUri, Buffer.from(emptyData, 'utf8'));
+            await vscode.commands.executeCommand('vscode.openWith', fileUri, 'any-markdown.outliner');
         })
     );
 

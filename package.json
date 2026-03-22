@@ -2,7 +2,7 @@
   "name": "any-markdown",
   "displayName": "Any Markdown Editor",
   "description": "A WYSIWYG markdown editor for VS Code with seamless live preview",
-  "version": "0.195.495",
+  "version": "0.195.497",
   "publisher": "imaken",
   "icon": "media/icon.png",
   "license": "MIT",
@@ -92,6 +92,11 @@
         "command": "any-markdown.scopeOut",
         "title": "Clear Scope",
         "category": "Any MD"
+      },
+      {
+        "command": "any-markdown.newOutliner",
+        "title": "New Outliner File",
+        "category": "Any MD"
       }
     ],
     "customEditors": [
@@ -113,7 +118,7 @@
         "displayName": "Any Markdown Outliner",
         "selector": [
           {
-            "filenamePattern": "*.mmd"
+            "filenamePattern": "*.out"
           }
         ],
         "priority": "default"
@@ -169,7 +174,7 @@
         "any-markdown.outlinerPageDir": {
           "type": "string",
           "default": "./pages",
-          "description": "Outliner page files directory. Relative to .mmd file or absolute path. / アウトライナのページファイルディレクトリ。.mmdファイルからの相対パスまたは絶対パス。"
+          "description": "Outliner page files directory. Relative to .out file or absolute path. / アウトライナのページファイルディレクトリ。.outファイルからの相対パスまたは絶対パス。"
         },
         "any-markdown.toolbarMode": {
           "type": "string",
