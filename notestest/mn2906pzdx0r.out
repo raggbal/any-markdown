@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "rootIds": [
+    "nmn2906pz5lddat",
+    "nmn29085o6be3n9"
+  ],
+  "nodes": {
+    "nmn2906pz5lddat": {
+      "id": "nmn2906pz5lddat",
+      "text": "ss",
+      "childIds": [],
+      "collapsed": false,
+      "children": [],
+      "subtext": "",
+      "tags": []
+    },
+    "nmn29085o6be3n9": {
+      "id": "nmn29085o6be3n9",
+      "parentId": null,
+      "children": [],
+      "text": "",
+      "tags": [],
+      "isPage": false,
+      "pageId": null,
+      "collapsed": false,
+      "checked": null,
+      "subtext": ""
+    }
+  },
+  "title": "test",
+  "searchFocusMode": false,
+  "pageDir": "./mn2906pzdx0r"
+}

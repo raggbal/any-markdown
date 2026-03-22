@@ -3,37 +3,50 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { getNonce } from './webviewContent';
 
-interface OutlinerConfig {
+interface NotesConfig {
     theme: string;
     fontSize: number;
     webviewMessages?: Record<string, string>;
     enableDebugLogging?: boolean;
-    outlinerPageTitle?: boolean;
 }
 
-export function getOutlinerWebviewContent(
+interface NotesInitData {
+    jsonContent: string;
+    fileList: Array<{ filePath: string; title: string; id: string }>;
+    currentFilePath: string | null;
+    panelCollapsed: boolean;
+}
+
+export function getNotesWebviewContent(
     webview: vscode.Webview,
     extensionUri: vscode.Uri,
-    jsonContent: string,
-    config: OutlinerConfig
+    config: NotesConfig,
+    initData: NotesInitData
 ): string {
     const nonce = getNonce();
-
-    // i18n messages
     const msg = config.webviewMessages || {};
 
     // Load CSS
     const outlinerCssPath = path.join(__dirname, 'webview', 'outliner.css');
     const outlinerCss = fs.readFileSync(outlinerCssPath, 'utf8');
 
-    // Load editor styles (for side panel)
     const stylesPath = path.join(__dirname, 'webview', 'styles.css');
     const editorStyles = fs.readFileSync(stylesPath, 'utf8')
         .replace('__FONT_SIZE__', String(config.fontSize));
 
-    // Load HostBridge
-    const hostBridgePath = path.join(__dirname, 'shared', 'outliner-host-bridge.js');
-    const hostBridgeScript = fs.readFileSync(hostBridgePath, 'utf8');
+    // Load Notes shared CSS/HTML
+    const notesBodyHtml = require(path.join(__dirname, 'shared', 'notes-body-html.js'));
+    const { css: notesCss, html: notesHtml } = notesBodyHtml.generateNotesFilePanelHtml({
+        collapsed: initData.panelCollapsed,
+    });
+
+    // Load Notes file panel JS
+    const notesFilePanelScript = fs.readFileSync(
+        path.join(__dirname, 'shared', 'notes-file-panel.js'), 'utf8');
+
+    // Load Notes HostBridge
+    const notesHostBridgeScript = fs.readFileSync(
+        path.join(__dirname, 'shared', 'notes-host-bridge.js'), 'utf8');
 
     // Load outliner scripts
     const outlinerModelScript = fs.readFileSync(
@@ -46,7 +59,6 @@ export function getOutlinerWebviewContent(
     // Load editor scripts (for side panel EditorInstance)
     const editorUtilsScript = fs.readFileSync(
         path.join(__dirname, 'webview', 'editor-utils.js'), 'utf8');
-
     const editorScript = fs.readFileSync(
         path.join(__dirname, 'webview', 'editor.js'), 'utf8')
         .replace('__DEBUG_MODE__', String(config.enableDebugLogging ?? false))
@@ -66,11 +78,11 @@ export function getOutlinerWebviewContent(
     const katexJsUri = vendorUri('katex.min.js');
     const katexCssUri = vendorUri('katex.min.css');
 
-    // Base64 encode JSON content to prevent XSS
-    const jsonToEncode = jsonContent || '{"version":1,"rootIds":[],"nodes":{}}';
+    // Base64 encode JSON content
+    const jsonToEncode = initData.jsonContent || '{"version":1,"rootIds":[],"nodes":{}}';
     const base64Content = Buffer.from(jsonToEncode, 'utf8').toString('base64');
 
-    // Side panel HTML (same structure as editor-body-html.js)
+    // Side panel HTML
     const sidePanelHtml = `
         <div class="side-panel" id="sidePanel">
             <aside class="side-panel-sidebar" id="sidePanelSidebar">
@@ -127,66 +139,64 @@ export function getOutlinerWebviewContent(
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap">
-    <title>Any Markdown Outliner</title>
-    <style>
-        ${editorStyles}
-    </style>
-    <style>
-        ${outlinerCss}
-    </style>
+    <title>Any Markdown Notes</title>
+    <style>${editorStyles}</style>
+    <style>${outlinerCss}</style>
     <link rel="stylesheet" href="${katexCssUri}">
+    <style>${notesCss}</style>
 </head>
 <body>
-    <div class="outliner-container">
-        <div class="outliner-page-title" style="${config.outlinerPageTitle ? '' : 'display:none'}">
-            <input type="text" class="outliner-page-title-input" placeholder="Untitled" />
+    <div class="notes-layout">
+        ${notesHtml}
+        <div class="notes-main-wrapper">
+            <button class="notes-panel-toggle-btn" id="notesPanelToggleBtn" title="Show file panel">&#x25B6;</button>
+            <div class="outliner-container">
+                <div class="outliner-page-title" style="display:none;">
+                    <input type="text" class="outliner-page-title-input" placeholder="Untitled" />
+                </div>
+                <div class="outliner-breadcrumb"></div>
+                <div class="outliner-search-bar">
+                    <button class="outliner-search-mode-toggle" title="Toggle search mode: Tree / Focus"></button>
+                    <input type="text" class="outliner-search-input" placeholder="Search... (e.g. #tag, keyword, is:page)" />
+                    <button class="outliner-menu-btn" title="Menu"></button>
+                </div>
+                <div class="outliner-tree" role="tree"></div>
+            </div>
         </div>
-        <div class="outliner-breadcrumb"></div>
-        <div class="outliner-search-bar">
-            <button class="outliner-search-mode-toggle" title="Toggle search mode: Tree / Focus"></button>
-            <input type="text" class="outliner-search-input" placeholder="Search... (e.g. #tag, keyword, is:page)" />
-            <button class="outliner-menu-btn" title="Menu"></button>
-        </div>
-        <div class="outliner-tree" role="tree"></div>
     </div>
 
     ${sidePanelHtml}
 
-    <script src="${turndownUri}"></script>
-    <script src="${turndownGfmUri}"></script>
-    <script src="${mermaidUri}"></script>
-    <script src="${katexJsUri}"></script>
+    <script src="${turndownUri}" nonce="${nonce}"></script>
+    <script src="${turndownGfmUri}" nonce="${nonce}"></script>
+    <script src="${mermaidUri}" nonce="${nonce}"></script>
+    <script src="${katexJsUri}" nonce="${nonce}"></script>
 
     <script nonce="${nonce}">
         window.__SKIP_EDITOR_AUTO_INIT__ = true;
         window.__outlinerMessages = ${JSON.stringify(config.webviewMessages || {})};
     </script>
-    <script nonce="${nonce}">
-        ${editorUtilsScript}
-    </script>
-    <script nonce="${nonce}">
-        ${editorScript}
-    </script>
-    <script nonce="${nonce}">
-        ${hostBridgeScript}
-    </script>
-    <script nonce="${nonce}">
-        ${outlinerModelScript}
-    </script>
-    <script nonce="${nonce}">
-        ${outlinerSearchScript}
-    </script>
-    <script nonce="${nonce}">
-        ${outlinerScript}
-    </script>
+    <script nonce="${nonce}">${notesHostBridgeScript}</script>
+    <script nonce="${nonce}">${editorUtilsScript}</script>
+    <script nonce="${nonce}">${editorScript}</script>
+    <script nonce="${nonce}">${outlinerModelScript}</script>
+    <script nonce="${nonce}">${outlinerSearchScript}</script>
+    <script nonce="${nonce}">${outlinerScript}</script>
+    <script nonce="${nonce}">${notesFilePanelScript}</script>
     <script nonce="${nonce}">
         try {
             var initialData = JSON.parse(decodeURIComponent(escape(atob('${base64Content}'))));
             Outliner.init(initialData);
         } catch(e) {
-            console.error('[Outliner] Failed to initialize:', e);
+            console.error('[Notes] Failed to initialize outliner:', e);
             Outliner.init({ version: 1, rootIds: [], nodes: {} });
         }
+        // Initialize notes file panel
+        notesFilePanel.init(
+            window.notesHostBridge,
+            ${JSON.stringify(initData.fileList)},
+            ${JSON.stringify(initData.currentFilePath)}
+        );
     </script>
 </body>
 </html>`;

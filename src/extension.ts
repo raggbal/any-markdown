@@ -1,6 +1,8 @@
 import * as vscode from 'vscode';
 import { AnyMarkdownEditorProvider } from './editorProvider';
 import { OutlinerProvider } from './outlinerProvider';
+import { NotesFolderProvider } from './notesFolderProvider';
+import { NotesEditorProvider } from './notesEditorProvider';
 import { initLocale, t } from './i18n/messages';
 
 export function activate(context: vscode.ExtensionContext) {
@@ -128,6 +130,32 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.commands.registerCommand('any-markdown.toggleSourceMode', () => {
             provider.sendToggleSourceMode();
+        })
+    );
+
+    // --- Notes (Activity Bar + WebviewPanel) ---
+    const notesFolderProvider = new NotesFolderProvider(context);
+    const notesEditorProvider = new NotesEditorProvider(context);
+
+    context.subscriptions.push(
+        vscode.window.registerTreeDataProvider('notesExplorer', notesFolderProvider)
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('any-markdown.addNotesFolder', () => {
+            notesFolderProvider.addFolder();
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('any-markdown.removeNotesFolder', (item) => {
+            notesFolderProvider.removeFolder(item);
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('any-markdown.openNotesFolder', (folderPath: string) => {
+            notesEditorProvider.openNotesFolder(folderPath);
         })
     );
 

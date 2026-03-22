@@ -2,7 +2,7 @@
   "name": "any-markdown",
   "displayName": "Any Markdown Editor",
   "description": "A WYSIWYG markdown editor for VS Code with seamless live preview",
-  "version": "0.195.504",
+  "version": "0.195.505",
   "publisher": "imaken",
   "icon": "media/icon.png",
   "license": "MIT",
@@ -37,10 +37,44 @@
   "activationEvents": [],
   "main": "./out/extension.js",
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "any-markdown-notes",
+          "title": "Any Markdown Notes",
+          "icon": "media/notes-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "any-markdown-notes": [
+        {
+          "id": "notesExplorer",
+          "name": "Notes Folders"
+        }
+      ]
+    },
     "commands": [
       {
         "command": "any-markdown.openEditor",
         "title": "Open with Any Markdown Editor",
+        "category": "Any MD"
+      },
+      {
+        "command": "any-markdown.addNotesFolder",
+        "title": "Add Notes Folder",
+        "category": "Any MD",
+        "icon": "$(add)"
+      },
+      {
+        "command": "any-markdown.removeNotesFolder",
+        "title": "Remove Notes Folder",
+        "category": "Any MD",
+        "icon": "$(remove)"
+      },
+      {
+        "command": "any-markdown.openNotesFolder",
+        "title": "Open Notes Folder",
         "category": "Any MD"
       },
       {
@@ -236,6 +270,20 @@
           "command": "any-markdown.openAsText",
           "when": "resourceLangId == markdown",
           "group": "navigation"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "any-markdown.addNotesFolder",
+          "when": "view == notesExplorer",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "any-markdown.removeNotesFolder",
+          "when": "view == notesExplorer",
+          "group": "inline"
         }
       ]
     },
