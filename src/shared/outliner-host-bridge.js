@@ -25,8 +25,11 @@
         openPage: function(nodeId, pageId) {
             api.postMessage({ type: 'openPage', nodeId: nodeId, pageId: pageId });
         },
-        removePage: function(nodeId) {
-            api.postMessage({ type: 'removePage', nodeId: nodeId });
+        removePage: function(nodeId, pageId) {
+            api.postMessage({ type: 'removePage', nodeId: nodeId, pageId: pageId });
+        },
+        setPageDir: function() {
+            api.postMessage({ type: 'setPageDir' });
         },
 
         // サイドパネル (ページ表示用)

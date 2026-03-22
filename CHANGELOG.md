@@ -5,6 +5,22 @@ All notable changes to the "Any Markdown Editor" extension will be documented in
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.195.502] - 2026-03-23
+
+### Fixed
+
+- **Outliner: ページディレクトリ設定が編集で消失するバグを修正** — outファイル個別に設定した `pageDir` が、ノード編集のたびに消えてしまう問題を修正しました
+
+### Added
+
+- **Outliner: メニューボタン** — 検索バー右端にメニューボタン（⋮）を追加。ページディレクトリの設定が可能です
+
+## [0.195.500] - 2026-03-22
+
+### Improved
+
+- **Outliner: ページ解除でファイルをゴミ箱に移動** — ページ解除時に対応する `.md` ファイルをOSのゴミ箱に移動するようになりました。誤操作時はゴミ箱から復元できます
+
 ## [0.195.483] - 2026-03-22
 
 ### Fixed

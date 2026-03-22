@@ -350,9 +350,11 @@ var OutlinerModel = (function() {
 
     Model.prototype.removePage = function(nodeId) {
         var node = this.nodes[nodeId];
-        if (!node) { return; }
+        if (!node) { return null; }
+        var oldPageId = node.pageId;
         node.isPage = false;
         node.pageId = null;
+        return oldPageId;
     };
 
     // --- クエリ ---

@@ -132,6 +132,10 @@ export class OutlinerProvider implements vscode.CustomTextEditorProvider {
                         await this.handleMakePage(document, webviewPanel, message);
                         break;
 
+                    case 'removePage':
+                        await this.handleRemovePage(document, sidePanel, message);
+                        break;
+
                     case 'openPage':
                         await this.handleOpenPage(document, webviewPanel, message);
                         break;
@@ -415,6 +419,30 @@ export class OutlinerProvider implements vscode.CustomTextEditorProvider {
             nodeId: message.nodeId,
             pageId: message.pageId
         });
+    }
+
+    private async handleRemovePage(
+        document: vscode.TextDocument,
+        sidePanel: SidePanelManager,
+        message: { nodeId: string; pageId: string }
+    ): Promise<void> {
+        if (!message.pageId) { return; }
+        const filePath = this.getPageFilePath(document, message.pageId);
+        if (!fs.existsSync(filePath)) { return; }
+
+        // サイドパネルで開いている場合は先に閉じる
+        if (sidePanel.watchedPath === filePath) {
+            sidePanel.handleClose();
+        }
+
+        try {
+            await vscode.workspace.fs.delete(
+                vscode.Uri.file(filePath),
+                { useTrash: true }
+            );
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to move page file to trash: ${filePath}`);
+        }
     }
 
     private async handleOpenPage(

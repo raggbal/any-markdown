@@ -22,7 +22,9 @@ var Outliner = (function() {
     var currentScope = { type: 'document' };
     var currentSearchResult = null;  // Set<string> or null
     var searchFocusMode = false;     // true: マッチノード頂点+子のみ, false: ルートまで表示
+    var pageDir = null;              // outファイル個別のpageDir設定
     var searchModeToggleBtn = null;  // toggle button element
+    var menuBtn = null;              // menu button element
     var contextMenuEl = null;
 
     var syncDebounceTimer = null;
@@ -86,6 +88,7 @@ var Outliner = (function() {
     // 検索モードアイコン (Lucide風SVG)
     var ICON_TREE_MODE = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12h-8"/><path d="M21 6H8"/><path d="M21 18h-8"/><path d="M3 6v4c0 1.1.9 2 2 2h3"/><path d="M3 10v6c0 1.1.9 2 2 2h3"/></svg>';
     var ICON_FOCUS_MODE = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>';
+    var ICON_MENU = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>';
 
     function init(data) {
         host = window.outlinerHostBridge;
@@ -96,15 +99,23 @@ var Outliner = (function() {
         if (data && data.searchFocusMode) {
             searchFocusMode = true;
         }
+        // JSONからpageDirを復元
+        if (data && data.pageDir) {
+            pageDir = data.pageDir;
+        }
 
         treeEl = document.querySelector('.outliner-tree');
         searchInput = document.querySelector('.outliner-search-input');
         breadcrumbEl = document.querySelector('.outliner-breadcrumb');
         searchModeToggleBtn = document.querySelector('.outliner-search-mode-toggle');
+        menuBtn = document.querySelector('.outliner-menu-btn');
 
         // ボタンアイコン初期化
         if (searchModeToggleBtn) {
             updateSearchModeButton();
+        }
+        if (menuBtn) {
+            menuBtn.innerHTML = ICON_MENU;
         }
 
         renderTree();
@@ -1650,7 +1661,10 @@ var Outliner = (function() {
 
     function removePage(nodeId) {
         saveSnapshot();
-        model.removePage(nodeId);
+        var pageId = model.removePage(nodeId);
+        if (pageId) {
+            host.removePage(nodeId, pageId);
+        }
         renderTree();
         scheduleSyncToHost();
     }
@@ -1701,6 +1715,46 @@ var Outliner = (function() {
                 scheduleSyncToHost();
             });
         }
+
+        // メニューボタン
+        if (menuBtn) {
+            menuBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                toggleMenuDropdown();
+            });
+        }
+    }
+
+    function toggleMenuDropdown() {
+        var existing = document.querySelector('.outliner-menu-dropdown');
+        if (existing) {
+            existing.remove();
+            return;
+        }
+        var dropdown = document.createElement('div');
+        dropdown.className = 'outliner-menu-dropdown';
+
+        var setPageDirItem = document.createElement('button');
+        setPageDirItem.className = 'menu-item';
+        setPageDirItem.textContent = i18n.outlinerSetPageDir || 'Set page directory...';
+        setPageDirItem.addEventListener('click', function() {
+            dropdown.remove();
+            host.setPageDir();
+        });
+        dropdown.appendChild(setPageDirItem);
+
+        // 検索バーを基準に配置
+        var searchBar = document.querySelector('.outliner-search-bar');
+        searchBar.style.position = 'relative';
+        searchBar.appendChild(dropdown);
+
+        // 外側クリックで閉じる
+        setTimeout(function() {
+            document.addEventListener('click', function closeMenu() {
+                dropdown.remove();
+                document.removeEventListener('click', closeMenu);
+            }, { once: true });
+        }, 0);
     }
 
     function executeSearch() {
@@ -2239,6 +2293,7 @@ var Outliner = (function() {
         clearTimeout(syncDebounceTimer);
         var data = model.serialize();
         data.searchFocusMode = searchFocusMode;
+        if (pageDir) { data.pageDir = pageDir; }
         host.syncData(JSON.stringify(data, null, 2));
     }
 
@@ -2249,6 +2304,7 @@ var Outliner = (function() {
                     var savedFocus = focusedNodeId;
                     model = new OutlinerModel(msg.data);
                     searchEngine = new OutlinerSearch.SearchEngine(model);
+                    pageDir = msg.data.pageDir || null;
                     renderTree();
                     if (savedFocus && model.getNode(savedFocus)) {
                         focusNode(savedFocus);
@@ -2261,6 +2317,10 @@ var Outliner = (function() {
                         renderTree();
                         focusNode(msg.nodeId);
                     }
+                    break;
+
+                case 'pageDirChanged':
+                    pageDir = msg.pageDir || null;
                     break;
 
                 // --- サイドパネル関連メッセージ ---

@@ -141,6 +141,7 @@ export function getOutlinerWebviewContent(
         <div class="outliner-search-bar">
             <button class="outliner-search-mode-toggle" title="Toggle search mode: Tree / Focus"></button>
             <input type="text" class="outliner-search-input" placeholder="Search... (e.g. #tag, keyword, is:page)" />
+            <button class="outliner-menu-btn" title="Menu"></button>
         </div>
         <div class="outliner-tree" role="tree"></div>
     </div>
