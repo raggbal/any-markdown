@@ -16,6 +16,10 @@ export interface ElectronSettings {
     enableDebugLogging: boolean;
     windowBounds?: { x: number; y: number; width: number; height: number };
     recentFiles?: string[];
+    // Outliner settings
+    outlinerPanelCollapsed?: boolean;
+    lastOutlinerFolder?: string;
+    lastOutlinerFile?: string;
 }
 
 const DEFAULTS: ElectronSettings = {

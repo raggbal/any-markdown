@@ -5,6 +5,12 @@ All notable changes to the "Any Markdown Editor" extension will be documented in
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.195.504] - 2026-03-23
+
+### Improved
+
+- **Outliner: スコープアウト時のカーソル位置改善** — Cmd+Shift+]やTOPリンクでスコープ解除した際、直前にスコープしていたノードにカーソルが移動するようになりました
+
 ## [0.195.502] - 2026-03-23
 
 ### Fixed

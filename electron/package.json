@@ -1,6 +1,6 @@
 {
   "name": "any-markdown-desktop",
-  "version": "0.195.438",
+  "version": "0.195.503",
   "description": "Any Markdown — WYSIWYG Markdown editor for desktop",
   "main": "out/main.js",
   "author": {
@@ -40,7 +40,11 @@
         "filter": [
           "editor.js",
           "editor-utils.js",
-          "styles.css"
+          "styles.css",
+          "outliner.js",
+          "outliner-model.js",
+          "outliner-search.js",
+          "outliner.css"
         ]
       },
       {
@@ -79,6 +83,11 @@
           ],
           "name": "Markdown Document",
           "role": "Editor"
+        },
+        {
+          "ext": ["out"],
+          "name": "Outliner Document",
+          "role": "Editor"
         }
       ]
     },
@@ -90,6 +99,10 @@
         {
           "ext": "md",
           "name": "Markdown Document"
+        },
+        {
+          "ext": "out",
+          "name": "Outliner Document"
         }
       ]
     },
@@ -105,6 +118,11 @@
           "ext": "md",
           "name": "Markdown Document",
           "mimeType": "text/markdown"
+        },
+        {
+          "ext": "out",
+          "name": "Outliner Document",
+          "mimeType": "application/x-outliner"
         }
       ]
     },

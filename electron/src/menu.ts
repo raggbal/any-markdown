@@ -6,6 +6,7 @@ import { app, Menu, MenuItemConstructorOptions, BrowserWindow, shell } from 'ele
 export function buildMenu(handlers: {
     newFile: () => void;
     openFile: () => void;
+    openOutlinerFolder: () => void;
     save: () => void;
     saveAs: () => void;
     openPreferences: () => void;
@@ -46,6 +47,10 @@ export function buildMenu(handlers: {
                     label: 'Open...',
                     accelerator: 'CmdOrCtrl+O',
                     click: handlers.openFile,
+                },
+                {
+                    label: 'Open Outliner Folder...',
+                    click: handlers.openOutlinerFolder,
                 },
                 { type: 'separator' },
                 {
@@ -104,6 +109,21 @@ export function buildMenu(handlers: {
                     accelerator: 'CmdOrCtrl+.',
                     click: (_item, win) => {
                         if (win) (win as BrowserWindow).webContents.send('host-message', { type: 'toggleSourceMode' });
+                    },
+                },
+                { type: 'separator' },
+                {
+                    label: 'Scope In',
+                    accelerator: 'CmdOrCtrl+]',
+                    click: (_item, win) => {
+                        if (win) (win as BrowserWindow).webContents.send('host-message', { type: 'scopeIn' });
+                    },
+                },
+                {
+                    label: 'Scope Out',
+                    accelerator: 'CmdOrCtrl+[',
+                    click: (_item, win) => {
+                        if (win) (win as BrowserWindow).webContents.send('host-message', { type: 'scopeOut' });
                     },
                 },
                 { type: 'separator' },

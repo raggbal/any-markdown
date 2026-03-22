@@ -1820,10 +1820,20 @@ var Outliner = (function() {
     }
 
     function setScope(scope) {
+        var previousRootId = (currentScope.type === 'subtree') ? currentScope.rootId : null;
         currentScope = scope;
         updateBreadcrumb();
         if (searchInput.value.trim()) { executeSearch(); }
         renderTree();
+        // scope out時は直前のscopeノードにカーソルを移動
+        if (previousRootId && previousRootId !== scope.rootId) {
+            var targetEl = treeEl.querySelector('.outliner-node[data-id="' + previousRootId + '"]');
+            if (targetEl) {
+                focusNodeElAtStart(targetEl);
+                targetEl.scrollIntoView({ block: 'nearest' });
+                return;
+            }
+        }
         focusFirstVisibleNode();
     }
 
@@ -2345,9 +2355,17 @@ var Outliner = (function() {
                     if (pageTitleInput && document.activeElement !== pageTitleInput) {
                         pageTitleInput.value = model.title || '';
                     }
-                    renderTree();
-                    if (savedFocus && model.getNode(savedFocus)) {
-                        focusNode(savedFocus);
+                    // 空の場合、初期ノードを追加（init()と同じ処理）
+                    if (model.rootIds.length === 0) {
+                        var firstNode = model.addNode(null, null, '');
+                        renderTree();
+                        focusNode(firstNode.id);
+                        syncData();
+                    } else {
+                        renderTree();
+                        if (savedFocus && model.getNode(savedFocus)) {
+                            focusNode(savedFocus);
+                        }
                     }
                     break;
 
