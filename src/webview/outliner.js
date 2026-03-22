@@ -122,6 +122,12 @@ var Outliner = (function() {
             var firstNode = model.addNode(null, null, '');
             renderTree();
             focusNode(firstNode.id);
+        } else {
+            // 非空の場合、最初のノードにフォーカス
+            // webviewが完全にレンダリングされるまで待つ
+            setTimeout(function() {
+                focusFirstVisibleNode();
+            }, 100);
         }
     }
 
@@ -943,6 +949,7 @@ var Outliner = (function() {
         if (!nodeEl) { return; }
         var textEl = nodeEl.querySelector('.outliner-text');
         if (textEl) {
+            setFocusedNode(nodeId);
             textEl.focus();
             setCursorToEnd(textEl);
         }
@@ -953,6 +960,71 @@ var Outliner = (function() {
         if (!nodeEl) { return; }
         var textEl = nodeEl.querySelector('.outliner-text');
         if (textEl) {
+            setFocusedNode(nodeId);
+            textEl.focus();
+            setCursorToStart(textEl);
+        }
+    }
+
+    /** 表示されている最初のノードにフォーカス（先頭にカーソル） */
+    function focusFirstVisibleNode() {
+        var firstNodeEl = treeEl.querySelector('.outliner-node');
+        if (firstNodeEl) {
+            focusNodeElAtStart(firstNodeEl);
+        }
+    }
+
+    /** DOM上で前のノード要素を取得（現在のDOM要素から探索、重複ID・collapsed対応） */
+    function getDomPrevNodeEl(currentTextEl) {
+        var currentNodeEl = currentTextEl.closest('.outliner-node');
+        if (!currentNodeEl) { return null; }
+        var allNodes = treeEl.querySelectorAll('.outliner-node');
+        for (var i = 0; i < allNodes.length; i++) {
+            if (allNodes[i] === currentNodeEl) {
+                for (var j = i - 1; j >= 0; j--) {
+                    if (!allNodes[j].closest('.is-collapsed')) { return allNodes[j]; }
+                }
+                return null;
+            }
+        }
+        return null;
+    }
+
+    /** DOM上で次のノード要素を取得（現在のDOM要素から探索、重複ID・collapsed対応） */
+    function getDomNextNodeEl(currentTextEl) {
+        var currentNodeEl = currentTextEl.closest('.outliner-node');
+        if (!currentNodeEl) { return null; }
+        var allNodes = treeEl.querySelectorAll('.outliner-node');
+        for (var i = 0; i < allNodes.length; i++) {
+            if (allNodes[i] === currentNodeEl) {
+                for (var j = i + 1; j < allNodes.length; j++) {
+                    if (!allNodes[j].closest('.is-collapsed')) { return allNodes[j]; }
+                }
+                return null;
+            }
+        }
+        return null;
+    }
+
+    /** DOM要素を直接フォーカス（重複ID問題を回避） */
+    function focusNodeEl(nodeEl) {
+        if (!nodeEl) { return; }
+        var textEl = nodeEl.querySelector('.outliner-text');
+        if (textEl) {
+            var nodeId = nodeEl.dataset.id;
+            if (nodeId) { setFocusedNode(nodeId); }
+            textEl.focus();
+            setCursorToEnd(textEl);
+        }
+    }
+
+    /** DOM要素を直接フォーカス（先頭にカーソル、重複ID問題を回避） */
+    function focusNodeElAtStart(nodeEl) {
+        if (!nodeEl) { return; }
+        var textEl = nodeEl.querySelector('.outliner-text');
+        if (textEl) {
+            var nodeId = nodeEl.dataset.id;
+            if (nodeId) { setFocusedNode(nodeId); }
             textEl.focus();
             setCursorToStart(textEl);
         }
@@ -1094,16 +1166,17 @@ var Outliner = (function() {
                     // Shift+↑: 複数ノード選択を上に拡張
                     e.preventDefault();
                     if (!selectionAnchorId) { selectionAnchorId = nodeId; }
-                    var prevId = model.getPreviousVisibleId(nodeId);
-                    if (prevId) {
-                        selectRange(selectionAnchorId, prevId);
-                        focusNode(prevId);
+                    var prevEl = getDomPrevNodeEl(textEl);
+                    if (prevEl) {
+                        var prevElId = prevEl.dataset.id;
+                        if (prevElId) { selectRange(selectionAnchorId, prevElId); }
+                        focusNodeEl(prevEl);
                     }
                 } else {
                     e.preventDefault();
                     clearSelection();
-                    var prevId2 = model.getPreviousVisibleId(nodeId);
-                    if (prevId2) { focusNode(prevId2); }
+                    var prevEl2 = getDomPrevNodeEl(textEl);
+                    if (prevEl2) { focusNodeEl(prevEl2); }
                 }
                 break;
 
@@ -1120,16 +1193,17 @@ var Outliner = (function() {
                     // Shift+↓: 複数ノード選択を下に拡張
                     e.preventDefault();
                     if (!selectionAnchorId) { selectionAnchorId = nodeId; }
-                    var nextId = model.getNextVisibleId(nodeId);
-                    if (nextId) {
-                        selectRange(selectionAnchorId, nextId);
-                        focusNode(nextId);
+                    var nextEl = getDomNextNodeEl(textEl);
+                    if (nextEl) {
+                        var nextElId = nextEl.dataset.id;
+                        if (nextElId) { selectRange(selectionAnchorId, nextElId); }
+                        focusNodeEl(nextEl);
                     }
                 } else {
                     e.preventDefault();
                     clearSelection();
-                    var nextId2 = model.getNextVisibleId(nodeId);
-                    if (nextId2) { focusNode(nextId2); }
+                    var nextEl2 = getDomNextNodeEl(textEl);
+                    if (nextEl2) { focusNodeEl(nextEl2); }
                 }
                 break;
 
@@ -1658,6 +1732,7 @@ var Outliner = (function() {
         updateBreadcrumb();
         if (searchInput.value.trim()) { executeSearch(); }
         renderTree();
+        focusFirstVisibleNode();
     }
 
     function updateBreadcrumb() {
@@ -2053,6 +2128,7 @@ var Outliner = (function() {
         if (sidePanelIframeContainer) { sidePanelIframeContainer.innerHTML = ''; }
         sidePanelFilePath = null;
         host.notifySidePanelClosed();
+        focusFirstVisibleNode();
     }
 
     function renderSidePanelToc(toc) {
@@ -2162,15 +2238,6 @@ var Outliner = (function() {
     function setupHostMessages() {
         host.onMessage(function(msg) {
             switch (msg.type) {
-                case 'loadData':
-                    model = new OutlinerModel(msg.data);
-                    searchEngine = new OutlinerSearch.SearchEngine(model);
-                    renderTree();
-                    if (model.rootIds.length > 0) {
-                        focusNode(model.rootIds[0]);
-                    }
-                    break;
-
                 case 'updateData':
                     var savedFocus = focusedNodeId;
                     model = new OutlinerModel(msg.data);
