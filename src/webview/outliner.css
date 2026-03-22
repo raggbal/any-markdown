@@ -50,6 +50,30 @@ body {
     overflow: hidden;
 }
 
+/* --- Page Title --- */
+.outliner-page-title {
+    padding: 16px 16px 4px;
+    flex-shrink: 0;
+}
+
+.outliner-page-title-input {
+    width: 100%;
+    font-size: 1.5em;
+    font-weight: 600;
+    border: none;
+    background: transparent;
+    color: var(--outliner-fg);
+    outline: none;
+    padding: 4px 0;
+    font-family: inherit;
+    line-height: 1.3;
+}
+
+.outliner-page-title-input::placeholder {
+    color: var(--outliner-placeholder);
+    font-weight: 400;
+}
+
 /* --- Search Bar --- */
 .outliner-search-bar {
     display: flex;

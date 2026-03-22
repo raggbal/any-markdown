@@ -2,7 +2,7 @@
   "name": "any-markdown",
   "displayName": "Any Markdown Editor",
   "description": "A WYSIWYG markdown editor for VS Code with seamless live preview",
-  "version": "0.195.502",
+  "version": "0.195.503",
   "publisher": "imaken",
   "icon": "media/icon.png",
   "license": "MIT",
@@ -175,6 +175,11 @@
           "type": "string",
           "default": "./pages",
           "description": "Outliner page files directory. Relative to .out file or absolute path. / アウトライナのページファイルディレクトリ。.outファイルからの相対パスまたは絶対パス。"
+        },
+        "any-markdown.outlinerPageTitle": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show page title input above the search bar in Outliner. / アウトライナの検索バー上部にタイトル入力欄を表示します。"
         },
         "any-markdown.toolbarMode": {
           "type": "string",

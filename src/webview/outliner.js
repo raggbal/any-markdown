@@ -17,6 +17,8 @@ var Outliner = (function() {
     var treeEl;         // .outliner-tree DOM element
     var searchInput;    // .outliner-search-input element
     var breadcrumbEl;   // .outliner-breadcrumb element
+    var pageTitleEl;     // .outliner-page-title container
+    var pageTitleInput;  // .outliner-page-title-input element
 
     var focusedNodeId = null;
     var currentScope = { type: 'document' };
@@ -109,6 +111,14 @@ var Outliner = (function() {
         breadcrumbEl = document.querySelector('.outliner-breadcrumb');
         searchModeToggleBtn = document.querySelector('.outliner-search-mode-toggle');
         menuBtn = document.querySelector('.outliner-menu-btn');
+
+        // ページタイトル
+        pageTitleEl = document.querySelector('.outliner-page-title');
+        pageTitleInput = document.querySelector('.outliner-page-title-input');
+        if (pageTitleInput) {
+            pageTitleInput.value = model.title || '';
+            setupPageTitle();
+        }
 
         // ボタンアイコン初期化
         if (searchModeToggleBtn) {
@@ -1677,6 +1687,33 @@ var Outliner = (function() {
         host.openPageInSidePanel(nodeId, node.pageId);
     }
 
+    // --- ページタイトル ---
+
+    function setupPageTitle() {
+        var isComposing = false;
+        pageTitleInput.addEventListener('compositionstart', function() {
+            isComposing = true;
+        });
+        pageTitleInput.addEventListener('compositionend', function() {
+            isComposing = false;
+            model.title = pageTitleInput.value;
+            scheduleSyncToHost();
+        });
+        pageTitleInput.addEventListener('input', function() {
+            if (!isComposing) {
+                model.title = pageTitleInput.value;
+                scheduleSyncToHost();
+            }
+        });
+        // Enterでツリーにフォーカス移動
+        pageTitleInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                focusFirstVisibleNode();
+            }
+        });
+    }
+
     // --- 検索 ---
 
     function setupSearchBar() {
@@ -2305,6 +2342,9 @@ var Outliner = (function() {
                     model = new OutlinerModel(msg.data);
                     searchEngine = new OutlinerSearch.SearchEngine(model);
                     pageDir = msg.data.pageDir || null;
+                    if (pageTitleInput && document.activeElement !== pageTitleInput) {
+                        pageTitleInput.value = model.title || '';
+                    }
                     renderTree();
                     if (savedFocus && model.getNode(savedFocus)) {
                         focusNode(savedFocus);

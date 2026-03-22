@@ -8,6 +8,7 @@ interface OutlinerConfig {
     fontSize: number;
     webviewMessages?: Record<string, string>;
     enableDebugLogging?: boolean;
+    outlinerPageTitle?: boolean;
 }
 
 export function getOutlinerWebviewContent(
@@ -137,6 +138,9 @@ export function getOutlinerWebviewContent(
 </head>
 <body>
     <div class="outliner-container">
+        <div class="outliner-page-title" style="${config.outlinerPageTitle ? '' : 'display:none'}">
+            <input type="text" class="outliner-page-title-input" placeholder="Untitled" />
+        </div>
         <div class="outliner-breadcrumb"></div>
         <div class="outliner-search-bar">
             <button class="outliner-search-mode-toggle" title="Toggle search mode: Tree / Focus"></button>

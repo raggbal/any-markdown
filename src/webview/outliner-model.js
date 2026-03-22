@@ -49,6 +49,7 @@ var OutlinerModel = (function() {
     function Model(data) {
         data = data || {};
         this.version = data.version || 1;
+        this.title = (data.title !== undefined) ? data.title : '';
         this.rootIds = data.rootIds || [];
         this.nodes = {};
 
@@ -437,11 +438,15 @@ var OutlinerModel = (function() {
     // --- シリアライズ ---
 
     Model.prototype.serialize = function() {
-        return {
+        var data = {
             version: this.version,
             rootIds: this.rootIds.slice(),
             nodes: JSON.parse(JSON.stringify(this.nodes))
         };
+        if (this.title) {
+            data.title = this.title;
+        }
+        return data;
     };
 
     // Static methods

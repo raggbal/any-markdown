@@ -66,7 +66,8 @@ export class OutlinerProvider implements vscode.CustomTextEditorProvider {
                         theme: config.get<string>('theme', 'github'),
                         fontSize: config.get<number>('fontSize', 16),
                         webviewMessages: getWebviewMessages() as unknown as Record<string, string>,
-                        enableDebugLogging: config.get<boolean>('enableDebugLogging', false)
+                        enableDebugLogging: config.get<boolean>('enableDebugLogging', false),
+                        outlinerPageTitle: config.get<boolean>('outlinerPageTitle', false)
                     }
                 );
             } catch (error) {
@@ -332,7 +333,8 @@ export class OutlinerProvider implements vscode.CustomTextEditorProvider {
         disposables.push(
             vscode.workspace.onDidChangeConfiguration((e) => {
                 if (e.affectsConfiguration('any-markdown.theme') ||
-                    e.affectsConfiguration('any-markdown.fontSize')) {
+                    e.affectsConfiguration('any-markdown.fontSize') ||
+                    e.affectsConfiguration('any-markdown.outlinerPageTitle')) {
                     updateWebview();
                 }
             })
