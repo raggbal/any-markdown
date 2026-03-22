@@ -56,6 +56,7 @@ function generateNotesFilePanelHtml(options) {
             display: none; color: inherit;
         }
         .notes-file-panel.collapsed ~ .notes-main-wrapper .notes-panel-toggle-btn { display: block; }
+        .notes-file-panel.collapsed ~ .notes-main-wrapper .outliner-search-bar { padding-left: 44px; }
         .file-panel-rename-input {
             width: 100%; padding: 4px 8px; font-size: 13px; border: 1px solid var(--outliner-active, #4a9eff);
             border-radius: 3px; outline: none; background: var(--outliner-bg, #fff); color: inherit;

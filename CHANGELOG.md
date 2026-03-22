@@ -5,6 +5,18 @@ All notable changes to the "Any Markdown Editor" extension will be documented in
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.195.506] - 2026-03-23
+
+### Added
+
+- **Notes機能（VSCode Activity Bar）** — Activity Barからフォルダを登録し、複数の.outアウトラインをまとめて管理できる新機能。左パネルでファイル一覧表示・追加・削除・リネーム・切替が可能。Electron版と同等の体験をVSCode上で実現
+
+### Improved
+
+- **Notes: 空フォルダ追加時にdefaultアウトラインを自動作成** — 空のフォルダを追加しても即座に編集開始可能
+- **Notes: Set page directoryメニューを非表示** — Notes modeではpageDirが自動管理されるため手動設定を無効化
+- **Notes: パネル閉じ時のUIレイアウト修正** — トグルボタンと検索モードボタンが重ならないよう調整
+
 ## [0.195.504] - 2026-03-23
 
 ### Improved

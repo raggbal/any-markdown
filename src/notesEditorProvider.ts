@@ -35,8 +35,12 @@ export class NotesEditorProvider {
         this.currentFolderPath = folderPath;
         this.fileManager = new NotesFileManager(folderPath);
 
-        // ファイル一覧取得
-        const fileList = this.fileManager.listFiles();
+        // ファイル一覧取得（空フォルダなら default outliner を自動作成）
+        let fileList = this.fileManager.listFiles();
+        if (fileList.length === 0) {
+            this.fileManager.createFile('default');
+            fileList = this.fileManager.listFiles();
+        }
         let currentFilePath: string | null = null;
         let jsonContent = '{"version":1,"rootIds":[],"nodes":{}}';
 

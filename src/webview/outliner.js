@@ -1771,14 +1771,17 @@ var Outliner = (function() {
         var dropdown = document.createElement('div');
         dropdown.className = 'outliner-menu-dropdown';
 
-        var setPageDirItem = document.createElement('button');
-        setPageDirItem.className = 'menu-item';
-        setPageDirItem.textContent = i18n.outlinerSetPageDir || 'Set page directory...';
-        setPageDirItem.addEventListener('click', function() {
-            dropdown.remove();
-            host.setPageDir();
-        });
-        dropdown.appendChild(setPageDirItem);
+        // Notes mode ではpageDirが自動管理のため Set page directory を非表示
+        if (!document.querySelector('.notes-layout')) {
+            var setPageDirItem = document.createElement('button');
+            setPageDirItem.className = 'menu-item';
+            setPageDirItem.textContent = i18n.outlinerSetPageDir || 'Set page directory...';
+            setPageDirItem.addEventListener('click', function() {
+                dropdown.remove();
+                host.setPageDir();
+            });
+            dropdown.appendChild(setPageDirItem);
+        }
 
         // 検索バーを基準に配置
         var searchBar = document.querySelector('.outliner-search-bar');
