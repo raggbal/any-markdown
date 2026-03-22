@@ -1659,6 +1659,7 @@ var Outliner = (function() {
     function openPage(nodeId) {
         var node = model.getNode(nodeId);
         if (!node || !node.isPage || !node.pageId) { return; }
+        sidePanelOriginNodeId = nodeId;
         host.openPageInSidePanel(nodeId, node.pageId);
     }
 
@@ -1960,6 +1961,7 @@ var Outliner = (function() {
     var sidePanelInstance = null;
     var sidePanelHostBridge = null;
     var sidePanelFilePath = null;
+    var sidePanelOriginNodeId = null;  // サイドパネルを開いたノードID（閉じた時にフォーカスを戻す）
     var sidePanelTocVisible = true;
     var sidePanelExpanded = false;
     var sidePanelImagePending = false;
@@ -2128,7 +2130,12 @@ var Outliner = (function() {
         if (sidePanelIframeContainer) { sidePanelIframeContainer.innerHTML = ''; }
         sidePanelFilePath = null;
         host.notifySidePanelClosed();
-        focusFirstVisibleNode();
+        if (sidePanelOriginNodeId) {
+            focusNode(sidePanelOriginNodeId);
+            sidePanelOriginNodeId = null;
+        } else {
+            focusFirstVisibleNode();
+        }
     }
 
     function renderSidePanelToc(toc) {
