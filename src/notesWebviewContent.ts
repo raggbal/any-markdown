@@ -149,17 +149,17 @@ export function getNotesWebviewContent(
     <div class="notes-layout">
         ${notesHtml}
         <div class="notes-main-wrapper">
-            <button class="notes-panel-toggle-btn" id="notesPanelToggleBtn" title="Show file panel">&#x25B6;</button>
             <div class="outliner-container">
                 <div class="outliner-page-title" style="display:none;">
                     <input type="text" class="outliner-page-title-input" placeholder="Untitled" />
                 </div>
-                <div class="outliner-breadcrumb"></div>
                 <div class="outliner-search-bar">
+                    <button class="notes-panel-toggle-btn" id="notesPanelToggleBtn" title="Show file panel"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg></button>
                     <button class="outliner-search-mode-toggle" title="Toggle search mode: Tree / Focus"></button>
                     <input type="text" class="outliner-search-input" placeholder="Search... (e.g. #tag, keyword, is:page)" />
                     <button class="outliner-menu-btn" title="Menu"></button>
                 </div>
+                <div class="outliner-breadcrumb"></div>
                 <div class="outliner-tree" role="tree"></div>
             </div>
         </div>
