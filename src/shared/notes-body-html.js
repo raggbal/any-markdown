@@ -35,7 +35,7 @@ function generateNotesFilePanelHtml(options) {
         .file-panel-btn {
             background: transparent; border: 1px solid var(--outliner-border, #e0e0e0);
             border-radius: 4px; cursor: pointer; color: inherit;
-            padding: 4px 6px; line-height: 1; font-size: 13px;
+            padding: 7px 8px; line-height: 1; font-size: 13px;
             display: flex; align-items: center; justify-content: center;
             opacity: 0.7;
         }

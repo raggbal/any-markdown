@@ -81,6 +81,10 @@ body {
     padding: 8px 16px;
     border-bottom: 1px solid var(--outliner-border);
     flex-shrink: 0;
+    box-sizing: border-box;
+}
+.outliner-search-bar:has(+ .outliner-breadcrumb.is-visible) {
+    border-bottom-color: transparent;
 }
 
 .outliner-search-mode-toggle {
