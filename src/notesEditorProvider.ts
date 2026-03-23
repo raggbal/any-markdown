@@ -35,6 +35,9 @@ export class NotesEditorProvider {
         this.currentFolderPath = folderPath;
         this.fileManager = new NotesFileManager(folderPath);
 
+        // .note構造をロード（自動マイグレーション含む）
+        const noteStructure = this.fileManager.loadStructure();
+
         // ファイル一覧取得（空フォルダなら default outliner を自動作成）
         let fileList = this.fileManager.listFiles();
         if (fileList.length === 0) {
@@ -44,8 +47,16 @@ export class NotesEditorProvider {
         let currentFilePath: string | null = null;
         let jsonContent = '{"version":1,"rootIds":[],"nodes":{}}';
 
-        // 最初のファイルを開く
-        if (fileList.length > 0) {
+        // 構造のツリー順で最初のファイルを開く
+        const firstFileId = this.fileManager.findFirstFileId();
+        if (firstFileId) {
+            const fp = this.fileManager.getFilePathById(firstFileId);
+            const content = this.fileManager.openFile(fp);
+            if (content !== null) {
+                currentFilePath = fp;
+                jsonContent = content;
+            }
+        } else if (fileList.length > 0) {
             const content = this.fileManager.openFile(fileList[0].filePath);
             if (content !== null) {
                 currentFilePath = fileList[0].filePath;
@@ -90,6 +101,7 @@ export class NotesEditorProvider {
                 fileList,
                 currentFilePath,
                 panelCollapsed,
+                structure: this.fileManager.getStructure(),
             }
         );
 
@@ -307,7 +319,7 @@ export class NotesEditorProvider {
                 webviewMessages: getWebviewMessages() as unknown as Record<string, string>,
                 enableDebugLogging: config.get<boolean>('enableDebugLogging', false),
             },
-            { jsonContent, fileList, currentFilePath, panelCollapsed }
+            { jsonContent, fileList, currentFilePath, panelCollapsed, structure: this.fileManager.getStructure() }
         );
     }
 
@@ -318,11 +330,15 @@ export class NotesEditorProvider {
 
         const refreshFileList = () => {
             if (!this.fileManager || !this.panel) return;
+            // ディスク変更を検知したら構造を再同期
+            (this.fileManager as any).structure = null; // キャッシュ無効化
+            const structure = this.fileManager.loadStructure();
             const fileList = this.fileManager.listFiles();
             const currentFile = this.fileManager.getCurrentFilePath();
             this.panel.webview.postMessage({
                 type: 'notesFileListChanged',
                 fileList,
+                structure,
                 currentFile,
             });
         };

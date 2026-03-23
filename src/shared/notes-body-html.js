@@ -41,13 +41,57 @@ function generateNotesFilePanelHtml(options) {
         }
         .file-panel-btn:hover { opacity: 1; border-color: var(--vscode-focusBorder, #007acc); background: transparent; }
         .file-panel-list { flex: 1; overflow-y: auto; padding: 4px 0; }
+
+        /* ── File item ── */
         .file-panel-item {
-            padding: 8px 12px; cursor: pointer; font-size: 13px;
+            padding: 6px 12px; cursor: pointer; font-size: 13px;
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
             border-radius: 4px; margin: 1px 4px;
+            display: flex; align-items: center; gap: 6px;
         }
         .file-panel-item:hover { background: var(--outliner-hover, #e8e8e8); }
         .file-panel-item.active { background: var(--outliner-active, #d8e8f8); font-weight: 500; }
+        .file-panel-item-icon { flex-shrink: 0; opacity: 0.5; width: 14px; height: 14px; }
+        .file-panel-item-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+        /* ── Folder ── */
+        .file-panel-folder { }
+        .file-panel-folder-header {
+            padding: 6px 12px; cursor: pointer; font-size: 13px;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            border-radius: 4px; margin: 1px 4px;
+            display: flex; align-items: center; gap: 4px;
+            font-weight: 500;
+        }
+        .file-panel-folder-header:hover { background: var(--outliner-hover, #e8e8e8); }
+        .file-panel-folder-chevron {
+            flex-shrink: 0; width: 14px; height: 14px;
+            display: flex; align-items: center; justify-content: center;
+            transition: transform 0.15s;
+            opacity: 0.6;
+        }
+        .file-panel-folder.collapsed > .file-panel-folder-header > .file-panel-folder-chevron {
+            transform: rotate(-90deg);
+        }
+        .file-panel-folder-icon { flex-shrink: 0; opacity: 0.5; width: 14px; height: 14px; }
+        .file-panel-folder-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .file-panel-folder-children {
+            padding-left: 12px;
+        }
+        .file-panel-folder.collapsed > .file-panel-folder-children {
+            display: none;
+        }
+
+        /* ── Drag & Drop ── */
+        .file-panel-drag-over { background: var(--outliner-active, #d8e8f8); border-radius: 4px; }
+        .file-panel-drop-line {
+            height: 2px; background: var(--vscode-focusBorder, #007acc);
+            margin: 0 4px; border-radius: 1px;
+            pointer-events: none;
+        }
+        [draggable="true"] { cursor: grab; }
+        [draggable="true"]:active { cursor: grabbing; }
+
         .file-panel-empty {
             padding: 16px 12px; color: var(--outliner-subtext, #999); font-size: 12px; text-align: center;
         }
@@ -80,6 +124,7 @@ function generateNotesFilePanelHtml(options) {
             <div class="file-panel-header">
                 <span class="file-panel-title">Outlines</span>
                 <div class="file-panel-actions">
+                    <button class="file-panel-btn" id="filePanelAddFolder" title="New Folder"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/><line x1="12" y1="10" x2="12" y2="16"/><line x1="9" y1="13" x2="15" y2="13"/></svg></button>
                     <button class="file-panel-btn" id="filePanelAdd" title="New Outline">+</button>
                     <button class="file-panel-btn" id="filePanelCollapse" title="Collapse panel">&#9776;</button>
                 </div>

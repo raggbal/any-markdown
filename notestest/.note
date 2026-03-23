@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "rootIds": [
+    "fmn39kscpr66g",
+    "fmn39kxz8h8uh"
+  ],
+  "items": {
+    "mn2906pzdx0r": {
+      "type": "file",
+      "id": "mn2906pzdx0r",
+      "title": "test"
+    },
+    "fmn39kscpr66g": {
+      "type": "folder",
+      "id": "fmn39kscpr66g",
+      "title": "ｇ",
+      "childIds": [
+        "mn2906pzdx0r",
+        "mn39l1ysogpg"
+      ],
+      "collapsed": false
+    },
+    "fmn39kxz8h8uh": {
+      "type": "folder",
+      "id": "fmn39kxz8h8uh",
+      "title": "b",
+      "childIds": [],
+      "collapsed": true
+    },
+    "mn39l1ysogpg": {
+      "type": "file",
+      "id": "mn39l1ysogpg",
+      "title": "aaa"
+    }
+  }
+}

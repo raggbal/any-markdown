@@ -46,6 +46,24 @@ export interface NotesPlatformActions {
 }
 
 /**
+ * 構造付きファイルリスト更新メッセージを送信するヘルパー
+ */
+function sendFileListWithStructure(
+    fileManager: NotesFileManager,
+    sender: NotesSender,
+    currentFile?: string | null
+): void {
+    const fileList = fileManager.listFiles();
+    const structure = fileManager.getStructure();
+    sender.postMessage({
+        type: 'notesFileListChanged',
+        fileList,
+        structure,
+        currentFile: currentFile !== undefined ? currentFile : fileManager.getCurrentFilePath(),
+    });
+}
+
+/**
  * Notes メッセージハンドラ
  * webview からのメッセージを処理する共通ロジック
  */
@@ -59,6 +77,10 @@ export function handleNotesMessage(
         // ── Core Data ──
 
         case 'syncData':
+            // stale sync（ファイル切替前のデータ）を無視
+            if (message.fileChangeId !== undefined && message.fileChangeId !== fileManager.getFileChangeId()) {
+                break;
+            }
             fileManager.saveCurrentFile(message.content);
             break;
 
@@ -171,25 +193,23 @@ export function handleNotesMessage(
                     platform.saveLastOpenedFile(message.filePath);
                 }
                 const data = JSON.parse(content);
-                const fileList = fileManager.listFiles();
-                sender.postMessage({ type: 'notesFileListChanged', fileList, currentFile: message.filePath });
-                sender.postMessage({ type: 'updateData', data });
+                sendFileListWithStructure(fileManager, sender, message.filePath);
+                sender.postMessage({ type: 'updateData', data, fileChangeId: fileManager.getFileChangeId() });
             }
             break;
         }
 
         case 'notesCreateFile': {
             fileManager.flushSave();
-            const filePath = fileManager.createFile(message.title || 'Untitled');
+            const filePath = fileManager.createFile(message.title || 'Untitled', message.parentId || null);
             const content = fileManager.openFile(filePath);
             if (content !== null) {
                 if (platform.saveLastOpenedFile) {
                     platform.saveLastOpenedFile(filePath);
                 }
                 const data = JSON.parse(content);
-                const fileList = fileManager.listFiles();
-                sender.postMessage({ type: 'notesFileListChanged', fileList, currentFile: filePath });
-                sender.postMessage({ type: 'updateData', data });
+                sendFileListWithStructure(fileManager, sender, filePath);
+                sender.postMessage({ type: 'updateData', data, fileChangeId: fileManager.getFileChangeId() });
             }
             break;
         }
@@ -197,36 +217,70 @@ export function handleNotesMessage(
         case 'notesDeleteFile': {
             const wasCurrent = fileManager.getCurrentFilePath() === message.filePath;
             fileManager.deleteFile(message.filePath);
-            const fileList = fileManager.listFiles();
-            sender.postMessage({ type: 'notesFileListChanged', fileList });
             if (wasCurrent) {
-                if (fileList.length > 0) {
-                    const content = fileManager.openFile(fileList[0].filePath);
+                const firstId = fileManager.findFirstFileId();
+                if (firstId) {
+                    const fp = fileManager.getFilePathById(firstId);
+                    const content = fileManager.openFile(fp);
                     if (content !== null) {
                         if (platform.saveLastOpenedFile) {
-                            platform.saveLastOpenedFile(fileList[0].filePath);
+                            platform.saveLastOpenedFile(fp);
                         }
                         const data = JSON.parse(content);
-                        sender.postMessage({ type: 'notesFileListChanged', fileList, currentFile: fileList[0].filePath });
-                        sender.postMessage({ type: 'updateData', data });
+                        sendFileListWithStructure(fileManager, sender, fp);
+                        sender.postMessage({ type: 'updateData', data, fileChangeId: fileManager.getFileChangeId() });
                     }
                 } else {
-                    sender.postMessage({ type: 'updateData', data: { title: '', rootIds: [], nodes: {} } });
+                    sendFileListWithStructure(fileManager, sender);
+                    sender.postMessage({ type: 'updateData', data: { title: '', rootIds: [], nodes: {} }, fileChangeId: fileManager.getFileChangeId() });
                 }
+            } else {
+                sendFileListWithStructure(fileManager, sender);
             }
             break;
         }
 
         case 'notesRenameTitle': {
             fileManager.renameTitle(message.filePath, message.newTitle);
-            const fileList = fileManager.listFiles();
-            sender.postMessage({ type: 'notesFileListChanged', fileList });
+            sendFileListWithStructure(fileManager, sender);
             break;
         }
 
         case 'notesTogglePanel':
             platform.savePanelCollapsed(message.collapsed);
             break;
+
+        // ── Folder Operations ──
+
+        case 'notesCreateFolder': {
+            fileManager.createFolder(message.title || 'New Folder', message.parentId || null);
+            sendFileListWithStructure(fileManager, sender);
+            break;
+        }
+
+        case 'notesDeleteFolder': {
+            fileManager.deleteFolder(message.folderId);
+            sendFileListWithStructure(fileManager, sender);
+            break;
+        }
+
+        case 'notesRenameFolder': {
+            fileManager.renameFolder(message.folderId, message.newTitle);
+            sendFileListWithStructure(fileManager, sender);
+            break;
+        }
+
+        case 'notesToggleFolder': {
+            fileManager.toggleFolderCollapsed(message.folderId);
+            sendFileListWithStructure(fileManager, sender);
+            break;
+        }
+
+        case 'notesMoveItem': {
+            fileManager.moveItem(message.itemId, message.targetParentId, message.index);
+            sendFileListWithStructure(fileManager, sender);
+            break;
+        }
 
         // ── Focus (no-op in shared, platforms handle if needed) ──
         case 'webviewFocus':

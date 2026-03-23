@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "rootIds": [
+    "nmn39l1ys929bf4",
+    "nmn3a3y90c1ui1p",
+    "nmn3a3yy6xkxsgu",
+    "nmn3a4i9gr9thnc"
+  ],
+  "nodes": {
+    "nmn39l1ys929bf4": {
+      "id": "nmn39l1ys929bf4",
+      "text": "ｓｄｓｄ",
+      "childIds": [],
+      "collapsed": false,
+      "children": [],
+      "subtext": "",
+      "tags": []
+    },
+    "nmn3a3y90c1ui1p": {
+      "id": "nmn3a3y90c1ui1p",
+      "parentId": null,
+      "children": [],
+      "text": "ｓｄｓｄ",
+      "tags": [],
+      "isPage": false,
+      "pageId": null,
+      "collapsed": false,
+      "checked": null,
+      "subtext": ""
+    },
+    "nmn3a3yy6xkxsgu": {
+      "id": "nmn3a3yy6xkxsgu",
+      "parentId": null,
+      "children": [],
+      "text": "ああああ",
+      "tags": [],
+      "isPage": false,
+      "pageId": null,
+      "collapsed": false,
+      "checked": null,
+      "subtext": ""
+    },
+    "nmn3a4i9gr9thnc": {
+      "id": "nmn3a4i9gr9thnc",
+      "parentId": null,
+      "children": [],
+      "text": "",
+      "tags": [],
+      "isPage": false,
+      "pageId": null,
+      "collapsed": false,
+      "checked": null,
+      "subtext": ""
+    }
+  },
+  "title": "aaa",
+  "searchFocusMode": false,
+  "pageDir": "./mn39l1ysogpg"
+}

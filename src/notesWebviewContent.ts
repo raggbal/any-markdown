@@ -15,6 +15,7 @@ interface NotesInitData {
     fileList: Array<{ filePath: string; title: string; id: string }>;
     currentFilePath: string | null;
     panelCollapsed: boolean;
+    structure?: any;
 }
 
 export function getNotesWebviewContent(
@@ -195,7 +196,8 @@ export function getNotesWebviewContent(
         notesFilePanel.init(
             window.notesHostBridge,
             ${JSON.stringify(initData.fileList)},
-            ${JSON.stringify(initData.currentFilePath)}
+            ${JSON.stringify(initData.currentFilePath)},
+            ${JSON.stringify(initData.structure || null)}
         );
     </script>
 </body>

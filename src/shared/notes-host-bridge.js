@@ -8,11 +8,19 @@
 (function() {
     var api = acquireVsCodeApi();
 
+    // ファイル切替カウンター: stale syncData を防止
+    var currentFileChangeId = 0;
+    window.addEventListener('message', function(e) {
+        if (e.data && e.data.type === 'updateData' && e.data.fileChangeId !== undefined) {
+            currentFileChangeId = e.data.fileChangeId;
+        }
+    });
+
     // ── outliner.js 用ブリッジ (既存 outliner-host-bridge.js と同一インターフェース) ──
     window.outlinerHostBridge = {
         // データ同期
         syncData: function(jsonString) {
-            api.postMessage({ type: 'syncData', content: jsonString });
+            api.postMessage({ type: 'syncData', content: jsonString, fileChangeId: currentFileChangeId });
         },
 
         // 保存
@@ -97,11 +105,12 @@
 
     // ── notes-file-panel.js 用ブリッジ ──
     window.notesHostBridge = {
+        // ファイル操作
         openFile: function(filePath) {
             api.postMessage({ type: 'notesOpenFile', filePath: filePath });
         },
-        createFile: function(title) {
-            api.postMessage({ type: 'notesCreateFile', title: title });
+        createFile: function(title, parentId) {
+            api.postMessage({ type: 'notesCreateFile', title: title, parentId: parentId || null });
         },
         deleteFile: function(filePath) {
             api.postMessage({ type: 'notesDeleteFile', filePath: filePath });
@@ -112,11 +121,31 @@
         togglePanel: function(collapsed) {
             api.postMessage({ type: 'notesTogglePanel', collapsed: collapsed });
         },
+
+        // フォルダ操作
+        createFolder: function(title, parentId) {
+            api.postMessage({ type: 'notesCreateFolder', title: title, parentId: parentId || null });
+        },
+        deleteFolder: function(folderId) {
+            api.postMessage({ type: 'notesDeleteFolder', folderId: folderId });
+        },
+        renameFolder: function(folderId, newTitle) {
+            api.postMessage({ type: 'notesRenameFolder', folderId: folderId, newTitle: newTitle });
+        },
+        toggleFolder: function(folderId) {
+            api.postMessage({ type: 'notesToggleFolder', folderId: folderId });
+        },
+
+        // D&D 移動
+        moveItem: function(itemId, targetParentId, index) {
+            api.postMessage({ type: 'notesMoveItem', itemId: itemId, targetParentId: targetParentId, index: index });
+        },
+
+        // イベントリスナー
         onFileListChanged: function(handler) {
-            // Handled via outlinerHostBridge.onMessage — listen for notesFileListChanged
             window.addEventListener('message', function(e) {
                 if (e.data && e.data.type === 'notesFileListChanged') {
-                    handler(e.data.fileList, e.data.currentFile);
+                    handler(e.data.fileList, e.data.currentFile, e.data.structure);
                 }
             });
         }
