@@ -81,7 +81,7 @@ function generateNotesFilePanelHtml(options) {
                 <span class="file-panel-title">Outlines</span>
                 <div class="file-panel-actions">
                     <button class="file-panel-btn" id="filePanelAdd" title="New Outline">+</button>
-                    <button class="file-panel-btn" id="filePanelCollapse" title="Collapse panel"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg></button>
+                    <button class="file-panel-btn" id="filePanelCollapse" title="Collapse panel">&#9776;</button>
                 </div>
             </div>
             <div class="file-panel-list" id="notesFileList"></div>
