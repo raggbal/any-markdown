@@ -2468,6 +2468,7 @@ var Outliner = (function() {
 
     return {
         init: init,
-        getModel: function() { return model; }
+        getModel: function() { return model; },
+        flushSync: function() { if (model) syncToHostImmediate(); }
     };
 })();

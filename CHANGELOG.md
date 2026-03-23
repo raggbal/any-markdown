@@ -5,6 +5,16 @@ All notable changes to the "Any Markdown Editor" extension will be documented in
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.195.513] - 2026-03-24
+
+### Added
+
+- **Notes: フォルダ/ツリー管理** — 左パネルで仮想フォルダを作成し、アウトラインをフォルダで分類・管理可能に。D&Dでファイルやフォルダの並び替え・移動が可能
+
+### Fixed
+
+- **Notes: ファイル切替時にアウトラインデータが消失するバグを修正** — 入力中にファイルを切り替えると未保存データが失われる問題を修正
+
 ## [0.195.509] - 2026-03-23
 
 ### Fixed

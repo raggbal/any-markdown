@@ -103,10 +103,19 @@
         }
     };
 
+    // ── Outliner即時同期ヘルパー ──
+    // ファイル切替前に未保存のoutlinerデータを即座にsyncする
+    function flushOutlinerSync() {
+        if (window.Outliner && window.Outliner.flushSync) {
+            window.Outliner.flushSync();
+        }
+    }
+
     // ── notes-file-panel.js 用ブリッジ ──
     window.notesHostBridge = {
         // ファイル操作
         openFile: function(filePath) {
+            flushOutlinerSync();
             api.postMessage({ type: 'notesOpenFile', filePath: filePath });
         },
         createFile: function(title, parentId) {
