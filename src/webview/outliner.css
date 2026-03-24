@@ -127,6 +127,8 @@ body {
     color: var(--outliner-placeholder);
 }
 
+.outliner-undo-btn,
+.outliner-redo-btn,
 .outliner-menu-btn {
     background: transparent;
     border: 1px solid var(--outliner-search-border);
@@ -142,9 +144,16 @@ body {
     align-items: center;
     justify-content: center;
 }
+.outliner-undo-btn:hover:not(:disabled),
+.outliner-redo-btn:hover:not(:disabled),
 .outliner-menu-btn:hover {
     opacity: 1;
     border-color: var(--vscode-focusBorder, #007acc);
+}
+.outliner-undo-btn:disabled,
+.outliner-redo-btn:disabled {
+    opacity: 0.3;
+    cursor: default;
 }
 
 /* --- Menu Dropdown --- */

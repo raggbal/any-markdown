@@ -28,6 +28,8 @@ var Outliner = (function() {
     var sidePanelWidthSetting = null; // outファイル個別のサイドパネル幅
     var searchModeToggleBtn = null;  // toggle button element
     var menuBtn = null;              // menu button element
+    var undoBtn = null;              // undo button element
+    var redoBtn = null;              // redo button element
     var contextMenuEl = null;
 
     var syncDebounceTimer = null;
@@ -56,6 +58,7 @@ var Outliner = (function() {
         undoStack.push(snapshot);
         if (undoStack.length > MAX_UNDO) { undoStack.shift(); }
         redoStack.length = 0;
+        updateUndoRedoButtons();
     }
 
     function undo() {
@@ -72,6 +75,7 @@ var Outliner = (function() {
         }
         syncToHostImmediate();
         isUndoRedo = false;
+        updateUndoRedoButtons();
     }
 
     function redo() {
@@ -87,6 +91,7 @@ var Outliner = (function() {
         }
         syncToHostImmediate();
         isUndoRedo = false;
+        updateUndoRedoButtons();
     }
 
     // --- 初期化 ---
@@ -97,6 +102,8 @@ var Outliner = (function() {
     var ICON_TREE_MODE = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12h-8"/><path d="M21 6H8"/><path d="M21 18h-8"/><path d="M3 6v4c0 1.1.9 2 2 2h3"/><path d="M3 10v6c0 1.1.9 2 2 2h3"/></svg>';
     var ICON_FOCUS_MODE = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>';
     var ICON_MENU = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>';
+    var ICON_UNDO = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M3 13a9 9 0 0 1 3-7.7A9 9 0 0 1 21 12a9 9 0 0 1-9 9 9 9 0 0 1-6.7-3"/></svg>';
+    var ICON_REDO = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"/><path d="M21 13a9 9 0 0 0-3-7.7A9 9 0 0 0 3 12a9 9 0 0 0 9 9 9 9 0 0 0 6.7-3"/></svg>';
 
     function init(data) {
         host = window.outlinerHostBridge;
@@ -117,6 +124,8 @@ var Outliner = (function() {
         breadcrumbEl = document.querySelector('.outliner-breadcrumb');
         searchModeToggleBtn = document.querySelector('.outliner-search-mode-toggle');
         menuBtn = document.querySelector('.outliner-menu-btn');
+        undoBtn = document.querySelector('.outliner-undo-btn');
+        redoBtn = document.querySelector('.outliner-redo-btn');
 
         // ページタイトル
         pageTitleEl = document.querySelector('.outliner-page-title');
@@ -132,6 +141,12 @@ var Outliner = (function() {
         }
         if (menuBtn) {
             menuBtn.innerHTML = ICON_MENU;
+        }
+        if (undoBtn) {
+            undoBtn.innerHTML = ICON_UNDO;
+        }
+        if (redoBtn) {
+            redoBtn.innerHTML = ICON_REDO;
         }
 
         renderTree();
@@ -1930,6 +1945,16 @@ var Outliner = (function() {
                 toggleMenuDropdown();
             });
         }
+
+        // Undo/Redo ボタン
+        if (undoBtn) {
+            undoBtn.addEventListener('mousedown', function(e) { e.preventDefault(); });
+            undoBtn.addEventListener('click', function() { undo(); });
+        }
+        if (redoBtn) {
+            redoBtn.addEventListener('mousedown', function(e) { e.preventDefault(); });
+            redoBtn.addEventListener('click', function() { redo(); });
+        }
     }
 
     function toggleMenuDropdown() {
@@ -2008,6 +2033,15 @@ var Outliner = (function() {
         searchModeToggleBtn.title = searchFocusMode
             ? (i18n.outlinerFocusMode || 'Focus mode: matched node + children only')
             : (i18n.outlinerTreeMode || 'Tree mode: show ancestors to root');
+    }
+
+    function updateUndoRedoButtons() {
+        if (undoBtn) {
+            undoBtn.disabled = (undoStack.length === 0);
+        }
+        if (redoBtn) {
+            redoBtn.disabled = (redoStack.length === 0);
+        }
     }
 
     function setScope(scope) {
@@ -2753,6 +2787,11 @@ var Outliner = (function() {
                     searchEngine = new OutlinerSearch.SearchEngine(model);
                     pageDir = msg.data.pageDir || null;
                     sidePanelWidthSetting = msg.data.sidePanelWidth || null;
+                    // モデルが入れ替わったのでundo/redoスタックをクリア
+                    // (別ファイルのスナップショットでundo→データ上書きを防止)
+                    undoStack.length = 0;
+                    redoStack.length = 0;
+                    updateUndoRedoButtons();
                     // Daily Notes 表示切替
                     isDailyNotes = !!msg.isDailyNotes;
                     updateDailyNavBar();

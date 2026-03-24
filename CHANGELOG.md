@@ -5,7 +5,11 @@ All notable changes to the "Any Markdown Editor" extension will be documented in
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.195.524] - 2026-03-25
+## [0.195.526] - 2026-03-25
+
+### Added
+
+- **Outliner: Undo/Redoボタン** — 検索バーにUndo/Redoボタンを追加、スタック状態に応じたdisabled制御
 
 ### Changed
 
@@ -15,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Outliner: ファイル切替時のデータ上書きバグを修正** — undo/redoスタックのクリア漏れによるデータ消失を防止
+- **Outliner: フォーカスモード検索がスコープ外のノードを表示するバグを修正**
 - **Outliner: テキスト全選択状態でのBackspace動作を修正** — 前行マージではなくテキスト削除に
 
 ## [0.195.517] - 2026-03-24

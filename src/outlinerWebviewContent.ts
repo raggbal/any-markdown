@@ -145,6 +145,8 @@ export function getOutlinerWebviewContent(
         <div class="outliner-search-bar">
             <button class="outliner-search-mode-toggle" title="Toggle search mode: Tree / Focus"></button>
             <input type="text" class="outliner-search-input" placeholder="Search... (e.g. #tag, keyword, is:page)" />
+            <button class="outliner-undo-btn" title="Undo (Cmd+Z)" disabled></button>
+            <button class="outliner-redo-btn" title="Redo (Cmd+Shift+Z)" disabled></button>
             <button class="outliner-menu-btn" title="Menu"></button>
         </div>
         <div class="outliner-breadcrumb"></div>
