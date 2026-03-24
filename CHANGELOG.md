@@ -5,6 +5,18 @@ All notable changes to the "Any Markdown Editor" extension will be documented in
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.195.524] - 2026-03-25
+
+### Changed
+
+- **Outliner: Scope-in時のカーソル位置改善** — スコープヘッダーのテキスト末尾にカーソルを配置
+- **Notes: Daily Notes空ノード自動追加を削除** — スコープ空状態UIで代替
+- **Outliner: Shift+Tabのスコープ境界制限** — スコープ対象ノードの子レベルを超えてデインデントしないよう制限
+
+### Fixed
+
+- **Outliner: テキスト全選択状態でのBackspace動作を修正** — 前行マージではなくテキスト削除に
+
 ## [0.195.517] - 2026-03-24
 
 ### Changed

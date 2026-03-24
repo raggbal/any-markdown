@@ -304,12 +304,6 @@ export function handleNotesMessage(
 
             const { dayNodeId, modified } = fileManager.ensureDailyNode(dailyData, year, month, day);
             let dailyDidModify = modified;
-            // 日付ノードに子がなければ空ノードを自動追加
-            const dailyDayNode = dailyData.nodes[dayNodeId];
-            if (dailyDayNode && (!dailyDayNode.children || dailyDayNode.children.length === 0)) {
-                fileManager.addNodeToData(dailyData, dayNodeId, '', 'last');
-                dailyDidModify = true;
-            }
             if (dailyDidModify) {
                 fileManager.saveCurrentFileImmediate(JSON.stringify(dailyData));
             }
@@ -351,12 +345,6 @@ export function handleNotesMessage(
 
             const navResult = fileManager.ensureDailyNode(navData, navYear, navMonth, navDay);
             let navDidModify = navResult.modified;
-            // 日付ノードに子がなければ空ノードを自動追加
-            const navDayNode = navData.nodes[navResult.dayNodeId];
-            if (navDayNode && (!navDayNode.children || navDayNode.children.length === 0)) {
-                fileManager.addNodeToData(navData, navResult.dayNodeId, '', 'last');
-                navDidModify = true;
-            }
             if (navDidModify) {
                 fileManager.saveCurrentFileImmediate(JSON.stringify(navData));
             }
@@ -389,12 +377,6 @@ export function handleNotesMessage(
 
             const dateResult = fileManager.ensureDailyNode(navDateData, targetYear, targetMonth, targetDay);
             let dateDidModify = dateResult.modified;
-            // 日付ノードに子がなければ空ノードを自動追加
-            const dateDayNode = navDateData.nodes[dateResult.dayNodeId];
-            if (dateDayNode && (!dateDayNode.children || dateDayNode.children.length === 0)) {
-                fileManager.addNodeToData(navDateData, dateResult.dayNodeId, '', 'last');
-                dateDidModify = true;
-            }
             if (dateDidModify) {
                 fileManager.saveCurrentFileImmediate(JSON.stringify(navDateData));
             }

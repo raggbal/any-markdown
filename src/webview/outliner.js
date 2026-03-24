@@ -1253,12 +1253,21 @@ var Outliner = (function() {
                 }, 0);
                 break;
 
-            case 'Backspace':
-                // スコープヘッダー: 先頭でのBackspace（親合流・削除）を禁止
-                if (isScopeHeader && isAtStart) {
+            case 'Backspace': {
+                var bsSel = window.getSelection();
+                var hasSelection = bsSel && !bsSel.isCollapsed;
+                // スコープヘッダー: 先頭でのBackspace（親合流・削除）を禁止（選択範囲がある場合はテキスト削除を許可）
+                if (isScopeHeader && isAtStart && !hasSelection) {
                     e.preventDefault();
                     break;
                 }
+                // 選択範囲がある場合: ブラウザのデフォルト動作（選択テキスト削除）に任せる
+                // input イベントハンドラで getPlainText → model.updateText が自動同期
+                if (hasSelection) {
+                    saveSnapshot();
+                    break;
+                }
+                // 以下は既存ロジック（カーソルのみの場合）
                 // 先頭に空白がある場合: contenteditableでは先頭空白をBackspaceで消せないため
                 // カーソルが先頭空白内(offset ≤ 空白長)にいればtrim処理
                 var nodeText = node.text || '';
@@ -1277,6 +1286,7 @@ var Outliner = (function() {
                     handleBackspaceAtStart(node, textEl);
                 }
                 break;
+            }
 
             case 'Tab':
                 // スコープヘッダー: インデント変更を禁止
@@ -1285,10 +1295,15 @@ var Outliner = (function() {
                     break;
                 }
                 e.preventDefault();
-                saveSnapshot();
                 if (e.shiftKey) {
+                    // スコープルートの直接の子: デインデントするとスコープ外になるため禁止
+                    if (currentScope.type === 'subtree' && currentScope.rootId && node.parentId === currentScope.rootId) {
+                        break;
+                    }
+                    saveSnapshot();
                     handleShiftTab(node, textEl);
                 } else {
+                    saveSnapshot();
                     handleTab(node, textEl);
                 }
                 break;
@@ -2007,7 +2022,12 @@ var Outliner = (function() {
                 return;
             }
         }
-        focusFirstVisibleNode();
+        // scope-in時: スコープヘッダーの末尾にカーソル
+        if (currentScope.type === 'subtree' && currentScope.rootId) {
+            focusNode(currentScope.rootId);
+        } else {
+            focusFirstVisibleNode();
+        }
     }
 
     function jumpToAndHighlightNode(nodeId) {
