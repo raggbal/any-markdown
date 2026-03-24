@@ -301,7 +301,7 @@ var Outliner = (function() {
         // Scope Inボタン（ホバー時に表示）
         var scopeBtn = document.createElement('div');
         scopeBtn.className = 'outliner-scope-btn';
-        scopeBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>';
+        scopeBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>';
         scopeBtn.addEventListener('click', function(e) {
             e.stopPropagation();
             setScope({ type: 'subtree', rootId: node.id });
@@ -1737,7 +1737,19 @@ var Outliner = (function() {
         if (!searchInput) { return; }
 
         var debounceTimer = null;
+        var isSearchComposing = false;
+
+        searchInput.addEventListener('compositionstart', function() {
+            isSearchComposing = true;
+        });
+        searchInput.addEventListener('compositionend', function() {
+            isSearchComposing = false;
+            clearTimeout(debounceTimer);
+            executeSearch();
+        });
+
         searchInput.addEventListener('input', function() {
+            if (isSearchComposing) return;
             clearTimeout(debounceTimer);
             debounceTimer = setTimeout(function() {
                 executeSearch();
@@ -1822,7 +1834,25 @@ var Outliner = (function() {
         }
         var query = OutlinerSearch.parseQuery(queryStr);
         currentSearchResult = searchEngine.search(query, currentScope, { focusMode: searchFocusMode });
+        expandCollapsedParentsForSearch();
         renderTree();
+    }
+
+    /** 検索結果にマッチした子孫を持つ折り畳み親を自動展開（展開しっぱなし） */
+    function expandCollapsedParentsForSearch() {
+        if (!currentSearchResult) return;
+        currentSearchResult.forEach(function(nodeId) {
+            var node = model.getNode(nodeId);
+            if (!node) return;
+            var current = node;
+            while (current && current.parentId) {
+                var parent = model.getNode(current.parentId);
+                if (parent && parent.collapsed) {
+                    parent.collapsed = false;
+                }
+                current = parent;
+            }
+        });
     }
 
     function clearSearch() {

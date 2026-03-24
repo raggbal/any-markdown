@@ -8,6 +8,7 @@ interface NotesConfig {
     fontSize: number;
     webviewMessages?: Record<string, string>;
     enableDebugLogging?: boolean;
+    outlinerPageTitle?: boolean;
 }
 
 interface NotesInitData {
@@ -153,7 +154,7 @@ export function getNotesWebviewContent(
         ${notesHtml}
         <div class="notes-main-wrapper">
             <div class="outliner-container">
-                <div class="outliner-page-title" style="display:none;">
+                <div class="outliner-page-title" style="${config.outlinerPageTitle ? '' : 'display:none;'}">
                     <input type="text" class="outliner-page-title-input" placeholder="Untitled" />
                 </div>
                 <div class="outliner-search-bar">

@@ -95,6 +95,7 @@ export class NotesEditorProvider {
                 fontSize: config.get<number>('fontSize', 16),
                 webviewMessages: getWebviewMessages() as unknown as Record<string, string>,
                 enableDebugLogging: config.get<boolean>('enableDebugLogging', false),
+                outlinerPageTitle: config.get<boolean>('outlinerPageTitle', false),
             },
             {
                 jsonContent,
@@ -294,7 +295,8 @@ export class NotesEditorProvider {
         this.disposables.push(
             vscode.workspace.onDidChangeConfiguration((e) => {
                 if (e.affectsConfiguration('any-markdown.theme') ||
-                    e.affectsConfiguration('any-markdown.fontSize')) {
+                    e.affectsConfiguration('any-markdown.fontSize') ||
+                    e.affectsConfiguration('any-markdown.outlinerPageTitle')) {
                     this.refreshPanel();
                 }
             })
@@ -331,6 +333,7 @@ export class NotesEditorProvider {
                 fontSize: config.get<number>('fontSize', 16),
                 webviewMessages: getWebviewMessages() as unknown as Record<string, string>,
                 enableDebugLogging: config.get<boolean>('enableDebugLogging', false),
+                outlinerPageTitle: config.get<boolean>('outlinerPageTitle', false),
             },
             { jsonContent, fileList, currentFilePath, panelCollapsed, structure: this.fileManager.getStructure(), panelWidth: this.fileManager.getPanelWidth() }
         );

@@ -5,6 +5,22 @@ All notable changes to the "Any Markdown Editor" extension will be documented in
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.195.516] - 2026-03-24
+
+### Added
+
+- **Notes: Scope Inホバーアイコン** — アウトライナ各ノードのバレット左にホバー時表示されるScope Inアイコンを追加
+- **Notes: Daily Notes空ノード自動追加** — Daily Notesで日付にScope in時、子ノードがなければ空ノードを自動追加
+
+### Changed
+
+- **Notes: 左パネルタブ整理** — Todayタブを廃止しアクションバーにTodayボタンを移動。Folder/Outlineボタンをアイコンのみに簡素化
+
+### Fixed
+
+- **Notes: 左パネル開閉ボタンが効かないバグを修正**
+- **Notes: ファイル切替が時々効かないバグを修正**
+
 ## [0.195.515] - 2026-03-24
 
 ### Added
