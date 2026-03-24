@@ -95,7 +95,7 @@ export class NotesEditorProvider {
                 fontSize: config.get<number>('fontSize', 16),
                 webviewMessages: getWebviewMessages() as unknown as Record<string, string>,
                 enableDebugLogging: config.get<boolean>('enableDebugLogging', false),
-                outlinerPageTitle: config.get<boolean>('outlinerPageTitle', false),
+                outlinerPageTitle: config.get<boolean>('outlinerPageTitle', true),
             },
             {
                 jsonContent,
@@ -333,7 +333,7 @@ export class NotesEditorProvider {
                 fontSize: config.get<number>('fontSize', 16),
                 webviewMessages: getWebviewMessages() as unknown as Record<string, string>,
                 enableDebugLogging: config.get<boolean>('enableDebugLogging', false),
-                outlinerPageTitle: config.get<boolean>('outlinerPageTitle', false),
+                outlinerPageTitle: config.get<boolean>('outlinerPageTitle', true),
             },
             { jsonContent, fileList, currentFilePath, panelCollapsed, structure: this.fileManager.getStructure(), panelWidth: this.fileManager.getPanelWidth() }
         );

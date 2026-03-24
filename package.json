@@ -2,7 +2,7 @@
   "name": "any-markdown",
   "displayName": "Any Markdown Editor",
   "description": "A WYSIWYG markdown editor for VS Code with seamless live preview",
-  "version": "0.195.517",
+  "version": "0.195.518",
   "publisher": "imaken",
   "icon": "media/icon.png",
   "license": "MIT",
@@ -212,7 +212,7 @@
         },
         "any-markdown.outlinerPageTitle": {
           "type": "boolean",
-          "default": false,
+          "default": true,
           "description": "Show page title input above the search bar in Outliner. / アウトライナの検索バー上部にタイトル入力欄を表示します。"
         },
         "any-markdown.toolbarMode": {

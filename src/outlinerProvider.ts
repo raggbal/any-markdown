@@ -67,7 +67,7 @@ export class OutlinerProvider implements vscode.CustomTextEditorProvider {
                         fontSize: config.get<number>('fontSize', 16),
                         webviewMessages: getWebviewMessages() as unknown as Record<string, string>,
                         enableDebugLogging: config.get<boolean>('enableDebugLogging', false),
-                        outlinerPageTitle: config.get<boolean>('outlinerPageTitle', false)
+                        outlinerPageTitle: config.get<boolean>('outlinerPageTitle', true)
                     }
                 );
             } catch (error) {

@@ -5,6 +5,18 @@ All notable changes to the "Any Markdown Editor" extension will be documented in
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.195.517] - 2026-03-24
+
+### Changed
+
+- **Outliner: Scope Inアイコン変更** — ターゲット/照準アイコンに変更し、ノード展開との誤解を防止
+- **Notes: ページタイトル設定対応** — `outlinerPageTitle`設定がtrueの場合、Notesモードでもタイトル表示
+
+### Fixed
+
+- **Outliner: 検索時に折り畳み親が展開されないバグを修正**
+- **Outliner: IME変換中に検索が発動するバグを修正**
+
 ## [0.195.516] - 2026-03-24
 
 ### Added
