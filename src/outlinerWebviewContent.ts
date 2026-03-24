@@ -73,6 +73,7 @@ export function getOutlinerWebviewContent(
     // Side panel HTML (same structure as editor-body-html.js)
     const sidePanelHtml = `
         <div class="side-panel" id="sidePanel">
+            <div class="side-panel-resize-handle" id="sidePanelResizeHandle"></div>
             <aside class="side-panel-sidebar" id="sidePanelSidebar">
                 <div class="sidebar-header">
                     <h3>Outline</h3>

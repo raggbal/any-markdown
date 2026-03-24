@@ -308,6 +308,28 @@ body {
     pointer-events: none;
 }
 
+/* --- Scope In Button --- */
+.outliner-scope-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 28px;
+    flex-shrink: 0;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    color: var(--outliner-fg);
+}
+
+.outliner-node:hover > .outliner-scope-btn {
+    opacity: 0.35;
+}
+
+.outliner-scope-btn:hover {
+    opacity: 0.8 !important;
+}
+
 /* --- Page Icon --- */
 .outliner-page-icon {
     display: flex;
@@ -765,3 +787,104 @@ body {
     --outliner-match-bg: rgba(255,200,0,0.3);
     --outliner-page-icon-color: #0B8A6F;
 }
+
+/* Search jump highlight */
+.outliner-search-jump-highlight {
+    background: rgba(255, 200, 0, 0.25) !important;
+    transition: background 2s ease-out;
+}
+
+/* ── Daily Notes Nav Bar ── */
+.outliner-daily-nav {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 16px;
+    border-bottom: 1px solid var(--outliner-border);
+    flex-shrink: 0;
+    position: relative;
+}
+.outliner-daily-btn {
+    padding: 4px 10px;
+    border: 1px solid var(--outliner-search-border);
+    border-radius: 4px;
+    background: var(--outliner-search-bg);
+    cursor: pointer;
+    font-size: 12px;
+    color: inherit;
+    line-height: 1.2;
+}
+.outliner-daily-btn:hover {
+    border-color: var(--vscode-focusBorder, #007acc);
+}
+.outliner-daily-btn-sm {
+    padding: 4px 6px;
+    min-width: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ── Daily Date Picker ── */
+.outliner-daily-picker {
+    position: absolute;
+    top: 100%;
+    left: 16px;
+    z-index: 100;
+    background: var(--outliner-bg);
+    border: 1px solid var(--outliner-border);
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    padding: 8px;
+    width: 220px;
+}
+.outliner-daily-picker-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+.outliner-daily-picker-nav {
+    border: none;
+    background: none;
+    cursor: pointer;
+    padding: 2px 6px;
+    font-size: 14px;
+    opacity: 0.7;
+    color: inherit;
+}
+.outliner-daily-picker-nav:hover { opacity: 1; }
+.outliner-daily-picker-title {
+    font-size: 13px;
+    font-weight: 600;
+}
+.outliner-daily-picker-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    text-align: center;
+    font-size: 10px;
+    opacity: 0.5;
+    margin-bottom: 4px;
+}
+.outliner-daily-picker-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+}
+.outliner-daily-picker-day {
+    border: none;
+    background: none;
+    cursor: pointer;
+    padding: 4px;
+    text-align: center;
+    font-size: 12px;
+    border-radius: 4px;
+    color: inherit;
+}
+.outliner-daily-picker-day:hover { background: var(--outliner-hover); }
+.outliner-daily-picker-day.today { font-weight: 700; }
+.outliner-daily-picker-day.selected {
+    background: var(--vscode-focusBorder, #007acc);
+    color: #fff;
+}
+.outliner-daily-picker-empty { /* spacer cell */ }

@@ -102,6 +102,7 @@ export class NotesEditorProvider {
                 currentFilePath,
                 panelCollapsed,
                 structure: this.fileManager.getStructure(),
+                panelWidth: this.fileManager.getPanelWidth(),
             }
         );
 
@@ -130,12 +131,24 @@ export class NotesEditorProvider {
                 const uri = vscode.Uri.file(filePath);
                 vscode.commands.executeCommand('vscode.openWith', uri, 'any-markdown.editor');
             },
-            openPageInSidePanel: async (filePath: string) => {
+            openPageInSidePanel: async (filePath: string, lineNumber?: number) => {
                 if (!fs.existsSync(filePath)) {
                     vscode.window.showWarningMessage(`Page file not found: ${filePath}`);
                     return;
                 }
                 await sidePanel.openFile(filePath);
+                if (lineNumber !== undefined) {
+                    setTimeout(() => {
+                        this.panel?.webview.postMessage({
+                            type: 'scrollToLine',
+                            lineNumber: lineNumber,
+                        });
+                    }, 500);
+                }
+            },
+            openFileExternal: async (filePath: string) => {
+                const uri = vscode.Uri.file(filePath);
+                await vscode.commands.executeCommand('vscode.open', uri);
             },
             requestInsertImage: async (sidePanelFilePath: string) => {
                 if (!this.fileManager) return;
@@ -319,7 +332,7 @@ export class NotesEditorProvider {
                 webviewMessages: getWebviewMessages() as unknown as Record<string, string>,
                 enableDebugLogging: config.get<boolean>('enableDebugLogging', false),
             },
-            { jsonContent, fileList, currentFilePath, panelCollapsed, structure: this.fileManager.getStructure() }
+            { jsonContent, fileList, currentFilePath, panelCollapsed, structure: this.fileManager.getStructure(), panelWidth: this.fileManager.getPanelWidth() }
         );
     }
 

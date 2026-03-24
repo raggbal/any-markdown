@@ -82,6 +82,18 @@
         createPageAuto: function() { /* no-op in outliner */ },
         updatePageH1: function() { /* no-op in outliner */ },
 
+        // Daily Notes ナビゲーション（outliner.jsから呼び出し）
+        postDailyNotes: function(type, dayOffset, currentDate) {
+            if (window.Outliner && window.Outliner.flushSync) {
+                window.Outliner.flushSync();
+            }
+            if (type === 'notesNavigateToDate') {
+                api.postMessage({ type: 'notesNavigateToDate', targetDate: dayOffset }); // dayOffset = date string
+            } else {
+                api.postMessage({ type: type, dayOffset: dayOffset || 0, currentDate: currentDate || null });
+            }
+        },
+
         // リンク
         openLink: function(href) {
             api.postMessage({ type: 'openLink', href: href });
@@ -148,6 +160,74 @@
         // D&D 移動
         moveItem: function(itemId, targetParentId, index) {
             api.postMessage({ type: 'notesMoveItem', itemId: itemId, targetParentId: targetParentId, index: index });
+        },
+
+        // Daily Notes
+        openDailyNotes: function() {
+            flushOutlinerSync();
+            api.postMessage({ type: 'notesOpenDailyNotes' });
+        },
+        navigateDailyNotes: function(dayOffset, currentDate) {
+            flushOutlinerSync();
+            api.postMessage({ type: 'notesNavigateDailyNotes', dayOffset: dayOffset, currentDate: currentDate || null });
+        },
+
+        // パネル幅保存
+        savePanelWidth: function(width) {
+            api.postMessage({ type: 'notesSavePanelWidth', width: width });
+        },
+
+        // 検索
+        search: function(query, options) {
+            flushOutlinerSync();
+            // outlinerの検索・スコープをリセット (RQ-1-2)
+            if (window.Outliner && window.Outliner.resetSearchAndScope) {
+                window.Outliner.resetSearchAndScope();
+            }
+            api.postMessage({
+                type: 'notesSearch',
+                query: query,
+                caseSensitive: options.caseSensitive,
+                wholeWord: options.wholeWord,
+                useRegex: options.useRegex,
+            });
+        },
+        jumpToNode: function(fileId, nodeId) {
+            flushOutlinerSync();
+            api.postMessage({ type: 'notesJumpToNode', fileId: fileId, nodeId: nodeId });
+        },
+        jumpToMdPage: function(outFileId, pageId, lineNumber) {
+            flushOutlinerSync();
+            api.postMessage({
+                type: 'notesJumpToMdPage',
+                outFileId: outFileId,
+                pageId: pageId,
+                lineNumber: lineNumber,
+            });
+        },
+        openMdFileExternal: function(filePath) {
+            api.postMessage({ type: 'notesOpenMdExternal', filePath: filePath });
+        },
+        onSearchStart: function(handler) {
+            window.addEventListener('message', function(e) {
+                if (e.data && e.data.type === 'notesSearchStart') {
+                    handler(e.data.searchId, e.data.query);
+                }
+            });
+        },
+        onSearchPartial: function(handler) {
+            window.addEventListener('message', function(e) {
+                if (e.data && e.data.type === 'notesSearchPartial') {
+                    handler(e.data.searchId, e.data.result);
+                }
+            });
+        },
+        onSearchEnd: function(handler) {
+            window.addEventListener('message', function(e) {
+                if (e.data && e.data.type === 'notesSearchEnd') {
+                    handler(e.data.searchId);
+                }
+            });
         },
 
         // イベントリスナー

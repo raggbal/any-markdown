@@ -25,12 +25,18 @@ var Outliner = (function() {
     var currentSearchResult = null;  // Set<string> or null
     var searchFocusMode = false;     // true: マッチノード頂点+子のみ, false: ルートまで表示
     var pageDir = null;              // outファイル個別のpageDir設定
+    var sidePanelWidthSetting = null; // outファイル個別のサイドパネル幅
     var searchModeToggleBtn = null;  // toggle button element
     var menuBtn = null;              // menu button element
     var contextMenuEl = null;
 
     var syncDebounceTimer = null;
     var SYNC_DEBOUNCE_MS = 1000;
+
+    // --- Daily Notes ---
+    var isDailyNotes = false;
+    var dailyNavBar = null;
+    var dailyCurrentDate = null;  // YYYY-MM-DD
 
     // --- 複数ノード選択 ---
     var selectedNodeIds = new Set();    // 選択中のノードIDセット
@@ -130,6 +136,7 @@ var Outliner = (function() {
 
         renderTree();
         setupSearchBar();
+        setupDailyNavBar();
         setupKeyHandlers();
         setupContextMenu();
         setupHostMessages();
@@ -290,6 +297,16 @@ var Outliner = (function() {
         indentEl.className = 'outliner-node-indent';
         indentEl.style.width = (depth * 24) + 'px';
         el.appendChild(indentEl);
+
+        // Scope Inボタン（ホバー時に表示）
+        var scopeBtn = document.createElement('div');
+        scopeBtn.className = 'outliner-scope-btn';
+        scopeBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>';
+        scopeBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            setScope({ type: 'subtree', rootId: node.id });
+        });
+        el.appendChild(scopeBtn);
 
         // バレット
         var bulletEl = document.createElement('div');
@@ -1840,6 +1857,38 @@ var Outliner = (function() {
         focusFirstVisibleNode();
     }
 
+    function jumpToAndHighlightNode(nodeId) {
+        var node = model.getNode(nodeId);
+        if (!node) return;
+
+        // scope をリセット
+        if (currentScope.type === 'subtree') {
+            currentScope = { type: 'document' };
+            updateBreadcrumb();
+        }
+
+        // 親ノードを展開
+        var parent = model.getParent(nodeId);
+        while (parent) {
+            if (parent.collapsed) {
+                parent.collapsed = false;
+            }
+            parent = model.getParent(parent.id);
+        }
+
+        renderTree();
+
+        var el = treeEl.querySelector('.outliner-node[data-id="' + nodeId + '"]');
+        if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            el.classList.add('outliner-search-jump-highlight');
+            setTimeout(function() {
+                el.classList.remove('outliner-search-jump-highlight');
+            }, 2000);
+        }
+        focusNode(nodeId);
+    }
+
     function updateBreadcrumb() {
         if (!breadcrumbEl) { return; }
         breadcrumbEl.innerHTML = '';
@@ -2100,12 +2149,24 @@ var Outliner = (function() {
                 if (sidePanelExpanded) {
                     sidePanelEl.classList.add('expanded');
                     sidePanelExpandBtn.classList.add('active');
+                    sidePanelEl.style.width = '';
+                    sidePanelEl.style.maxWidth = '';
                 } else {
                     sidePanelEl.classList.remove('expanded');
                     sidePanelExpandBtn.classList.remove('active');
+                    if (sidePanelWidthSetting) {
+                        sidePanelEl.style.width = sidePanelWidthSetting + 'px';
+                        sidePanelEl.style.maxWidth = sidePanelWidthSetting + 'px';
+                    } else {
+                        sidePanelEl.style.width = '';
+                        sidePanelEl.style.maxWidth = '';
+                    }
                 }
             });
         }
+
+        // Side panel resize
+        setupSidePanelResize();
 
         // Open in tab
         var sidePanelOpenTabBtn = document.querySelector('.side-panel-open-tab');
@@ -2141,6 +2202,57 @@ var Outliner = (function() {
                 closeSidePanel();
             }
         });
+    }
+
+    function setupSidePanelResize() {
+        var spResizeHandle = document.getElementById('sidePanelResizeHandle');
+        if (!spResizeHandle || !sidePanelEl) return;
+
+        var spResizing = false;
+        var spStartX = 0;
+        var spStartWidth = 0;
+
+        spResizeHandle.addEventListener('mousedown', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            spResizing = true;
+            spStartX = e.clientX;
+            spStartWidth = sidePanelEl.offsetWidth;
+            spResizeHandle.classList.add('active');
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+            sidePanelEl.classList.remove('expanded');
+            sidePanelExpanded = false;
+            var iframes = sidePanelEl.querySelectorAll('iframe');
+            iframes.forEach(function(f) { f.style.pointerEvents = 'none'; });
+
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onEnd);
+        });
+
+        function onMove(e) {
+            if (!spResizing) return;
+            var delta = spStartX - e.clientX;
+            var newWidth = spStartWidth + delta;
+            var maxW = (sidePanelEl.parentElement || document.body).offsetWidth * 0.95;
+            newWidth = Math.max(320, Math.min(newWidth, maxW));
+            sidePanelEl.style.width = newWidth + 'px';
+            sidePanelEl.style.maxWidth = newWidth + 'px';
+        }
+
+        function onEnd() {
+            if (!spResizing) return;
+            spResizing = false;
+            spResizeHandle.classList.remove('active');
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onEnd);
+            var iframes = sidePanelEl.querySelectorAll('iframe');
+            iframes.forEach(function(f) { f.style.pointerEvents = ''; });
+            sidePanelWidthSetting = sidePanelEl.offsetWidth;
+            syncToHostImmediate();
+        }
     }
 
     function openSidePanel(markdown, filePath, fileName, toc, spDocumentBaseUri) {
@@ -2201,6 +2313,12 @@ var Outliner = (function() {
 
         // Setup image dir display
         setupSidePanelImageDir();
+
+        // Apply saved width
+        if (sidePanelWidthSetting && sidePanelEl) {
+            sidePanelEl.style.width = sidePanelWidthSetting + 'px';
+            sidePanelEl.style.maxWidth = sidePanelWidthSetting + 'px';
+        }
 
         // Show panel with animation
         if (sidePanelEl) { sidePanelEl.style.display = 'flex'; }
@@ -2344,7 +2462,106 @@ var Outliner = (function() {
         var data = model.serialize();
         data.searchFocusMode = searchFocusMode;
         if (pageDir) { data.pageDir = pageDir; }
+        if (sidePanelWidthSetting) { data.sidePanelWidth = sidePanelWidthSetting; }
         host.syncData(JSON.stringify(data, null, 2));
+    }
+
+    // --- Daily Notes ナビバー ---
+
+    function updateDailyNavBar() {
+        if (!dailyNavBar) return;
+        dailyNavBar.style.display = isDailyNotes ? 'flex' : 'none';
+    }
+
+    function setupDailyNavBar() {
+        dailyNavBar = document.querySelector('.outliner-daily-nav');
+        if (!dailyNavBar) return;
+
+        var todayBtn = document.getElementById('dailyNavToday');
+        var prevBtn = document.getElementById('dailyNavPrev');
+        var nextBtn = document.getElementById('dailyNavNext');
+        var calendarBtn = document.getElementById('dailyNavCalendar');
+        var pickerEl = document.getElementById('dailyNavPicker');
+        var pickerMonth = new Date();
+
+        if (todayBtn) todayBtn.addEventListener('click', function() {
+            dailyCurrentDate = null;
+            host.postDailyNotes('notesOpenDailyNotes');
+        });
+        if (prevBtn) prevBtn.addEventListener('click', function() {
+            host.postDailyNotes('notesNavigateDailyNotes', -1, dailyCurrentDate);
+        });
+        if (nextBtn) nextBtn.addEventListener('click', function() {
+            host.postDailyNotes('notesNavigateDailyNotes', 1, dailyCurrentDate);
+        });
+
+        if (calendarBtn && pickerEl) {
+            calendarBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                pickerEl.style.display = pickerEl.style.display === 'none' ? '' : 'none';
+                if (pickerEl.style.display !== 'none') {
+                    if (dailyCurrentDate) {
+                        pickerMonth = new Date(dailyCurrentDate);
+                    } else {
+                        pickerMonth = new Date();
+                    }
+                    renderDailyPicker();
+                }
+            });
+
+            document.addEventListener('click', function() {
+                if (pickerEl) pickerEl.style.display = 'none';
+            });
+            pickerEl.addEventListener('click', function(e) { e.stopPropagation(); });
+
+            var prevMonthBtn = document.getElementById('dailyPickerPrevMonth');
+            var nextMonthBtn = document.getElementById('dailyPickerNextMonth');
+            if (prevMonthBtn) prevMonthBtn.addEventListener('click', function() {
+                pickerMonth.setMonth(pickerMonth.getMonth() - 1);
+                renderDailyPicker();
+            });
+            if (nextMonthBtn) nextMonthBtn.addEventListener('click', function() {
+                pickerMonth.setMonth(pickerMonth.getMonth() + 1);
+                renderDailyPicker();
+            });
+        }
+
+        function renderDailyPicker() {
+            var titleEl = document.getElementById('dailyPickerTitle');
+            var gridEl = document.getElementById('dailyPickerGrid');
+            if (!titleEl || !gridEl) return;
+
+            var y = pickerMonth.getFullYear();
+            var m = pickerMonth.getMonth();
+            titleEl.textContent = y + '-' + String(m + 1).padStart(2, '0');
+            gridEl.innerHTML = '';
+
+            var firstDay = new Date(y, m, 1).getDay();
+            var daysInMonth = new Date(y, m + 1, 0).getDate();
+            var today = new Date();
+
+            for (var i = 0; i < firstDay; i++) {
+                var empty = document.createElement('span');
+                empty.className = 'outliner-daily-picker-empty';
+                gridEl.appendChild(empty);
+            }
+            for (var d = 1; d <= daysInMonth; d++) {
+                var cell = document.createElement('button');
+                cell.className = 'outliner-daily-picker-day';
+                cell.textContent = String(d);
+                var dateStr = y + '-' + String(m + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+                if (dateStr === dailyCurrentDate) cell.classList.add('selected');
+                if (y === today.getFullYear() && m === today.getMonth() && d === today.getDate()) {
+                    cell.classList.add('today');
+                }
+                cell.dataset.date = dateStr;
+                cell.addEventListener('click', function() {
+                    pickerEl.style.display = 'none';
+                    host.postDailyNotes('notesNavigateToDate', this.dataset.date);
+                });
+                gridEl.appendChild(cell);
+            }
+        }
     }
 
     function setupHostMessages() {
@@ -2355,6 +2572,21 @@ var Outliner = (function() {
                     model = new OutlinerModel(msg.data);
                     searchEngine = new OutlinerSearch.SearchEngine(model);
                     pageDir = msg.data.pageDir || null;
+                    sidePanelWidthSetting = msg.data.sidePanelWidth || null;
+                    // Daily Notes 表示切替
+                    isDailyNotes = !!msg.isDailyNotes;
+                    updateDailyNavBar();
+                    // Notes モードのファイル切替時: 検索・スコープをリセット
+                    // fileChangeId はNotes用のupdateDataにのみ存在する
+                    // 単体.outの外部変更検知（outlinerProvider.ts）ではfileChangeIdがないためリセットしない
+                    if (msg.fileChangeId !== undefined) {
+                        if (searchInput) {
+                            searchInput.value = '';
+                        }
+                        currentSearchResult = null;
+                        currentScope = { type: 'document' };
+                        updateBreadcrumb();
+                    }
                     if (pageTitleInput && document.activeElement !== pageTitleInput) {
                         pageTitleInput.value = model.title || '';
                     }
@@ -2369,6 +2601,34 @@ var Outliner = (function() {
                         if (savedFocus && model.getNode(savedFocus)) {
                             focusNode(savedFocus);
                         }
+                    }
+                    // Daily Notes 等: 特定ノードに scope in
+                    if (msg.scopeToNodeId) {
+                        setTimeout(function() {
+                            var scopeTarget = model.getNode(msg.scopeToNodeId);
+                            if (scopeTarget) {
+                                setScope({ type: 'subtree', rootId: msg.scopeToNodeId });
+                            }
+                        }, 50);
+                    }
+                    // dailyCurrentDate を scopeToNodeId のノード階層から復元
+                    if (msg.scopeToNodeId && isDailyNotes) {
+                        var dayNode = model.getNode(msg.scopeToNodeId);
+                        if (dayNode) {
+                            var monthNode = model.getParent(msg.scopeToNodeId);
+                            var yearNode = monthNode ? model.getParent(monthNode.id) : null;
+                            if (yearNode && monthNode) {
+                                dailyCurrentDate = yearNode.text + '-' +
+                                    String(monthNode.text).padStart(2, '0') + '-' +
+                                    String(dayNode.text).padStart(2, '0');
+                            }
+                        }
+                    }
+                    // 検索結果ジャンプ: 特定ノードにスクロール+ハイライト
+                    if (msg.jumpToNodeId) {
+                        setTimeout(function() {
+                            jumpToAndHighlightNode(msg.jumpToNodeId);
+                        }, 100);
                     }
                     break;
 
@@ -2392,6 +2652,12 @@ var Outliner = (function() {
                 case 'sidePanelMessage':
                     if (sidePanelHostBridge) {
                         sidePanelHostBridge._sendMessage(msg.data);
+                    }
+                    break;
+
+                case 'scrollToLine':
+                    if (sidePanelHostBridge) {
+                        sidePanelHostBridge._sendMessage({ type: 'scrollToLine', lineNumber: msg.lineNumber });
                     }
                     break;
 
@@ -2469,6 +2735,13 @@ var Outliner = (function() {
     return {
         init: init,
         getModel: function() { return model; },
-        flushSync: function() { if (model) syncToHostImmediate(); }
+        flushSync: function() { if (model) syncToHostImmediate(); },
+        resetSearchAndScope: function() {
+            if (searchInput) searchInput.value = '';
+            currentSearchResult = null;
+            currentScope = { type: 'document' };
+            if (typeof updateBreadcrumb === 'function') updateBreadcrumb();
+            if (typeof renderTree === 'function') renderTree();
+        }
     };
 })();

@@ -5,6 +5,29 @@ All notable changes to the "Any Markdown Editor" extension will be documented in
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.195.515] - 2026-03-24
+
+### Added
+
+- **Notes: タブナビゲーション** — 左パネルをNotes/Search/Todayの3タブ構成に刷新
+- **Notes: Daily Notesナビバー** — アウトライナ側にToday/前日/翌日/カレンダー日付ピッカーを表示（dailynotes.out表示時のみ）
+- **Notes: MD検索結果ジャンプ** — フル検索で.mdファイルの結果クリック時、親アウトラインを表示しサイドパネルで該当行にスクロール
+
+### Fixed
+
+- **Notes: ファイル切替時にアウトライナの検索・スコープ状態が残るバグを修正**
+- **Notes: フル検索が間欠的に0件になるバグを修正**
+
+## [0.195.514] - 2026-03-24
+
+### Added
+
+- **Notes: フル検索** — 全.out/.mdファイルを横断検索。Match Case/Whole Word/Regex対応。結果クリックでノードにジャンプ＋ハイライト
+- **Notes: Daily Notes** — Todayボタンで今日のノードを自動作成（年→月→日階層）。`< >`ボタンで前日/翌日ナビゲーション
+- **Notes: 左パネル幅リサイズ** — D&Dでパネル幅を変更可能。幅はoutline.noteに保存され次回復元
+- **Notes: サイドパネル幅リサイズ** — D&Dでサイドパネル幅を変更可能。Outlinerでは.outに永続化、Markdownではセッション内のみ
+- **Notes: outline.noteリネーム** — 管理ファイルを`.note`から`outline.note`に変更（自動マイグレーション付き）
+
 ## [0.195.513] - 2026-03-24
 
 ### Added

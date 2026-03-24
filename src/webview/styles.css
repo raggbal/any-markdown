@@ -1159,6 +1159,23 @@ body {
     width: 95%;
     max-width: 95%;
 }
+/* Side panel resize handle */
+.side-panel-resize-handle {
+    position: absolute;
+    top: 0;
+    left: -3px;
+    width: 6px;
+    height: 100%;
+    cursor: col-resize;
+    z-index: 101;
+    background: transparent;
+}
+.side-panel-resize-handle:hover,
+.side-panel-resize-handle.active {
+    background: var(--vscode-focusBorder, #007acc);
+    width: 3px;
+    left: -1px;
+}
 /* Side panel sidebar (mirrors main .sidebar) */
 .side-panel-sidebar {
     width: 180px;

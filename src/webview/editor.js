@@ -13320,6 +13320,9 @@ class EditorInstance {
                     }
                 }
             }
+        } else if (message.type === 'scrollToLine') {
+            // Scroll to a specific line number in the document
+            scrollToLine(message.lineNumber);
         } else if (message.type === 'pasteText') {
             // Paste text relayed from main webview (side panel can't receive paste events directly)
             logger.log('pasteText received from main webview');
@@ -13379,6 +13382,7 @@ class EditorInstance {
     var sidePanelExpanded = false;
     var sidePanelImagePending = false;
     var sidebarWasOpenBeforeSidePanel = false;
+    var sidePanelCustomWidth = null; // session-only resize width
 
     function openSidePanel(markdown, filePath, fileName, toc, spDocumentBaseUri) {
         // Close existing panel if open
@@ -13602,12 +13606,71 @@ class EditorInstance {
             if (sidePanelExpanded) {
                 sidePanel.classList.add('expanded');
                 sidePanelExpandBtn.classList.add('active');
+                sidePanel.style.width = '';
+                sidePanel.style.maxWidth = '';
             } else {
                 sidePanel.classList.remove('expanded');
                 sidePanelExpandBtn.classList.remove('active');
+                if (sidePanelCustomWidth) {
+                    sidePanel.style.width = sidePanelCustomWidth + 'px';
+                    sidePanel.style.maxWidth = sidePanelCustomWidth + 'px';
+                } else {
+                    sidePanel.style.width = '';
+                    sidePanel.style.maxWidth = '';
+                }
             }
         });
     }
+
+    // Side panel resize (session-only, no persistence for .md editor)
+    (function() {
+        var spResizeHandle = container.querySelector('#sidePanelResizeHandle');
+        if (!spResizeHandle || !sidePanel) return;
+
+        var spResizing = false;
+        var spStartX = 0;
+        var spStartWidth = 0;
+
+        spResizeHandle.addEventListener('mousedown', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            spResizing = true;
+            spStartX = e.clientX;
+            spStartWidth = sidePanel.offsetWidth;
+            spResizeHandle.classList.add('active');
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+            sidePanel.classList.remove('expanded');
+            sidePanelExpanded = false;
+            var iframes = sidePanel.querySelectorAll('iframe');
+            iframes.forEach(function(f) { f.style.pointerEvents = 'none'; });
+            document.addEventListener('mousemove', onSpMove);
+            document.addEventListener('mouseup', onSpEnd);
+        });
+
+        function onSpMove(e) {
+            if (!spResizing) return;
+            var delta = spStartX - e.clientX;
+            var newWidth = spStartWidth + delta;
+            var maxW = (sidePanel.parentElement || document.body).offsetWidth * 0.95;
+            newWidth = Math.max(320, Math.min(newWidth, maxW));
+            sidePanel.style.width = newWidth + 'px';
+            sidePanel.style.maxWidth = newWidth + 'px';
+        }
+
+        function onSpEnd() {
+            if (!spResizing) return;
+            spResizing = false;
+            spResizeHandle.classList.remove('active');
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+            document.removeEventListener('mousemove', onSpMove);
+            document.removeEventListener('mouseup', onSpEnd);
+            var iframes = sidePanel.querySelectorAll('iframe');
+            iframes.forEach(function(f) { f.style.pointerEvents = ''; });
+            sidePanelCustomWidth = sidePanel.offsetWidth;
+        }
+    })();
 
     // Side panel sidebar open/close (mirrors main sidebar pattern)
     function openSidePanelSidebar() {
@@ -13654,6 +13717,28 @@ class EditorInstance {
     // Side panel paste relay no longer needed — same-DOM EditorInstance handles paste natively
 
     // External change toast notification
+    // --- scrollToLine: 行番号指定でスクロール ---
+    function scrollToLine(lineNumber) {
+        var blocks = editor.querySelectorAll(':scope > *');
+        var currentLine = 0;
+        for (var i = 0; i < blocks.length; i++) {
+            var block = blocks[i];
+            var text = block.textContent || '';
+            var blockLines = text.split('\n').length;
+            if (currentLine + blockLines > lineNumber) {
+                block.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                var origBg = block.style.backgroundColor;
+                block.style.transition = 'background-color 0.3s';
+                block.style.backgroundColor = 'rgba(255, 200, 0, 0.25)';
+                setTimeout(function() {
+                    block.style.backgroundColor = origBg;
+                }, 2000);
+                return;
+            }
+            currentLine += blockLines;
+        }
+    }
+
     let externalChangeToast = null;
     let toastHideTimer = null;
 

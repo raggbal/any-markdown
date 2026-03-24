@@ -29,6 +29,34 @@ export interface NoteStructure {
     version: number;
     rootIds: string[];                    // トップレベルの順序
     items: Record<string, NoteTreeItem>;  // 全アイテムのマップ
+    panelWidth?: number;                  // 左パネル幅 (px)
+}
+
+// ── 検索関連 ──
+
+export interface SearchResult {
+    fileId: string;
+    fileTitle: string;
+    fileType: 'out' | 'md';
+    matches: SearchMatch[];
+    parentOutFileId?: string;  // pages .md の場合、親.outのfileId
+    pageId?: string;           // pages .md の場合、pageId
+    mdFilePath?: string;       // ルート直下.mdのフルパス
+}
+
+export interface SearchMatch {
+    nodeId?: string;
+    field: 'text' | 'subtext' | 'content';
+    lineText: string;
+    matchStart: number;
+    matchEnd: number;
+    lineNumber?: number;  // .mdファイルの行番号 (0-based)
+}
+
+export interface SearchOptions {
+    caseSensitive: boolean;
+    wholeWord: boolean;
+    useRegex: boolean;
 }
 
 /**
@@ -57,10 +85,10 @@ export class NotesFileManager {
     isDirtyState(): boolean { return this.isDirty; }
     getFileChangeId(): number { return this.fileChangeId; }
 
-    // ── .note 構造管理 ──
+    // ── outline.note 構造管理 ──
 
     private getNoteFilePath(): string {
-        return path.join(this.mainFolderPath, '.note');
+        return path.join(this.mainFolderPath, 'outline.note');
     }
 
     private static generateItemId(): string {
@@ -68,13 +96,28 @@ export class NotesFileManager {
     }
 
     /**
-     * .note ファイルを読み込み、ディスク上の .out と同期する
-     * .note が存在しない場合は全 .out からフラット構造を自動生成
+     * outline.note ファイルを読み込み、ディスク上の .out と同期する
+     * outline.note が存在しない場合は全 .out からフラット構造を自動生成
+     * 旧 .note が存在する場合は自動マイグレーション
      */
     loadStructure(): NoteStructure {
         if (this.structure) return this.structure;
 
         const noteFilePath = this.getNoteFilePath();
+
+        // マイグレーション: 旧 .note → outline.note
+        if (!fs.existsSync(noteFilePath)) {
+            const legacyPath = path.join(this.mainFolderPath, '.note');
+            if (fs.existsSync(legacyPath)) {
+                try {
+                    fs.renameSync(legacyPath, noteFilePath);
+                    console.log('[NotesFileManager] Migrated .note → outline.note');
+                } catch (e) {
+                    console.error('[NotesFileManager] Migration .note → outline.note failed:', e);
+                }
+            }
+        }
+
         let structure: NoteStructure;
 
         if (fs.existsSync(noteFilePath)) {
@@ -207,7 +250,7 @@ export class NotesFileManager {
     }
 
     /**
-     * .note ファイルに構造を書き込む
+     * outline.note ファイルに構造を書き込む
      */
     saveStructure(): void {
         if (!this.structure) return;
@@ -216,6 +259,22 @@ export class NotesFileManager {
         } catch (e) {
             console.error('[NotesFileManager] saveStructure error:', e);
         }
+    }
+
+    /**
+     * 左パネル幅を outline.note に保存
+     */
+    savePanelWidth(width: number): void {
+        const structure = this.getStructure();
+        structure.panelWidth = width;
+        this.saveStructure();
+    }
+
+    /**
+     * 左パネル幅を取得
+     */
+    getPanelWidth(): number | undefined {
+        return this.getStructure().panelWidth;
     }
 
     /**
@@ -608,6 +667,290 @@ export class NotesFileManager {
             }
         }
         return null;
+    }
+
+    // ── 検索 ──
+
+    /**
+     * ファイル単位でストリーミング検索
+     * コールバックでファイルごとの結果を返す
+     */
+    searchFilesStreaming(
+        query: string,
+        options: SearchOptions,
+        onResult: (result: SearchResult) => void
+    ): void {
+        let regex: RegExp;
+        try {
+            regex = this.buildSearchRegex(query, options);
+        } catch {
+            return; // invalid regex
+        }
+
+        // 1. .out ファイルを検索
+        let outFiles: string[];
+        try {
+            outFiles = fs.readdirSync(this.mainFolderPath).filter(f => f.endsWith('.out'));
+        } catch {
+            outFiles = [];
+        }
+
+        for (const outFile of outFiles) {
+            const filePath = path.join(this.mainFolderPath, outFile);
+            try {
+                const content = fs.readFileSync(filePath, 'utf8');
+                const data = JSON.parse(content);
+                const fileId = outFile.replace(/\.out$/, '');
+                const matches: SearchMatch[] = [];
+
+                for (const [nodeId, node] of Object.entries(data.nodes || {})) {
+                    const n = node as any;
+                    if (n.text) {
+                        this.findMatches(n.text, regex, 'text', nodeId, matches);
+                    }
+                    if (n.subtext) {
+                        this.findMatches(n.subtext.substring(0, 500), regex, 'subtext', nodeId, matches);
+                    }
+                }
+
+                if (matches.length > 0) {
+                    onResult({
+                        fileId,
+                        fileTitle: data.title || fileId,
+                        fileType: 'out',
+                        matches,
+                    });
+                }
+            } catch { /* skip corrupted */ }
+        }
+
+        // 2. フォルダ直下の .md
+        try {
+            const mdFiles = fs.readdirSync(this.mainFolderPath).filter(f => f.endsWith('.md'));
+            for (const mdFile of mdFiles) {
+                this.searchMdFile(
+                    path.join(this.mainFolderPath, mdFile),
+                    mdFile, mdFile, regex, onResult,
+                    undefined, undefined
+                );
+            }
+        } catch { /* skip */ }
+
+        // 3. 各 .out の pages ディレクトリ内 .md
+        for (const outFile of outFiles) {
+            try {
+                const outPath = path.join(this.mainFolderPath, outFile);
+                const outData = JSON.parse(fs.readFileSync(outPath, 'utf8'));
+                const pDir = outData.pageDir
+                    ? path.resolve(path.dirname(outPath), outData.pageDir)
+                    : path.join(this.mainFolderPath, 'pages');
+                if (!fs.existsSync(pDir)) continue;
+                const pageMds = fs.readdirSync(pDir).filter(f => f.endsWith('.md'));
+                for (const pm of pageMds) {
+                    const pageId = pm.replace(/\.md$/, '');
+                    this.searchMdFile(
+                        path.join(pDir, pm),
+                        pm, `${outData.title || outFile}/${pm}`,
+                        regex, onResult,
+                        outFile.replace(/\.out$/, ''),
+                        pageId,
+                    );
+                }
+            } catch { /* skip */ }
+        }
+    }
+
+    private searchMdFile(
+        filePath: string,
+        fileId: string,
+        fileTitle: string,
+        regex: RegExp,
+        onResult: (result: SearchResult) => void,
+        parentOutFileId?: string,
+        pageId?: string,
+    ): void {
+        try {
+            const content = fs.readFileSync(filePath, 'utf8');
+            const lines = content.split('\n');
+            const matches: SearchMatch[] = [];
+            for (let i = 0; i < lines.length; i++) {
+                const lineMatches: SearchMatch[] = [];
+                this.findMatches(lines[i].substring(0, 200), regex, 'content', undefined, lineMatches);
+                for (const m of lineMatches) {
+                    m.lineNumber = i;
+                    matches.push(m);
+                }
+            }
+            if (matches.length > 0) {
+                onResult({
+                    fileId, fileTitle, fileType: 'md', matches,
+                    parentOutFileId,
+                    pageId,
+                    mdFilePath: parentOutFileId ? undefined : filePath,
+                });
+            }
+        } catch { /* skip */ }
+    }
+
+    private findMatches(
+        text: string,
+        regex: RegExp,
+        field: 'text' | 'subtext' | 'content',
+        nodeId: string | undefined,
+        matches: SearchMatch[]
+    ): void {
+        regex.lastIndex = 0;
+        const m = regex.exec(text);
+        if (m) {
+            matches.push({
+                nodeId,
+                field,
+                lineText: text.substring(0, 200),
+                matchStart: m.index,
+                matchEnd: m.index + m[0].length,
+            });
+            regex.lastIndex = 0;
+        }
+    }
+
+    private buildSearchRegex(query: string, options: SearchOptions): RegExp {
+        let pattern: string;
+        if (options.useRegex) {
+            pattern = query;
+        } else {
+            pattern = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        }
+        if (options.wholeWord) {
+            pattern = `\\b${pattern}\\b`;
+        }
+        const flags = options.caseSensitive ? 'g' : 'gi';
+        return new RegExp(pattern, flags);
+    }
+
+    // ── Daily Notes ──
+
+    /**
+     * dailynotes.out が存在しなければ作成し、outline.note にも登録
+     * @returns dailynotes.out のフルパス
+     */
+    ensureDailyNotesFile(): string {
+        const filePath = path.join(this.mainFolderPath, 'dailynotes.out');
+
+        if (!fs.existsSync(filePath)) {
+            const initialData = {
+                version: 1,
+                title: 'Daily Notes',
+                rootIds: [] as string[],
+                nodes: {} as Record<string, unknown>,
+            };
+            fs.writeFileSync(filePath, JSON.stringify(initialData, null, 2), 'utf8');
+
+            // outline.note に登録
+            const structure = this.getStructure();
+            if (!structure.items['dailynotes']) {
+                structure.items['dailynotes'] = {
+                    type: 'file' as const,
+                    id: 'dailynotes',
+                    title: 'Daily Notes',
+                };
+                // rootIds の先頭に追加
+                structure.rootIds.unshift('dailynotes');
+                this.saveStructure();
+            }
+        }
+
+        return filePath;
+    }
+
+    /**
+     * 年→月→日の階層ノードを作成/確認
+     * 既存ノードがあれば再利用、なければ新規作成
+     * @returns { dayNodeId: string, modified: boolean }
+     */
+    ensureDailyNode(
+        data: any,
+        year: string,
+        month: string,
+        day: string
+    ): { dayNodeId: string; modified: boolean } {
+        let modified = false;
+
+        // 年ノード検索/作成
+        let yearNodeId = this.findChildByText(data, null, year);
+        if (!yearNodeId) {
+            yearNodeId = this.addNodeToData(data, null, year, 'first');
+            modified = true;
+        }
+
+        // 月ノード検索/作成
+        let monthNodeId = this.findChildByText(data, yearNodeId, month);
+        if (!monthNodeId) {
+            monthNodeId = this.addNodeToData(data, yearNodeId, month, 'first');
+            modified = true;
+        }
+
+        // 日ノード検索/作成
+        let dayNodeId = this.findChildByText(data, monthNodeId, day);
+        if (!dayNodeId) {
+            dayNodeId = this.addNodeToData(data, monthNodeId, day, 'first');
+            modified = true;
+        }
+
+        return { dayNodeId, modified };
+    }
+
+    /**
+     * 指定親の直接子ノードから text が一致するものを検索
+     */
+    private findChildByText(data: any, parentId: string | null, text: string): string | null {
+        const childIds = parentId ? (data.nodes[parentId]?.children || []) : data.rootIds;
+        for (const childId of childIds) {
+            if (data.nodes[childId]?.text === text) {
+                return childId;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * data JSON にノードを追加（outliner-model.js と同等のロジックをホスト側で実行）
+     */
+    addNodeToData(data: any, parentId: string | null, text: string, position: 'first' | 'last'): string {
+        const nodeId = 'n' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+
+        const node: Record<string, unknown> = {
+            id: nodeId,
+            parentId: parentId,
+            children: [],
+            text: text,
+            tags: [],
+            isPage: false,
+            pageId: null,
+            collapsed: false,
+            checked: null,
+            subtext: '',
+        };
+
+        data.nodes[nodeId] = node;
+
+        if (parentId) {
+            if (!data.nodes[parentId].children) {
+                data.nodes[parentId].children = [];
+            }
+            if (position === 'first') {
+                data.nodes[parentId].children.unshift(nodeId);
+            } else {
+                data.nodes[parentId].children.push(nodeId);
+            }
+        } else {
+            if (position === 'first') {
+                data.rootIds.unshift(nodeId);
+            } else {
+                data.rootIds.push(nodeId);
+            }
+        }
+
+        return nodeId;
     }
 
     /**

@@ -108,6 +108,7 @@ function generateEditorBodyHtml(messages, platform) {
                 <textarea class="source-editor" id="sourceEditor" style="display: none;"></textarea>
             </div>
             <div class="side-panel" id="sidePanel">
+                <div class="side-panel-resize-handle" id="sidePanelResizeHandle"></div>
                 <aside class="side-panel-sidebar" id="sidePanelSidebar">
                     <div class="sidebar-header">
                         <h3>Outline</h3>

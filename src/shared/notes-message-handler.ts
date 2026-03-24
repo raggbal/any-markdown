@@ -19,8 +19,8 @@ export interface NotesPlatformActions {
     openExternalLink(href: string): void;
     /** .md ファイルをエディタで開く (Electron: createWindow, VSCode: vscode.openWith) */
     openFileInEditor(filePath: string): void;
-    /** サイドパネルでページを開く */
-    openPageInSidePanel(filePath: string): void;
+    /** サイドパネルでページを開く (lineNumber指定時はスクロール) */
+    openPageInSidePanel(filePath: string, lineNumber?: number): void;
     /** 画像挿入ダイアログ表示 */
     requestInsertImage(sidePanelFilePath: string): void;
     /** パネル折り畳み状態を永続化 */
@@ -39,6 +39,8 @@ export interface NotesPlatformActions {
     handleSidePanelOpenLink(href: string, sidePanelFilePath: string): void;
     /** サイドパネルが閉じられた */
     handleSidePanelClosed(): void;
+    /** 外部エディタでファイルを開く */
+    openFileExternal?(filePath: string): void;
     /** 最後に開いたファイルを記録 */
     saveLastOpenedFile?(filePath: string): void;
     /** ファイル検索 */
@@ -194,7 +196,11 @@ export function handleNotesMessage(
                 }
                 const data = JSON.parse(content);
                 sendFileListWithStructure(fileManager, sender, message.filePath);
-                sender.postMessage({ type: 'updateData', data, fileChangeId: fileManager.getFileChangeId() });
+                const isDailyNotes = path.basename(message.filePath) === 'dailynotes.out';
+                sender.postMessage({ type: 'updateData', data, fileChangeId: fileManager.getFileChangeId(), isDailyNotes });
+            } else {
+                // ファイル読み込み失敗: 元のファイルリストを再送信してUI状態を復元
+                sendFileListWithStructure(fileManager, sender);
             }
             break;
         }
@@ -282,12 +288,235 @@ export function handleNotesMessage(
             break;
         }
 
+        // ── Daily Notes ──
+
+        case 'notesOpenDailyNotes': {
+            fileManager.flushSave();
+            const dailyFilePath = fileManager.ensureDailyNotesFile();
+            const dailyContent = fileManager.openFile(dailyFilePath);
+            if (dailyContent === null) break;
+
+            const dailyData = JSON.parse(dailyContent);
+            const today = new Date();
+            const year = String(today.getFullYear());
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+            const day = String(today.getDate()).padStart(2, '0');
+
+            const { dayNodeId, modified } = fileManager.ensureDailyNode(dailyData, year, month, day);
+            let dailyDidModify = modified;
+            // 日付ノードに子がなければ空ノードを自動追加
+            const dailyDayNode = dailyData.nodes[dayNodeId];
+            if (dailyDayNode && (!dailyDayNode.children || dailyDayNode.children.length === 0)) {
+                fileManager.addNodeToData(dailyData, dayNodeId, '', 'last');
+                dailyDidModify = true;
+            }
+            if (dailyDidModify) {
+                fileManager.saveCurrentFileImmediate(JSON.stringify(dailyData));
+            }
+
+            if (platform.saveLastOpenedFile) {
+                platform.saveLastOpenedFile(dailyFilePath);
+            }
+            sendFileListWithStructure(fileManager, sender, dailyFilePath);
+            sender.postMessage({
+                type: 'updateData',
+                data: dailyData,
+                fileChangeId: fileManager.getFileChangeId(),
+                scopeToNodeId: dayNodeId,
+                isDailyNotes: true,
+            });
+            break;
+        }
+
+        case 'notesNavigateDailyNotes': {
+            fileManager.flushSave();
+            const navDailyFilePath = fileManager.ensureDailyNotesFile();
+            const navContent = fileManager.openFile(navDailyFilePath);
+            if (navContent === null) break;
+
+            const navData = JSON.parse(navContent);
+
+            // currentDate が送られてきた場合はそこからの相対、なければ今日から
+            let baseDate: Date;
+            if (message.currentDate) {
+                baseDate = new Date(message.currentDate);
+            } else {
+                baseDate = new Date();
+            }
+            baseDate.setDate(baseDate.getDate() + (message.dayOffset || 0));
+
+            const navYear = String(baseDate.getFullYear());
+            const navMonth = String(baseDate.getMonth() + 1).padStart(2, '0');
+            const navDay = String(baseDate.getDate()).padStart(2, '0');
+
+            const navResult = fileManager.ensureDailyNode(navData, navYear, navMonth, navDay);
+            let navDidModify = navResult.modified;
+            // 日付ノードに子がなければ空ノードを自動追加
+            const navDayNode = navData.nodes[navResult.dayNodeId];
+            if (navDayNode && (!navDayNode.children || navDayNode.children.length === 0)) {
+                fileManager.addNodeToData(navData, navResult.dayNodeId, '', 'last');
+                navDidModify = true;
+            }
+            if (navDidModify) {
+                fileManager.saveCurrentFileImmediate(JSON.stringify(navData));
+            }
+
+            if (platform.saveLastOpenedFile) {
+                platform.saveLastOpenedFile(navDailyFilePath);
+            }
+            sendFileListWithStructure(fileManager, sender, navDailyFilePath);
+            sender.postMessage({
+                type: 'updateData',
+                data: navData,
+                fileChangeId: fileManager.getFileChangeId(),
+                scopeToNodeId: navResult.dayNodeId,
+                isDailyNotes: true,
+            });
+            break;
+        }
+
+        case 'notesNavigateToDate': {
+            fileManager.flushSave();
+            const navDateFilePath = fileManager.ensureDailyNotesFile();
+            const navDateContent = fileManager.openFile(navDateFilePath);
+            if (navDateContent === null) break;
+
+            const navDateData = JSON.parse(navDateContent);
+            const targetDate = new Date(message.targetDate);
+            const targetYear = String(targetDate.getFullYear());
+            const targetMonth = String(targetDate.getMonth() + 1).padStart(2, '0');
+            const targetDay = String(targetDate.getDate()).padStart(2, '0');
+
+            const dateResult = fileManager.ensureDailyNode(navDateData, targetYear, targetMonth, targetDay);
+            let dateDidModify = dateResult.modified;
+            // 日付ノードに子がなければ空ノードを自動追加
+            const dateDayNode = navDateData.nodes[dateResult.dayNodeId];
+            if (dateDayNode && (!dateDayNode.children || dateDayNode.children.length === 0)) {
+                fileManager.addNodeToData(navDateData, dateResult.dayNodeId, '', 'last');
+                dateDidModify = true;
+            }
+            if (dateDidModify) {
+                fileManager.saveCurrentFileImmediate(JSON.stringify(navDateData));
+            }
+
+            if (platform.saveLastOpenedFile) {
+                platform.saveLastOpenedFile(navDateFilePath);
+            }
+            sendFileListWithStructure(fileManager, sender, navDateFilePath);
+            sender.postMessage({
+                type: 'updateData',
+                data: navDateData,
+                fileChangeId: fileManager.getFileChangeId(),
+                scopeToNodeId: dateResult.dayNodeId,
+                isDailyNotes: true,
+            });
+            break;
+        }
+
+        // ── Panel Width ──
+
+        case 'notesSavePanelWidth': {
+            fileManager.savePanelWidth(message.width);
+            break;
+        }
+
         // ── Focus (no-op in shared, platforms handle if needed) ──
         case 'webviewFocus':
         case 'webviewBlur':
             break;
 
-        // ── Search ──
+        // ── Notes Search ──
+
+        case 'notesSearch': {
+            fileManager.flushSave();
+            const searchOpts = {
+                caseSensitive: message.caseSensitive || false,
+                wholeWord: message.wholeWord || false,
+                useRegex: message.useRegex || false,
+            };
+            const searchId = Date.now();
+
+            sender.postMessage({ type: 'notesSearchStart', searchId, query: message.query });
+
+            fileManager.searchFilesStreaming(message.query, searchOpts, (partialResult) => {
+                sender.postMessage({
+                    type: 'notesSearchPartial',
+                    searchId,
+                    result: partialResult,
+                });
+            });
+
+            sender.postMessage({ type: 'notesSearchEnd', searchId });
+            break;
+        }
+
+        case 'notesJumpToNode': {
+            fileManager.flushSave();
+            const jumpFilePath = fileManager.getFilePathById(message.fileId);
+            const jumpContent = fileManager.openFile(jumpFilePath);
+            if (jumpContent !== null) {
+                if (platform.saveLastOpenedFile) {
+                    platform.saveLastOpenedFile(jumpFilePath);
+                }
+                const jumpData = JSON.parse(jumpContent);
+                sendFileListWithStructure(fileManager, sender, jumpFilePath);
+                sender.postMessage({
+                    type: 'updateData',
+                    data: jumpData,
+                    fileChangeId: fileManager.getFileChangeId(),
+                    jumpToNodeId: message.nodeId,
+                });
+            }
+            break;
+        }
+
+        case 'notesJumpToMdPage': {
+            fileManager.flushSave();
+            const mdOutFilePath = fileManager.getFilePathById(message.outFileId);
+            const mdOutContent = fileManager.openFile(mdOutFilePath);
+            if (mdOutContent === null) break;
+
+            const mdOutData = JSON.parse(mdOutContent);
+
+            // pageIdからnodeIdを逆引き
+            let pageNodeId: string | null = null;
+            for (const [nodeId, node] of Object.entries(mdOutData.nodes || {})) {
+                if ((node as any).pageId === message.pageId) {
+                    pageNodeId = nodeId;
+                    break;
+                }
+            }
+
+            if (platform.saveLastOpenedFile) {
+                platform.saveLastOpenedFile(mdOutFilePath);
+            }
+            sendFileListWithStructure(fileManager, sender, mdOutFilePath);
+
+            // .outをアウトライナに表示
+            sender.postMessage({
+                type: 'updateData',
+                data: mdOutData,
+                fileChangeId: fileManager.getFileChangeId(),
+            });
+
+            // サイドパネルでページを開く（lineNumber付き）
+            if (pageNodeId) {
+                const pagePath = fileManager.getPageFilePath(message.pageId);
+                if (platform.openPageInSidePanel) {
+                    platform.openPageInSidePanel(pagePath, message.lineNumber);
+                }
+            }
+            break;
+        }
+
+        case 'notesOpenMdExternal': {
+            if (platform.openFileExternal) {
+                platform.openFileExternal(message.filePath);
+            }
+            break;
+        }
+
+        // ── Search (legacy) ──
         case 'searchFiles':
             if (platform.searchFiles) {
                 platform.searchFiles(message.query);

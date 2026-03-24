@@ -16,6 +16,7 @@ interface NotesInitData {
     currentFilePath: string | null;
     panelCollapsed: boolean;
     structure?: any;
+    panelWidth?: number;
 }
 
 export function getNotesWebviewContent(
@@ -86,6 +87,7 @@ export function getNotesWebviewContent(
     // Side panel HTML
     const sidePanelHtml = `
         <div class="side-panel" id="sidePanel">
+            <div class="side-panel-resize-handle" id="sidePanelResizeHandle"></div>
             <aside class="side-panel-sidebar" id="sidePanelSidebar">
                 <div class="sidebar-header">
                     <h3>Outline</h3>
@@ -160,6 +162,21 @@ export function getNotesWebviewContent(
                     <input type="text" class="outliner-search-input" placeholder="Search... (e.g. #tag, keyword, is:page)" />
                     <button class="outliner-menu-btn" title="Menu"></button>
                 </div>
+                <div class="outliner-daily-nav" style="display:none">
+                    <button class="outliner-daily-btn" id="dailyNavToday">Today</button>
+                    <button class="outliner-daily-btn outliner-daily-btn-sm" id="dailyNavPrev">&lt;</button>
+                    <button class="outliner-daily-btn outliner-daily-btn-sm" id="dailyNavNext">&gt;</button>
+                    <button class="outliner-daily-btn outliner-daily-btn-sm" id="dailyNavCalendar"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></button>
+                    <div class="outliner-daily-picker" id="dailyNavPicker" style="display:none">
+                        <div class="outliner-daily-picker-header">
+                            <button class="outliner-daily-picker-nav" id="dailyPickerPrevMonth">&lt;</button>
+                            <span class="outliner-daily-picker-title" id="dailyPickerTitle"></span>
+                            <button class="outliner-daily-picker-nav" id="dailyPickerNextMonth">&gt;</button>
+                        </div>
+                        <div class="outliner-daily-picker-weekdays"><span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span></div>
+                        <div class="outliner-daily-picker-grid" id="dailyPickerGrid"></div>
+                    </div>
+                </div>
                 <div class="outliner-breadcrumb"></div>
                 <div class="outliner-tree" role="tree"></div>
             </div>
@@ -197,7 +214,8 @@ export function getNotesWebviewContent(
             window.notesHostBridge,
             ${JSON.stringify(initData.fileList)},
             ${JSON.stringify(initData.currentFilePath)},
-            ${JSON.stringify(initData.structure || null)}
+            ${JSON.stringify(initData.structure || null)},
+            ${JSON.stringify(initData.panelWidth || null)}
         );
     </script>
 </body>
