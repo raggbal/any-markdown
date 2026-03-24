@@ -173,6 +173,41 @@ var Outliner = (function() {
             return;
         }
 
+        // スコープ内で子ノードが0個の場合: ヘッダー + 空表示
+        if (currentScope.type === 'subtree' && currentScope.rootId) {
+            var scopeRootNode = model.getNode(currentScope.rootId);
+            if (scopeRootNode && (!scopeRootNode.children || scopeRootNode.children.length === 0)) {
+                // スコープヘッダーは表示
+                var emptyHeaderEl = createNodeElement(scopeRootNode, 0, null);
+                emptyHeaderEl.classList.add('is-scope-header');
+                treeEl.appendChild(emptyHeaderEl);
+                // 空メッセージ
+                var emptyDiv = document.createElement('div');
+                emptyDiv.className = 'outliner-empty outliner-scope-empty';
+                emptyDiv.innerHTML = '<div>' + (i18n.outlinerNoItems || 'No items yet') + '</div>' +
+                    '<div class="outliner-empty-hint">' + (i18n.outlinerAddHint || 'Press Enter to add an item') + '</div>';
+                emptyDiv.tabIndex = 0;
+                emptyDiv.addEventListener('keydown', function(ev) {
+                    if (ev.key === 'Enter') {
+                        ev.preventDefault();
+                        var newNode = model.addNodeAtStart(currentScope.rootId, '');
+                        renderTree();
+                        focusNodeAtStart(newNode.id);
+                        scheduleSyncToHost();
+                    }
+                });
+                emptyDiv.addEventListener('click', function() {
+                    var newNode = model.addNodeAtStart(currentScope.rootId, '');
+                    renderTree();
+                    focusNodeAtStart(newNode.id);
+                    scheduleSyncToHost();
+                });
+                treeEl.appendChild(emptyDiv);
+                emptyDiv.focus();
+                return;
+            }
+        }
+
         // 検索時のマッチIDをキャッシュ (renderInlineText内での再計算を避ける)
         var searchQuery = null;
         if (currentSearchResult && searchInput) {
@@ -187,7 +222,17 @@ var Outliner = (function() {
         } else {
             var rootIds;
             if (currentScope.type === 'subtree' && currentScope.rootId) {
-                rootIds = [currentScope.rootId];
+                // スコープヘッダー: スコープ対象ノードをバレットなしで表示
+                var scopeNode = model.getNode(currentScope.rootId);
+                if (scopeNode) {
+                    var headerEl = createNodeElement(scopeNode, 0, searchQuery);
+                    headerEl.classList.add('is-scope-header');
+                    fragment.appendChild(headerEl);
+                }
+                // スコープ対象の子ノードをトップレベルとして表示
+                rootIds = (scopeNode && scopeNode.children && scopeNode.children.length > 0)
+                    ? scopeNode.children
+                    : [];
             } else {
                 rootIds = model.rootIds;
             }
@@ -1118,6 +1163,9 @@ var Outliner = (function() {
         var node = model.getNode(nodeId);
         if (!node) { return; }
 
+        // スコープヘッダーノードかどうか判定
+        var isScopeHeader = (currentScope.type === 'subtree' && currentScope.rootId === nodeId);
+
         var offset = getCursorOffset(textEl);
         var textLen = (textEl.textContent || '').length;
         var isAtStart = (offset === 0);
@@ -1158,6 +1206,9 @@ var Outliner = (function() {
                 } else if (e.shiftKey) {
                     // Shift+Enter: サブテキスト追加/フォーカス
                     openSubtext(nodeId);
+                } else if (isScopeHeader) {
+                    // スコープヘッダー: Enterで子ノード追加（兄弟追加はスコープ外になるため）
+                    handleScopeHeaderEnter(node, textEl, offset);
                 } else {
                     handleEnter(node, textEl, offset);
                 }
@@ -1203,6 +1254,11 @@ var Outliner = (function() {
                 break;
 
             case 'Backspace':
+                // スコープヘッダー: 先頭でのBackspace（親合流・削除）を禁止
+                if (isScopeHeader && isAtStart) {
+                    e.preventDefault();
+                    break;
+                }
                 // 先頭に空白がある場合: contenteditableでは先頭空白をBackspaceで消せないため
                 // カーソルが先頭空白内(offset ≤ 空白長)にいればtrim処理
                 var nodeText = node.text || '';
@@ -1223,6 +1279,11 @@ var Outliner = (function() {
                 break;
 
             case 'Tab':
+                // スコープヘッダー: インデント変更を禁止
+                if (isScopeHeader) {
+                    e.preventDefault();
+                    break;
+                }
                 e.preventDefault();
                 saveSnapshot();
                 if (e.shiftKey) {
@@ -1234,6 +1295,8 @@ var Outliner = (function() {
 
             case 'ArrowUp':
                 if ((e.metaKey || e.ctrlKey) && e.shiftKey) {
+                    // スコープヘッダー: 移動を禁止
+                    if (isScopeHeader) { e.preventDefault(); break; }
                     e.preventDefault();
                     saveSnapshot();
                     if (model.moveUp(nodeId)) {
@@ -1261,6 +1324,8 @@ var Outliner = (function() {
 
             case 'ArrowDown':
                 if ((e.metaKey || e.ctrlKey) && e.shiftKey) {
+                    // スコープヘッダー: 移動を禁止
+                    if (isScopeHeader) { e.preventDefault(); break; }
                     e.preventDefault();
                     saveSnapshot();
                     if (model.moveDown(nodeId)) {
@@ -1477,6 +1542,23 @@ var Outliner = (function() {
             newNode.checked = false;
         }
 
+        renderTree();
+        focusNodeAtStart(newNode.id);
+        scheduleSyncToHost();
+    }
+
+    /** スコープヘッダーでのEnter: 子ノードとして追加（兄弟追加はスコープ外になるため） */
+    function handleScopeHeaderEnter(node, textEl, offset) {
+        var text = node.text;
+        var afterText = text.slice(offset);
+        // ヘッダーテキストはカーソル位置までに更新
+        model.updateText(node.id, text.slice(0, offset));
+        // 子ノードの先頭に新ノード追加
+        var newNode = model.addNodeAtStart(node.id, afterText);
+        // タスクノード継承
+        if (node.checked !== null && node.checked !== undefined) {
+            newNode.checked = false;
+        }
         renderTree();
         focusNodeAtStart(newNode.id);
         scheduleSyncToHost();
@@ -2122,18 +2204,22 @@ var Outliner = (function() {
 
         addMenuSeparator(contextMenuEl);
 
-        addMenuItem(contextMenuEl, i18n.outlinerDelete || 'Delete', function() {
-            saveSnapshot();
-            var nextId = model.getNextVisibleId(nodeId) || model.getPreviousVisibleId(nodeId);
-            model.removeNode(nodeId);
-            if (currentScope.type === 'subtree' && !model.getNode(currentScope.rootId)) {
-                setScope({ type: 'document' });
-            }
-            renderTree();
-            if (nextId && model.getNode(nextId)) { focusNode(nextId); }
-            scheduleSyncToHost();
-            hideContextMenu();
-        });
+        // スコープヘッダーノードは削除不可
+        var isCtxScopeHeader = (currentScope.type === 'subtree' && currentScope.rootId === nodeId);
+        if (!isCtxScopeHeader) {
+            addMenuItem(contextMenuEl, i18n.outlinerDelete || 'Delete', function() {
+                saveSnapshot();
+                var nextId = model.getNextVisibleId(nodeId) || model.getPreviousVisibleId(nodeId);
+                model.removeNode(nodeId);
+                if (currentScope.type === 'subtree' && !model.getNode(currentScope.rootId)) {
+                    setScope({ type: 'document' });
+                }
+                renderTree();
+                if (nextId && model.getNode(nextId)) { focusNode(nextId); }
+                scheduleSyncToHost();
+                hideContextMenu();
+            });
+        }
 
         document.body.appendChild(contextMenuEl);
 
