@@ -274,7 +274,10 @@ var Outliner = (function() {
         // マッチノード（子孫でも祖先でもなく、直接マッチしたもの）を検索で再判定
         var query = OutlinerSearch.parseQuery(searchInput.value || '');
         if (!query) { return; }
-        var allNodeIds = Object.keys(model.nodes);
+        // スコープを考慮した候補ノード（scope-in時はスコープ内のみ）
+        var allNodeIds = (currentScope.type === 'subtree' && currentScope.rootId)
+            ? [currentScope.rootId].concat(model.getDescendantIds(currentScope.rootId))
+            : Object.keys(model.nodes);
         var directMatches = [];
         for (var i = 0; i < allNodeIds.length; i++) {
             var nid = allNodeIds[i];
