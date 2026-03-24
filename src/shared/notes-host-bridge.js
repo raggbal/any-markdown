@@ -9,7 +9,7 @@
     var api = acquireVsCodeApi();
 
     // ファイル切替カウンター: stale syncData を防止
-    var currentFileChangeId = 0;
+    var currentFileChangeId = window.__initialFileChangeId || 0;
     window.addEventListener('message', function(e) {
         if (e.data && e.data.type === 'updateData' && e.data.fileChangeId !== undefined) {
             currentFileChangeId = e.data.fileChangeId;

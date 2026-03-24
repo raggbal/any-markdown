@@ -18,6 +18,7 @@ interface NotesInitData {
     panelCollapsed: boolean;
     structure?: any;
     panelWidth?: number;
+    fileChangeId?: number;
 }
 
 export function getNotesWebviewContent(
@@ -196,6 +197,7 @@ export function getNotesWebviewContent(
     <script nonce="${nonce}">
         window.__SKIP_EDITOR_AUTO_INIT__ = true;
         window.__outlinerMessages = ${JSON.stringify(config.webviewMessages || {})};
+        window.__initialFileChangeId = ${initData.fileChangeId || 0};
     </script>
     <script nonce="${nonce}">${notesHostBridgeScript}</script>
     <script nonce="${nonce}">${editorUtilsScript}</script>

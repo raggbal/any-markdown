@@ -105,6 +105,7 @@ export class NotesEditorProvider {
                 panelCollapsed,
                 structure: this.fileManager.getStructure(),
                 panelWidth: this.fileManager.getPanelWidth(),
+                fileChangeId: this.fileManager.getFileChangeId(),
             }
         );
 
@@ -357,7 +358,7 @@ export class NotesEditorProvider {
                 enableDebugLogging: config.get<boolean>('enableDebugLogging', false),
                 outlinerPageTitle: config.get<boolean>('outlinerPageTitle', true),
             },
-            { jsonContent, fileList, currentFilePath, panelCollapsed, structure: this.fileManager.getStructure(), panelWidth: this.fileManager.getPanelWidth() }
+            { jsonContent, fileList, currentFilePath, panelCollapsed, structure: this.fileManager.getStructure(), panelWidth: this.fileManager.getPanelWidth(), fileChangeId: this.fileManager.getFileChangeId() }
         );
     }
 
