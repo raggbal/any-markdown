@@ -45,6 +45,14 @@ export interface NotesPlatformActions {
     saveLastOpenedFile?(filePath: string): void;
     /** ファイル検索 */
     searchFiles?(query: string): void;
+    /** S3同期（バックアップ） */
+    s3Sync?(bucketPath: string): void;
+    /** S3リモート全削除＋アップロード */
+    s3RemoteDeleteAndUpload?(bucketPath: string): void;
+    /** S3ローカル全削除＋ダウンロード */
+    s3LocalDeleteAndDownload?(bucketPath: string): void;
+    /** S3ステータス取得（認証情報の有無、バケットパス） */
+    s3GetStatus?(): void;
 }
 
 /**
@@ -399,6 +407,29 @@ export function handleNotesMessage(
 
         case 'notesSavePanelWidth': {
             fileManager.savePanelWidth(message.width);
+            break;
+        }
+
+        // ── S3 Sync ──
+
+        case 'notesS3Sync': {
+            if (platform.s3Sync) platform.s3Sync(message.bucketPath);
+            break;
+        }
+        case 'notesS3RemoteDeleteUpload': {
+            if (platform.s3RemoteDeleteAndUpload) platform.s3RemoteDeleteAndUpload(message.bucketPath);
+            break;
+        }
+        case 'notesS3LocalDeleteDownload': {
+            if (platform.s3LocalDeleteAndDownload) platform.s3LocalDeleteAndDownload(message.bucketPath);
+            break;
+        }
+        case 'notesS3SaveBucketPath': {
+            fileManager.saveS3BucketPath(message.bucketPath);
+            break;
+        }
+        case 'notesS3GetStatus': {
+            if (platform.s3GetStatus) platform.s3GetStatus();
             break;
         }
 

@@ -6,6 +6,7 @@ import { handleNotesMessage, NotesSender, NotesPlatformActions } from './shared/
 import { getNotesWebviewContent } from './notesWebviewContent';
 import { getWebviewMessages } from './i18n/messages';
 import { SidePanelManager } from './shared/sidePanelManager';
+import { s3Sync, s3RemoteDeleteAndUpload, s3LocalDeleteAndDownload, S3SyncConfig } from './notes-s3-sync';
 
 /**
  * NotesEditorProvider — WebviewPanel で Notes エディタを開く
@@ -281,6 +282,27 @@ export class NotesEditorProvider {
                     );
                 }
             },
+            s3Sync: (bucketPath: string) => {
+                this.runS3Operation('s3Sync', bucketPath, sender);
+            },
+            s3RemoteDeleteAndUpload: (bucketPath: string) => {
+                this.runS3Operation('s3RemoteDeleteAndUpload', bucketPath, sender);
+            },
+            s3LocalDeleteAndDownload: (bucketPath: string) => {
+                this.runS3Operation('s3LocalDeleteAndDownload', bucketPath, sender);
+            },
+            s3GetStatus: () => {
+                if (!this.fileManager) return;
+                const config = vscode.workspace.getConfiguration('any-markdown');
+                const bucketPath = this.fileManager.getS3BucketPath();
+                const hasCredentials = !!(config.get<string>('s3AccessKeyId') && config.get<string>('s3SecretAccessKey'));
+                sender.postMessage({
+                    type: 'notesS3Status',
+                    bucketPath: bucketPath || '',
+                    hasCredentials,
+                    region: config.get<string>('s3Region', 'us-east-1'),
+                });
+            },
         };
 
         // メッセージハンドラ登録
@@ -362,6 +384,57 @@ export class NotesEditorProvider {
         this.disposables.push(this.folderWatcher.onDidCreate(refreshFileList));
         this.disposables.push(this.folderWatcher.onDidDelete(refreshFileList));
         this.disposables.push(this.folderWatcher);
+    }
+
+    private getS3Config(bucketPath: string): S3SyncConfig | null {
+        const config = vscode.workspace.getConfiguration('any-markdown');
+        const accessKeyId = config.get<string>('s3AccessKeyId', '');
+        const secretAccessKey = config.get<string>('s3SecretAccessKey', '');
+        const region = config.get<string>('s3Region', 'us-east-1');
+        if (!accessKeyId || !secretAccessKey) {
+            vscode.window.showErrorMessage('AWS credentials not configured. Set any-markdown.s3AccessKeyId and s3SecretAccessKey in settings.');
+            return null;
+        }
+        if (!this.currentFolderPath) return null;
+        return { accessKeyId, secretAccessKey, region, bucketPath, localPath: this.currentFolderPath };
+    }
+
+    private async runS3Operation(
+        op: 's3Sync' | 's3RemoteDeleteAndUpload' | 's3LocalDeleteAndDownload',
+        bucketPath: string,
+        sender: NotesSender,
+    ): Promise<void> {
+        if (!this.fileManager || !this.currentFolderPath) return;
+        this.fileManager.flushSave();
+
+        const config = this.getS3Config(bucketPath);
+        if (!config) {
+            sender.postMessage({ type: 'notesS3Progress', phase: 'error', message: 'AWS credentials not configured.' });
+            return;
+        }
+
+        const onProgress = (p: { phase: string; message: string; currentFile?: string; filesProcessed?: number }) => {
+            sender.postMessage({ type: 'notesS3Progress', ...p });
+        };
+
+        try {
+            if (op === 's3Sync') {
+                await s3Sync(config, onProgress);
+            } else if (op === 's3RemoteDeleteAndUpload') {
+                await s3RemoteDeleteAndUpload(config, onProgress);
+            } else {
+                await s3LocalDeleteAndDownload(config, onProgress);
+                // ローカルファイルが完全に入れ替わったので、パネルを開き直して完全初期化
+                sender.postMessage({ type: 'notesS3Progress', phase: 'complete', message: 'Local delete & download complete. Reopening...' });
+                if (this.currentFolderPath) {
+                    await this.openNotesFolder(this.currentFolderPath);
+                }
+                return; // openNotesFolder が全てを再構築するので、後続の complete 送信は不要
+            }
+        } catch (e: unknown) {
+            const message = e instanceof Error ? e.message : String(e);
+            sender.postMessage({ type: 'notesS3Progress', phase: 'error', message });
+        }
     }
 
     private disposePanel(): void {

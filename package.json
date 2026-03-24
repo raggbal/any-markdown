@@ -2,7 +2,7 @@
   "name": "any-markdown",
   "displayName": "Any Markdown Editor",
   "description": "A WYSIWYG markdown editor for VS Code with seamless live preview",
-  "version": "0.195.526",
+  "version": "0.195.529",
   "publisher": "imaken",
   "icon": "media/icon.png",
   "license": "MIT",
@@ -237,6 +237,21 @@
           "type": "boolean",
           "default": false,
           "description": "Enable debug logging in the editor. Useful for troubleshooting. / エディタのデバッグログを有効にします。トラブルシューティングに便利です。"
+        },
+        "any-markdown.s3AccessKeyId": {
+          "type": "string",
+          "default": "",
+          "description": "AWS Access Key ID for S3 sync / S3同期用のAWSアクセスキーID"
+        },
+        "any-markdown.s3SecretAccessKey": {
+          "type": "string",
+          "default": "",
+          "description": "AWS Secret Access Key for S3 sync / S3同期用のAWSシークレットアクセスキー"
+        },
+        "any-markdown.s3Region": {
+          "type": "string",
+          "default": "us-east-1",
+          "description": "AWS Region for S3 sync (e.g., ap-northeast-1) / S3同期用のAWSリージョン"
         }
       }
     },

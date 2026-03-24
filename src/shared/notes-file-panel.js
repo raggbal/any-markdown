@@ -41,7 +41,7 @@ var notesFilePanel = (function() {
     var lastSavedPanelWidth = null;
 
     // Tab state
-    var currentTab = 'notes'; // 'notes' | 'search'
+    var currentTab = 'notes'; // 'notes' | 'search' | 's3'
 
     // Search state
     var searchInputEl = null;
@@ -663,14 +663,12 @@ var notesFilePanel = (function() {
         // コンテンツ表示切替
         var notesContent = document.getElementById('filePanelContentNotes');
         var searchContent = document.getElementById('filePanelContentSearch');
-        if (tabName === 'notes') {
-            if (notesContent) notesContent.style.display = '';
-            if (searchContent) searchContent.style.display = 'none';
-        } else if (tabName === 'search') {
-            if (notesContent) notesContent.style.display = 'none';
-            if (searchContent) searchContent.style.display = '';
-            if (searchInputEl) searchInputEl.focus();
-        }
+        var s3Content = document.getElementById('filePanelContentS3');
+        if (notesContent) notesContent.style.display = tabName === 'notes' ? '' : 'none';
+        if (searchContent) searchContent.style.display = tabName === 'search' ? '' : 'none';
+        if (s3Content) s3Content.style.display = tabName === 's3' ? '' : 'none';
+        if (tabName === 'search' && searchInputEl) searchInputEl.focus();
+        if (tabName === 's3' && bridge.s3GetStatus) bridge.s3GetStatus();
     }
 
     function executeSearch() {
@@ -957,11 +955,210 @@ var notesFilePanel = (function() {
         // Search
         setupSearch();
 
+        // S3
+        setupS3();
+
         // Panel resize
         setupPanelResize();
 
         // Initial render
         renderTree();
+    }
+
+    // ── S3 Confirm Dialog (confirm() は VSCode webview sandbox で使えない) ──
+
+    function showS3ConfirmDialog(title, message, onConfirm) {
+        // 既存ダイアログがあれば削除
+        var existing = document.getElementById('s3ConfirmOverlay');
+        if (existing) existing.remove();
+
+        var overlay = document.createElement('div');
+        overlay.id = 's3ConfirmOverlay';
+        overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+
+        var dialog = document.createElement('div');
+        dialog.style.cssText = 'background:var(--outliner-bg,#fff);border:1px solid var(--outliner-border,#ccc);border-radius:8px;padding:20px;max-width:400px;width:90%;box-shadow:0 4px 20px rgba(0,0,0,0.3);';
+
+        var titleEl = document.createElement('div');
+        titleEl.style.cssText = 'font-size:14px;font-weight:600;margin-bottom:8px;color:#c44;';
+        titleEl.textContent = title;
+
+        var msgEl = document.createElement('div');
+        msgEl.style.cssText = 'font-size:13px;margin-bottom:16px;line-height:1.5;';
+        msgEl.textContent = message;
+
+        var btnRow = document.createElement('div');
+        btnRow.style.cssText = 'display:flex;gap:8px;justify-content:flex-end;';
+
+        var cancelBtn = document.createElement('button');
+        cancelBtn.textContent = 'Cancel';
+        cancelBtn.style.cssText = 'padding:6px 16px;border:1px solid var(--outliner-border,#ccc);border-radius:4px;background:transparent;color:inherit;cursor:pointer;font-size:13px;';
+        cancelBtn.addEventListener('click', function() { overlay.remove(); });
+
+        var confirmBtn = document.createElement('button');
+        confirmBtn.textContent = 'Continue';
+        confirmBtn.style.cssText = 'padding:6px 16px;border:none;border-radius:4px;background:#c44;color:#fff;cursor:pointer;font-size:13px;font-weight:500;';
+        confirmBtn.addEventListener('click', function() { overlay.remove(); onConfirm(); });
+
+        btnRow.appendChild(cancelBtn);
+        btnRow.appendChild(confirmBtn);
+        dialog.appendChild(titleEl);
+        dialog.appendChild(msgEl);
+        dialog.appendChild(btnRow);
+        overlay.appendChild(dialog);
+        document.body.appendChild(overlay);
+
+        // Escキーでキャンセル
+        overlay.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') overlay.remove();
+        });
+        cancelBtn.focus();
+    }
+
+    // ── S3 Tab ──
+
+    var s3Operating = false;
+
+    function setupS3() {
+        var bucketInput = document.getElementById('s3BucketPathInput');
+        var savePathBtn = document.getElementById('s3SavePath');
+        var statusEl = document.getElementById('s3CredentialStatus');
+        var syncBtn = document.getElementById('s3BtnSync');
+        var remoteDeleteBtn = document.getElementById('s3BtnRemoteDeleteUpload');
+        var localDeleteBtn = document.getElementById('s3BtnLocalDeleteDownload');
+        var progressEl = document.getElementById('s3Progress');
+        var progressMsg = document.getElementById('s3ProgressMessage');
+        var progressDetail = document.getElementById('s3ProgressDetail');
+
+        if (!bucketInput || !bridge) return;
+
+        function setS3ButtonsEnabled(enabled) {
+            var hasBucket = bucketInput && bucketInput.value.trim().length > 0;
+            var isEnabled = enabled && hasBucket;
+            if (syncBtn) syncBtn.disabled = !isEnabled;
+            if (remoteDeleteBtn) remoteDeleteBtn.disabled = !isEnabled;
+            if (localDeleteBtn) localDeleteBtn.disabled = !isEnabled;
+        }
+
+        // Save bucket path
+        if (savePathBtn) {
+            savePathBtn.addEventListener('click', function() {
+                var val = bucketInput.value.trim();
+                if (val && bridge.s3SaveBucketPath) {
+                    bridge.s3SaveBucketPath(val);
+                    if (statusEl) {
+                        statusEl.textContent = 'Bucket path saved.';
+                        statusEl.className = 's3-status ok';
+                    }
+                    setS3ButtonsEnabled(true);
+                }
+            });
+        }
+
+        // Enable/disable buttons on input change
+        bucketInput.addEventListener('input', function() {
+            if (!s3Operating) setS3ButtonsEnabled(true);
+        });
+
+        // Sync button
+        if (syncBtn) {
+            syncBtn.addEventListener('click', function() {
+                var bp = bucketInput.value.trim();
+                if (!bp || s3Operating) return;
+                s3Operating = true;
+                setS3ButtonsEnabled(false);
+                if (progressEl) progressEl.style.display = '';
+                if (progressMsg) progressMsg.textContent = 'Starting sync...';
+                if (progressDetail) progressDetail.textContent = '';
+                if (bridge.s3Sync) bridge.s3Sync(bp);
+            });
+        }
+
+        // Remote Delete & Upload button
+        if (remoteDeleteBtn) {
+            remoteDeleteBtn.addEventListener('click', function() {
+                var bp = bucketInput.value.trim();
+                if (!bp || s3Operating) return;
+                showS3ConfirmDialog(
+                    'Remote Delete & Upload',
+                    'This will DELETE all remote data in s3://' + bp + ' and upload local data.',
+                    function() {
+                        s3Operating = true;
+                        setS3ButtonsEnabled(false);
+                        if (progressEl) progressEl.style.display = '';
+                        if (progressMsg) progressMsg.textContent = 'Starting remote delete & upload...';
+                        if (progressDetail) progressDetail.textContent = '';
+                        if (bridge.s3RemoteDeleteAndUpload) bridge.s3RemoteDeleteAndUpload(bp);
+                    }
+                );
+            });
+        }
+
+        // Local Delete & Download button
+        if (localDeleteBtn) {
+            localDeleteBtn.addEventListener('click', function() {
+                var bp = bucketInput.value.trim();
+                if (!bp || s3Operating) return;
+                showS3ConfirmDialog(
+                    'Local Delete & Download',
+                    'This will DELETE all local files and download from s3://' + bp + '.',
+                    function() {
+                        s3Operating = true;
+                        setS3ButtonsEnabled(false);
+                        if (progressEl) progressEl.style.display = '';
+                        if (progressMsg) progressMsg.textContent = 'Starting local delete & download...';
+                        if (progressDetail) progressDetail.textContent = '';
+                        if (bridge.s3LocalDeleteAndDownload) bridge.s3LocalDeleteAndDownload(bp);
+                    }
+                );
+            });
+        }
+
+        // Progress listener
+        if (bridge.onS3Progress) {
+            bridge.onS3Progress(function(data) {
+                if (progressMsg) progressMsg.textContent = data.message || '';
+                if (progressDetail) progressDetail.textContent = data.currentFile || '';
+                if (data.phase === 'complete' || data.phase === 'error') {
+                    s3Operating = false;
+                    setS3ButtonsEnabled(true);
+                    if (data.phase === 'complete') {
+                        if (statusEl) {
+                            statusEl.textContent = data.message;
+                            statusEl.className = 's3-status ok';
+                        }
+                        // 進捗を3秒後に隠す
+                        setTimeout(function() {
+                            if (progressEl && !s3Operating) progressEl.style.display = 'none';
+                        }, 3000);
+                    } else {
+                        if (statusEl) {
+                            statusEl.textContent = data.message;
+                            statusEl.className = 's3-status error';
+                        }
+                    }
+                }
+            });
+        }
+
+        // Status listener (receives bucket path and credential info)
+        if (bridge.onS3Status) {
+            bridge.onS3Status(function(data) {
+                if (bucketInput && data.bucketPath) {
+                    bucketInput.value = data.bucketPath;
+                }
+                if (statusEl) {
+                    if (data.hasCredentials) {
+                        statusEl.textContent = 'Credentials configured (' + (data.region || 'us-east-1') + ')';
+                        statusEl.className = 's3-status ok';
+                    } else {
+                        statusEl.textContent = 'AWS credentials not set. Configure in Settings.';
+                        statusEl.className = 's3-status error';
+                    }
+                }
+                if (!s3Operating) setS3ButtonsEnabled(data.hasCredentials);
+            });
+        }
     }
 
     return { init: init };

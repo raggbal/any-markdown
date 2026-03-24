@@ -237,6 +237,41 @@
                     handler(e.data.fileList, e.data.currentFile, e.data.structure);
                 }
             });
+        },
+
+        // ── S3 Sync ──
+
+        s3Sync: function(bucketPath) {
+            flushOutlinerSync();
+            api.postMessage({ type: 'notesS3Sync', bucketPath: bucketPath });
+        },
+        s3RemoteDeleteAndUpload: function(bucketPath) {
+            flushOutlinerSync();
+            api.postMessage({ type: 'notesS3RemoteDeleteUpload', bucketPath: bucketPath });
+        },
+        s3LocalDeleteAndDownload: function(bucketPath) {
+            flushOutlinerSync();
+            api.postMessage({ type: 'notesS3LocalDeleteDownload', bucketPath: bucketPath });
+        },
+        s3SaveBucketPath: function(bucketPath) {
+            api.postMessage({ type: 'notesS3SaveBucketPath', bucketPath: bucketPath });
+        },
+        s3GetStatus: function() {
+            api.postMessage({ type: 'notesS3GetStatus' });
+        },
+        onS3Progress: function(handler) {
+            window.addEventListener('message', function(e) {
+                if (e.data && e.data.type === 'notesS3Progress') {
+                    handler(e.data);
+                }
+            });
+        },
+        onS3Status: function(handler) {
+            window.addEventListener('message', function(e) {
+                if (e.data && e.data.type === 'notesS3Status') {
+                    handler(e.data);
+                }
+            });
         }
     };
 })();

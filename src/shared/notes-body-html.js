@@ -183,6 +183,30 @@ function generateNotesFilePanelHtml(options) {
         .file-panel-search-highlight { background: rgba(255, 200, 0, 0.3); font-weight: 500; }
         .file-panel-search-count { padding: 4px 12px; font-size: 11px; opacity: 0.6; }
         .file-panel-search-spinner { padding: 8px 12px; font-size: 12px; opacity: 0.5; }
+
+        /* ── S3 Tab ── */
+        .s3-panel-section { padding: 8px 12px; }
+        .s3-label { font-size: 11px; opacity: 0.7; margin-bottom: 4px; display: block; }
+        .s3-input-row { display: flex; gap: 4px; }
+        .s3-input-row .file-panel-search-input { flex: 1; }
+        .s3-status { font-size: 11px; margin-top: 6px; opacity: 0.6; }
+        .s3-status.ok { color: #3a3; opacity: 1; }
+        .s3-status.error { color: #e55; opacity: 1; }
+        .s3-actions { display: flex; flex-direction: column; gap: 6px; padding-top: 4px; }
+        .s3-action-btn {
+            width: 100%; text-align: center; padding: 8px 12px;
+            font-size: 12px; border-radius: 4px;
+        }
+        .s3-action-btn.s3-danger {
+            border-color: #c44; color: #c44;
+        }
+        .s3-action-btn.s3-danger:hover {
+            background: rgba(204, 68, 68, 0.1);
+        }
+        .s3-action-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .s3-progress { padding: 8px 12px; }
+        .s3-progress-message { font-size: 12px; font-weight: 500; }
+        .s3-progress-detail { font-size: 11px; opacity: 0.6; margin-top: 2px; word-break: break-all; }
     `;
 
     var html = `<aside class="notes-file-panel${panelClass}" id="notesFilePanel">
@@ -200,6 +224,10 @@ function generateNotesFilePanelHtml(options) {
                 <button class="file-panel-tab" data-tab="search">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
                     Search
+                </button>
+                <button class="file-panel-tab" data-tab="s3">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m16 16-4-4-4 4"/></svg>
+                    S3
                 </button>
             </div>
             <div class="file-panel-content" id="filePanelContentNotes">
@@ -222,6 +250,25 @@ function generateNotesFilePanelHtml(options) {
                 </div>
                 <div class="file-panel-search-count" id="notesSearchCount"></div>
                 <div class="file-panel-search-results" id="notesSearchResults"></div>
+            </div>
+            <div class="file-panel-content" id="filePanelContentS3" style="display:none">
+                <div class="s3-panel-section">
+                    <label class="s3-label">S3 Bucket Path</label>
+                    <div class="s3-input-row">
+                        <input type="text" class="file-panel-search-input" id="s3BucketPathInput" placeholder="my-bucket/path" />
+                        <button class="file-panel-btn" id="s3SavePath" title="Save">Save</button>
+                    </div>
+                    <div class="s3-status" id="s3CredentialStatus"></div>
+                </div>
+                <div class="s3-panel-section s3-actions">
+                    <button class="file-panel-btn s3-action-btn" id="s3BtnSync" disabled>Sync (Backup)</button>
+                    <button class="file-panel-btn s3-action-btn s3-danger" id="s3BtnRemoteDeleteUpload" disabled>Remote Delete &amp; Upload</button>
+                    <button class="file-panel-btn s3-action-btn s3-danger" id="s3BtnLocalDeleteDownload" disabled>Local Delete &amp; Download</button>
+                </div>
+                <div class="s3-progress" id="s3Progress" style="display:none">
+                    <div class="s3-progress-message" id="s3ProgressMessage"></div>
+                    <div class="s3-progress-detail" id="s3ProgressDetail"></div>
+                </div>
             </div>
         </aside>
         <div class="notes-resize-handle" id="notesResizeHandle"></div>`;

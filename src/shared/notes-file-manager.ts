@@ -30,6 +30,7 @@ export interface NoteStructure {
     rootIds: string[];                    // トップレベルの順序
     items: Record<string, NoteTreeItem>;  // 全アイテムのマップ
     panelWidth?: number;                  // 左パネル幅 (px)
+    s3BucketPath?: string;                // S3バケットパス (例: "my-bucket/notes-backup")
 }
 
 // ── 検索関連 ──
@@ -275,6 +276,22 @@ export class NotesFileManager {
      */
     getPanelWidth(): number | undefined {
         return this.getStructure().panelWidth;
+    }
+
+    /**
+     * S3バケットパスを outline.note に保存
+     */
+    saveS3BucketPath(bucketPath: string): void {
+        const structure = this.getStructure();
+        structure.s3BucketPath = bucketPath;
+        this.saveStructure();
+    }
+
+    /**
+     * S3バケットパスを取得
+     */
+    getS3BucketPath(): string | undefined {
+        return this.getStructure().s3BucketPath;
     }
 
     /**
