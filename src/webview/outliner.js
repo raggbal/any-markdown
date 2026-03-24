@@ -463,7 +463,7 @@ var Outliner = (function() {
 
         subtextEl.addEventListener('blur', function() {
             // モデル更新
-            var raw = subtextEl.textContent || '';
+            var raw = getSubtextPlainText(subtextEl);
             model.updateSubtext(node.id, raw);
             // 省略表示に切替
             subtextEl.classList.remove('is-editing');
@@ -479,7 +479,7 @@ var Outliner = (function() {
 
         subtextEl.addEventListener('input', function() {
             // リアルタイムでモデル更新
-            var raw = subtextEl.textContent || '';
+            var raw = getSubtextPlainText(subtextEl);
             model.updateSubtext(node.id, raw);
             scheduleSyncToHost();
         });
@@ -491,6 +491,27 @@ var Outliner = (function() {
         contentEl.appendChild(subtextEl);
         el.appendChild(contentEl);
         return el;
+    }
+
+    /** contenteditable要素から改行を正規化してプレーンテキストを取得 */
+    function getSubtextPlainText(element) {
+        var result = '';
+        var children = element.childNodes;
+        for (var i = 0; i < children.length; i++) {
+            var child = children[i];
+            if (child.nodeType === 1 && child.tagName === 'BR') {
+                result += '\n';
+            } else if (child.nodeType === 3) {
+                result += child.textContent;
+            } else if (child.nodeType === 1) {
+                // div等のブロック要素（ブラウザが挿入する場合がある）
+                if (result.length > 0 && result[result.length - 1] !== '\n') {
+                    result += '\n';
+                }
+                result += getSubtextPlainText(child);
+            }
+        }
+        return result;
     }
 
     /** サブテキストの省略表示テキストを生成 */
@@ -734,11 +755,31 @@ var Outliner = (function() {
         if (focusedNodeId === nodeId) { return; }
         if (focusedNodeId) {
             var prevEl = treeEl.querySelector('.outliner-node[data-id="' + focusedNodeId + '"]');
-            if (prevEl) { prevEl.classList.remove('is-focused'); }
+            if (prevEl) {
+                prevEl.classList.remove('is-focused');
+                // 前ノードのsubtextをプレビュー表示に戻す
+                var prevSubtext = prevEl.querySelector('.outliner-subtext');
+                if (prevSubtext && !prevSubtext.classList.contains('is-editing')) {
+                    var prevNode = model.getNode(focusedNodeId);
+                    if (prevNode && prevNode.subtext) {
+                        prevSubtext.textContent = getSubtextPreview(prevNode.subtext);
+                    }
+                }
+            }
         }
         focusedNodeId = nodeId;
         var el = treeEl.querySelector('.outliner-node[data-id="' + nodeId + '"]');
-        if (el) { el.classList.add('is-focused'); }
+        if (el) {
+            el.classList.add('is-focused');
+            // フォーカスしたノードのsubtextを全文表示
+            var subtextEl = el.querySelector('.outliner-subtext');
+            if (subtextEl && !subtextEl.classList.contains('is-editing')) {
+                var focusNode = model.getNode(nodeId);
+                if (focusNode && focusNode.subtext) {
+                    subtextEl.textContent = focusNode.subtext;
+                }
+            }
+        }
     }
 
     // --- 複数ノード選択管理 ---
@@ -1499,15 +1540,15 @@ var Outliner = (function() {
         if (!node) { return; }
 
         // テキスト保存
-        var raw = subtextEl.textContent || '';
+        var raw = getSubtextPlainText(subtextEl);
         model.updateSubtext(nodeId, raw);
 
-        // 省略表示に切替
+        // 編集モード解除 — ノードにフォーカスが残るので全文表示にする
         subtextEl.contentEditable = 'false';
         subtextEl.classList.remove('is-editing');
         if (raw) {
             subtextEl.classList.add('has-content');
-            subtextEl.textContent = getSubtextPreview(raw);
+            subtextEl.textContent = raw;  // 全文表示（フォーカスノードなので省略しない）
         } else {
             subtextEl.classList.remove('has-content');
             subtextEl.textContent = '';
@@ -1544,7 +1585,7 @@ var Outliner = (function() {
         // Cmd+S: 保存
         if ((e.metaKey || e.ctrlKey) && e.key === 's') {
             e.preventDefault();
-            var raw = subtextEl.textContent || '';
+            var raw = getSubtextPlainText(subtextEl);
             model.updateSubtext(nodeId, raw);
             syncToHostImmediate();
             host.save();

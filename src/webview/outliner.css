@@ -417,6 +417,13 @@ body {
     display: block;
 }
 
+/* フォーカス中のノード: サブテキスト全文表示 */
+.outliner-node.is-focused .outliner-subtext.has-content {
+    white-space: pre-wrap;
+    overflow: visible;
+    text-overflow: unset;
+}
+
 .outliner-subtext.is-editing {
     display: block;
     white-space: pre-wrap;
