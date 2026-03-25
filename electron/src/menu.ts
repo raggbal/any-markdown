@@ -6,7 +6,7 @@ import { app, Menu, MenuItemConstructorOptions, BrowserWindow, shell } from 'ele
 export function buildMenu(handlers: {
     newFile: () => void;
     openFile: () => void;
-    openOutlinerFolder: () => void;
+    openNotes: () => void;
     save: () => void;
     saveAs: () => void;
     openPreferences: () => void;
@@ -49,8 +49,8 @@ export function buildMenu(handlers: {
                     click: handlers.openFile,
                 },
                 {
-                    label: 'Open Outliner Folder...',
-                    click: handlers.openOutlinerFolder,
+                    label: 'Open Notes',
+                    click: handlers.openNotes,
                 },
                 { type: 'separator' },
                 {

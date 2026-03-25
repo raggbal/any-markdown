@@ -45,12 +45,11 @@ contextBridge.exposeInMainWorld('hostBridge', {
 
 // Welcome screen bridge (separate from hostBridge)
 contextBridge.exposeInMainWorld('welcomeBridge', {
+    openNotes: () => ipcRenderer.send('welcome-open-notes'),
     openFile: () => ipcRenderer.send('welcome-open-file'),
     createFile: () => ipcRenderer.send('welcome-create-file'),
     openRecent: (filePath: string) => ipcRenderer.send('welcome-open-recent', filePath),
     getRecentFiles: () => ipcRenderer.sendSync('welcome-get-recent-files'),
-    openOutlinerFolder: () => ipcRenderer.send('welcome-open-outliner-folder'),
-    createOutlinerFolder: () => ipcRenderer.send('welcome-create-outliner-folder'),
 });
 
 // ── fileChangeId tracking (for stale syncData prevention) ──
@@ -274,6 +273,20 @@ contextBridge.exposeInMainWorld('notesHostBridge', {
             if (msg && msg.type === 'notesS3Status') {
                 handler(msg);
             }
+        });
+    },
+});
+
+// Notes folder panel bridge (Electron only — manages folder list)
+contextBridge.exposeInMainWorld('notesFolderBridge', {
+    addFolder: () => ipcRenderer.send('folder-panel-add'),
+    removeFolder: (folderPath: string) => ipcRenderer.send('folder-panel-remove', folderPath),
+    selectFolder: (folderPath: string) => ipcRenderer.send('folder-panel-select', folderPath),
+    savePanelState: (collapsed: boolean) => ipcRenderer.send('folder-panel-state', collapsed),
+    getInitialData: () => ipcRenderer.sendSync('folder-panel-init'),
+    onFoldersChanged: (handler: (folders: unknown[], activeFolder: string | null) => void) => {
+        ipcRenderer.on('folder-panel-update', (_e: unknown, folders: unknown[], activeFolder: string | null) => {
+            handler(folders, activeFolder);
         });
     },
 });

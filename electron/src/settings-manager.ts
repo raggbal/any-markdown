@@ -21,6 +21,10 @@ export interface ElectronSettings {
     s3AccessKeyId: string;
     s3SecretAccessKey: string;
     s3Region: string;
+    // Folder panel
+    notesFolders: string[];
+    lastSelectedNoteFolder: string;
+    folderPanelCollapsed: boolean;
     // Window state
     windowBounds?: { x: number; y: number; width: number; height: number };
     recentFiles?: string[];
@@ -42,6 +46,9 @@ const DEFAULTS: ElectronSettings = {
     s3AccessKeyId: '',
     s3SecretAccessKey: '',
     s3Region: 'us-east-1',
+    notesFolders: [],
+    lastSelectedNoteFolder: '',
+    folderPanelCollapsed: false,
     recentFiles: [],
 };
 

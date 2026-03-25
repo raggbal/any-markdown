@@ -400,7 +400,7 @@ async function runElectronS3Operation(
 
 // ── Outliner Mode ──
 
-async function loadOutlinerMode(win: BrowserWindow, folderPath: string, openFilePath?: string): Promise<void> {
+async function loadOutlinerMode(win: BrowserWindow, folderPath: string, openFilePath?: string, opts?: { folderPanelEnabled?: boolean }): Promise<void> {
     // Dispose previous notes manager if any
     const oldNfm = notesManagers.get(win);
     if (oldNfm) {
@@ -431,6 +431,7 @@ async function loadOutlinerMode(win: BrowserWindow, folderPath: string, openFile
 
     const fileList = nfm.listFiles();
     const panelWidth = structure.panelWidth || undefined;
+    const useFolderPanel = opts?.folderPanelEnabled ?? (win as any).__folderPanelEnabled ?? false;
     const settings = settingsManager.getAll();
     const html = generateOutlinerHtml(outJson, fileList, nfm.getCurrentFilePath(), {
         theme: settings.theme,
@@ -443,6 +444,7 @@ async function loadOutlinerMode(win: BrowserWindow, folderPath: string, openFile
         panelWidth: panelWidth,
         fileChangeId: nfm.getFileChangeId(),
         outlinerPageTitle: settings.outlinerPageTitle !== false,
+        folderPanelEnabled: useFolderPanel,
     });
     const tempFile = writeHtmlToTempFile(html);
     await win.loadFile(tempFile);
@@ -452,13 +454,76 @@ async function loadOutlinerMode(win: BrowserWindow, folderPath: string, openFile
 
     // Track for restore
     settingsManager.set('lastOutlinerFolder', folderPath);
+    settingsManager.set('lastSelectedNoteFolder', folderPath);
     if (filePath) settingsManager.set('lastOutlinerFile', filePath);
     settingsManager.addRecentFile(folderPath);
 
-    // Store reload function
-    (win as any).__loadOutlinerMode = (fp?: string) => loadOutlinerMode(win, folderPath, fp);
+    // Store reload function & flags
+    (win as any).__loadOutlinerMode = (fp?: string) => loadOutlinerMode(win, folderPath, fp, { folderPanelEnabled: useFolderPanel });
     (win as any).__isOutlinerMode = true;
     (win as any).__outlinerFolderPath = folderPath;
+    (win as any).__folderPanelEnabled = useFolderPanel;
+}
+
+// ── Notes Mode (with Folder Panel) ──
+
+async function loadNotesMode(win: BrowserWindow): Promise<void> {
+    const folders: string[] = (settingsManager.get('notesFolders') || []).filter((f: string) => fs.existsSync(f));
+    const lastFolder = settingsManager.get('lastSelectedNoteFolder') || settingsManager.get('lastOutlinerFolder') || '';
+    let targetFolder: string | null = null;
+
+    if (lastFolder && fs.existsSync(lastFolder)) {
+        // Ensure it's in the folder list
+        if (!folders.includes(lastFolder)) {
+            folders.push(lastFolder);
+            settingsManager.set('notesFolders', folders);
+        }
+        targetFolder = lastFolder;
+    } else if (folders.length > 0) {
+        targetFolder = folders[0];
+    }
+
+    if (targetFolder) {
+        await loadOutlinerMode(win, targetFolder, undefined, { folderPanelEnabled: true });
+    } else {
+        // No folders registered — show empty notes mode with folder panel
+        await loadEmptyNotesMode(win);
+    }
+}
+
+async function loadEmptyNotesMode(win: BrowserWindow): Promise<void> {
+    const settings = settingsManager.getAll();
+    const emptyJson = '{"version":1,"rootIds":[],"nodes":{}}';
+    const html = generateOutlinerHtml(emptyJson, [], null, {
+        theme: settings.theme,
+        fontSize: settings.fontSize,
+        webviewMessages: getI18nMessages(),
+        enableDebugLogging: settings.enableDebugLogging,
+        mainFolderPath: '',
+        panelCollapsed: false,
+        structure: null,
+        panelWidth: undefined,
+        fileChangeId: 0,
+        outlinerPageTitle: settings.outlinerPageTitle !== false,
+        folderPanelEnabled: true,
+    });
+    const tempFile = writeHtmlToTempFile(html);
+    await win.loadFile(tempFile);
+    if (!app.isPackaged) {
+        win.webContents.openDevTools();
+    }
+    (win as any).__isOutlinerMode = true;
+    (win as any).__folderPanelEnabled = true;
+    (win as any).__loadOutlinerMode = undefined;
+}
+
+// ── Folder Panel Helpers ──
+
+function sendFolderUpdate(win: BrowserWindow): void {
+    const folders: string[] = (settingsManager.get('notesFolders') || []).filter((f: string) => fs.existsSync(f));
+    const mapped = folders.map((f: string) => ({ path: f, name: path.basename(f) }));
+    const active = settingsManager.get('lastSelectedNoteFolder') || null;
+    win.webContents.send('folder-panel-update', mapped, active);
 }
 
 function createWindow(filePath?: string): BrowserWindow {
@@ -910,32 +975,77 @@ ipcMain.on('welcome-get-recent-files', (event) => {
     event.returnValue = settingsManager.getRecentFiles();
 });
 
-ipcMain.on('welcome-open-outliner-folder', async (event) => {
+ipcMain.on('welcome-open-notes', async (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win) return;
+    await loadNotesMode(win);
+});
+
+// ── Folder Panel IPC ──
+
+ipcMain.on('folder-panel-init', (event) => {
+    const folders: string[] = (settingsManager.get('notesFolders') || [])
+        .filter((f: string) => fs.existsSync(f));
+    const mapped = folders.map((f: string) => ({ path: f, name: path.basename(f) }));
+    const activeFolder = settingsManager.get('lastSelectedNoteFolder') || null;
+    const collapsed = settingsManager.get('folderPanelCollapsed') || false;
+    event.returnValue = { folders: mapped, activeFolder, collapsed };
+});
+
+ipcMain.on('folder-panel-add', async (event) => {
     const win = BrowserWindow.fromWebContents(event.sender);
     if (!win) return;
     const result = await dialog.showOpenDialog(win, {
         properties: ['openDirectory'],
-        title: 'Open Outliner Folder',
-    });
-    if (result.canceled || result.filePaths.length === 0) return;
-    await loadOutlinerMode(win, result.filePaths[0]);
-});
-
-ipcMain.on('welcome-create-outliner-folder', async (event) => {
-    const win = BrowserWindow.fromWebContents(event.sender);
-    if (!win) return;
-    const result = await dialog.showOpenDialog(win, {
-        properties: ['openDirectory', 'createDirectory'],
-        title: 'Select or Create Outliner Folder',
+        title: 'Select Notes Folder',
     });
     if (result.canceled || result.filePaths.length === 0) return;
     const folderPath = result.filePaths[0];
-    // Create an initial .out file via NotesFileManager
-    const tempNfm = new NotesFileManager(folderPath);
-    tempNfm.loadStructure();
-    const filePath = tempNfm.createFile('default');
-    tempNfm.dispose();
-    await loadOutlinerMode(win, folderPath, filePath);
+    const folders: string[] = settingsManager.get('notesFolders') || [];
+    if (!folders.includes(folderPath)) {
+        folders.push(folderPath);
+        settingsManager.set('notesFolders', folders);
+    }
+    // Auto-select and load the added folder
+    await loadOutlinerMode(win, folderPath, undefined, { folderPanelEnabled: true });
+    sendFolderUpdate(win);
+});
+
+ipcMain.on('folder-panel-remove', (event, folderPath: string) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win) return;
+    const folders: string[] = settingsManager.get('notesFolders') || [];
+    const idx = folders.indexOf(folderPath);
+    if (idx >= 0) {
+        folders.splice(idx, 1);
+        settingsManager.set('notesFolders', folders);
+    }
+    const active = settingsManager.get('lastSelectedNoteFolder');
+    if (active === folderPath) {
+        const remaining = folders.filter((f: string) => fs.existsSync(f));
+        if (remaining.length > 0) {
+            loadOutlinerMode(win, remaining[0], undefined, { folderPanelEnabled: true });
+        } else {
+            settingsManager.set('lastSelectedNoteFolder', '');
+            loadEmptyNotesMode(win);
+        }
+    }
+    sendFolderUpdate(win);
+});
+
+ipcMain.on('folder-panel-select', async (event, folderPath: string) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win) return;
+    if (!fs.existsSync(folderPath)) return;
+    // Flush current before switching
+    const oldNfm = notesManagers.get(win);
+    if (oldNfm) oldNfm.flushSave();
+    await loadOutlinerMode(win, folderPath, undefined, { folderPanelEnabled: true });
+    sendFolderUpdate(win);
+});
+
+ipcMain.on('folder-panel-state', (_event, collapsed: boolean) => {
+    settingsManager.set('folderPanelCollapsed', collapsed);
 });
 
 ipcMain.on('editing-state', () => { /* no-op for Electron */ });
@@ -1047,15 +1157,9 @@ app.whenReady().then(() => {
                 createWindow(result.filePaths[0]);
             }
         },
-        openOutlinerFolder: async () => {
-            const result = await dialog.showOpenDialog({
-                properties: ['openDirectory'],
-                title: 'Open Outliner Folder',
-            });
-            if (!result.canceled && result.filePaths.length > 0) {
-                const w = createWindow();
-                loadOutlinerMode(w, result.filePaths[0]);
-            }
+        openNotes: async () => {
+            const w = createWindow();
+            await loadNotesMode(w);
         },
         save: () => {
             const win = BrowserWindow.getFocusedWindow();
@@ -1106,12 +1210,17 @@ app.whenReady().then(() => {
         });
     }
     if (!firstWindow) {
-        // No files specified — check for last outliner folder to restore
-        const lastFolder = settingsManager.get('lastOutlinerFolder');
-        const lastFile = settingsManager.get('lastOutlinerFile');
+        // No files specified — restore Notes mode if previously used
+        const notesFolders: string[] = settingsManager.get('notesFolders') || [];
+        const lastFolder = settingsManager.get('lastSelectedNoteFolder') || settingsManager.get('lastOutlinerFolder') || '';
         if (lastFolder && fs.existsSync(lastFolder)) {
+            // Ensure folder is in the list
+            if (!notesFolders.includes(lastFolder)) {
+                notesFolders.push(lastFolder);
+                settingsManager.set('notesFolders', notesFolders);
+            }
             firstWindow = createWindow();
-            loadOutlinerMode(firstWindow, lastFolder, lastFile && fs.existsSync(lastFile) ? lastFile : undefined);
+            loadNotesMode(firstWindow);
         } else {
             firstWindow = createWindow();
         }

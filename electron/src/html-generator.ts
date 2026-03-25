@@ -224,11 +224,10 @@ export function generateWelcomeHtml(theme: string): string {
         <h1>Any Markdown</h1>
         <p>WYSIWYG Markdown Editor</p>
         <div class="buttons">
-            <button class="btn btn-primary" id="open-file">Open File</button>
-            <button class="btn" id="create-file">Create New File</button>
+            <button class="btn btn-primary" id="open-notes">Open Notes</button>
             <div style="border-top:1px solid ${btnBorder};width:240px;margin:4px 0;"></div>
-            <button class="btn" id="open-outliner">Open Outliner Folder</button>
-            <button class="btn" id="create-outliner">Create Outliner</button>
+            <button class="btn" id="open-file">Open File</button>
+            <button class="btn" id="create-file">Create New File</button>
         </div>
         <div class="recent" id="recent-section" style="display:none;">
             <h3>Recent Files</h3>
@@ -236,17 +235,14 @@ export function generateWelcomeHtml(theme: string): string {
         </div>
     </div>
     <script>
+        document.getElementById('open-notes').addEventListener('click', () => {
+            window.welcomeBridge.openNotes();
+        });
         document.getElementById('open-file').addEventListener('click', () => {
             window.welcomeBridge.openFile();
         });
         document.getElementById('create-file').addEventListener('click', () => {
             window.welcomeBridge.createFile();
-        });
-        document.getElementById('open-outliner').addEventListener('click', () => {
-            window.welcomeBridge.openOutlinerFolder();
-        });
-        document.getElementById('create-outliner').addEventListener('click', () => {
-            window.welcomeBridge.createOutlinerFolder();
         });
         // Render recent files
         const recentFiles = window.welcomeBridge.getRecentFiles();
@@ -282,6 +278,7 @@ interface ElectronOutlinerConfig {
     panelWidth?: number;
     fileChangeId?: number;
     outlinerPageTitle?: boolean;
+    folderPanelEnabled?: boolean;
 }
 
 interface OutlinerFileEntry {
@@ -407,9 +404,50 @@ export function generateOutlinerHtml(
     <style>${outlinerCss}</style>
     <link rel="stylesheet" href="${vendorFileUriStr('katex.min.css')}">
     <style>${notesCss}</style>
+    ${config.folderPanelEnabled ? `<style>
+    .folder-panel { display:flex; flex-direction:column; flex-shrink:0; height:100%; border-right:1px solid var(--border-color,#e0e0e0); background:var(--panel-bg,#f5f5f5); }
+    .folder-panel-expanded { width:180px; display:flex; flex-direction:column; overflow:hidden; }
+    .folder-panel-header { display:flex; align-items:center; padding:8px 10px; border-bottom:1px solid var(--border-color,#e0e0e0); font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.3px; color:var(--muted-color,#888); }
+    .folder-panel-title { flex:1; }
+    .folder-panel-header button { background:none; border:none; cursor:pointer; padding:2px 4px; color:var(--muted-color,#888); font-size:14px; line-height:1; border-radius:3px; }
+    .folder-panel-header button:hover { background:var(--hover-bg,#e0e0e0); color:var(--fg-color,#333); }
+    .folder-panel-list { flex:1; overflow-y:auto; padding:4px 0; }
+    .folder-panel-item { padding:6px 10px; font-size:13px; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; border-left:3px solid transparent; display:flex; align-items:center; gap:6px; }
+    .folder-panel-item:hover { background:var(--hover-bg,#e8e8e8); }
+    .folder-panel-item.active { background:var(--active-bg,#dce7f7); border-left-color:var(--accent-color,#0078d4); font-weight:500; }
+    .folder-panel-item-icon { flex-shrink:0; width:16px; height:16px; opacity:0.6; }
+    .folder-panel-item-name { flex:1; overflow:hidden; text-overflow:ellipsis; }
+    .folder-panel-empty { padding:16px 10px; font-size:12px; color:var(--muted-color,#999); text-align:center; line-height:1.5; }
+    .folder-panel-collapsed-bar { width:40px; display:flex; flex-direction:column; align-items:center; padding-top:8px; gap:2px; }
+    .folder-panel-remove-btn { flex-shrink:0; width:16px; height:16px; border:none; border-radius:3px; background:transparent; cursor:pointer; display:flex; align-items:center; justify-content:center; color:var(--muted-color,#aaa); font-size:14px; font-weight:bold; line-height:1; padding:0; opacity:0; transition:opacity 0.15s; }
+    .folder-panel-item:hover .folder-panel-remove-btn { opacity:1; }
+    .folder-panel-remove-btn:hover { background:var(--hover-bg,#ddd); color:var(--danger-color,#d32f2f); }
+    .folder-panel-expand-btn, .folder-panel-icon-btn { width:32px; height:32px; border:none; border-radius:6px; background:transparent; cursor:pointer; display:flex; align-items:center; justify-content:center; color:var(--muted-color,#666); font-size:14px; font-weight:600; }
+    .folder-panel-expand-btn:hover, .folder-panel-icon-btn:hover { background:var(--hover-bg,#e8e8e8); }
+    .folder-panel-icon-btn.active { background:var(--active-bg,#dce7f7); color:var(--accent-color,#0078d4); }
+    [data-theme="night"] .folder-panel, [data-theme="dark"] .folder-panel { background:var(--panel-bg,#252525); }
+    [data-theme="night"] .folder-panel-item:hover, [data-theme="dark"] .folder-panel-item:hover { background:var(--hover-bg,#333); }
+    [data-theme="night"] .folder-panel-item.active, [data-theme="dark"] .folder-panel-item.active { background:var(--active-bg,#2a3a4a); }
+    </style>` : ''}
 </head>
 <body>
     <div class="notes-layout">
+        ${config.folderPanelEnabled ? `
+        <div class="folder-panel" id="folderPanel">
+            <div class="folder-panel-expanded" id="folderPanelExpanded">
+                <div class="folder-panel-header">
+                    <span class="folder-panel-title">Notes</span>
+                    <button id="folderPanelAdd" title="Add folder">+</button>
+                    <button id="folderPanelCollapse" title="Collapse">\u25C0</button>
+                </div>
+                <div class="folder-panel-list" id="folderPanelList"></div>
+            </div>
+            <div class="folder-panel-collapsed-bar" id="folderPanelCollapsedBar" style="display:none">
+                <button class="folder-panel-expand-btn" id="folderPanelExpand" title="Expand"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></button>
+                <div class="folder-panel-icons" id="folderPanelIcons"></div>
+            </div>
+        </div>
+        ` : ''}
         ${notesHtml}
         <div class="notes-main-wrapper">
             <div class="outliner-container">
@@ -498,6 +536,100 @@ export function generateOutlinerHtml(
                 }
             }
         });
+
+        // Folder Panel initialization
+        ${config.folderPanelEnabled ? `
+        (function() {
+            var bridge = window.notesFolderBridge;
+            if (!bridge) return;
+            var folders = [];
+            var activeFolder = null;
+            var isCollapsed = false;
+            var expandedEl = document.getElementById('folderPanelExpanded');
+            var collapsedBarEl = document.getElementById('folderPanelCollapsedBar');
+            var listEl = document.getElementById('folderPanelList');
+            var iconsEl = document.getElementById('folderPanelIcons');
+            var notebookSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>';
+
+            function render() {
+                listEl.innerHTML = '';
+                if (folders.length === 0) {
+                    var empty = document.createElement('div');
+                    empty.className = 'folder-panel-empty';
+                    empty.textContent = 'No folders added yet. Click + to add a Notes folder.';
+                    listEl.appendChild(empty);
+                } else {
+                    folders.forEach(function(f) {
+                        var item = document.createElement('div');
+                        item.className = 'folder-panel-item' + (f.path === activeFolder ? ' active' : '');
+                        item.title = f.path;
+                        var removeBtn = document.createElement('button');
+                        removeBtn.className = 'folder-panel-remove-btn';
+                        removeBtn.title = 'Remove from list';
+                        removeBtn.innerHTML = '\\u2212';
+                        removeBtn.addEventListener('click', function(e) {
+                            e.stopPropagation();
+                            if (confirm('Remove "' + f.name + '" from list?\\n(The folder itself will not be deleted)')) {
+                                bridge.removeFolder(f.path);
+                            }
+                        });
+                        var icon = document.createElement('span');
+                        icon.className = 'folder-panel-item-icon';
+                        icon.innerHTML = notebookSvg;
+                        var name = document.createElement('span');
+                        name.className = 'folder-panel-item-name';
+                        name.textContent = f.name;
+                        item.appendChild(icon);
+                        item.appendChild(name);
+                        item.appendChild(removeBtn);
+                        item.addEventListener('click', function() {
+                            bridge.selectFolder(f.path);
+                        });
+                        listEl.appendChild(item);
+                    });
+                }
+                iconsEl.innerHTML = '';
+                folders.forEach(function(f) {
+                    var btn = document.createElement('button');
+                    btn.className = 'folder-panel-icon-btn' + (f.path === activeFolder ? ' active' : '');
+                    btn.title = f.name;
+                    btn.textContent = (f.name || '?').charAt(0).toUpperCase();
+                    btn.addEventListener('click', function() {
+                        bridge.selectFolder(f.path);
+                        togglePanel(false);
+                    });
+                    iconsEl.appendChild(btn);
+                });
+            }
+
+            function togglePanel(collapse) {
+                isCollapsed = collapse;
+                expandedEl.style.display = collapse ? 'none' : '';
+                collapsedBarEl.style.display = collapse ? '' : 'none';
+                bridge.savePanelState(collapse);
+            }
+
+            document.getElementById('folderPanelAdd').addEventListener('click', function() { bridge.addFolder(); });
+            document.getElementById('folderPanelCollapse').addEventListener('click', function() { togglePanel(true); });
+            document.getElementById('folderPanelExpand').addEventListener('click', function() { togglePanel(false); });
+
+            bridge.onFoldersChanged(function(newFolders, newActiveFolder) {
+                folders = newFolders;
+                activeFolder = newActiveFolder;
+                render();
+            });
+
+            var initData = bridge.getInitialData();
+            folders = initData.folders || [];
+            activeFolder = initData.activeFolder || null;
+            isCollapsed = initData.collapsed || false;
+            if (isCollapsed) {
+                expandedEl.style.display = 'none';
+                collapsedBarEl.style.display = '';
+            }
+            render();
+        })();
+        ` : ''}
     </script>
 </body>
 </html>`;
