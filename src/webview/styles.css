@@ -1326,6 +1326,24 @@ body {
 .side-panel-outline-btn.hidden {
     display: none;
 }
+/* Side panel copy path button */
+.side-panel-copy-path {
+    background: none;
+    border: none;
+    color: var(--text-color);
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 4px;
+    line-height: 1;
+    opacity: 0.6;
+    margin-right: 4px;
+    display: flex;
+    align-items: center;
+}
+.side-panel-copy-path:hover {
+    opacity: 1;
+    background: var(--hover-bg, rgba(128,128,128,0.15));
+}
 /* Side panel expand button */
 .side-panel-open-tab {
     background: none;

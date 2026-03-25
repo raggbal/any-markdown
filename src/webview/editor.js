@@ -13587,6 +13587,23 @@ class EditorInstance {
         }
     }
 
+    // Side panel copy path button
+    var sidePanelCopyPathBtn = container.querySelector('.side-panel-copy-path');
+    if (sidePanelCopyPathBtn) {
+        sidePanelCopyPathBtn.addEventListener('click', function() {
+            if (!sidePanelFilePath) return;
+            navigator.clipboard.writeText(sidePanelFilePath).then(function() {
+                var originalHTML = sidePanelCopyPathBtn.innerHTML;
+                sidePanelCopyPathBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+                setTimeout(function() {
+                    sidePanelCopyPathBtn.innerHTML = originalHTML;
+                }, 2000);
+            }).catch(function(err) {
+                console.error('Failed to copy path:', err);
+            });
+        });
+    }
+
     // Side panel expand toggle button
     // Side panel open in new tab button
     var sidePanelOpenTabBtn = container.querySelector('.side-panel-open-tab');

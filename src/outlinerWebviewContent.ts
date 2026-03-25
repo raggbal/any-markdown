@@ -143,6 +143,8 @@ export function getOutlinerWebviewContent(
             <input type="text" class="outliner-page-title-input" placeholder="Untitled" />
         </div>
         <div class="outliner-search-bar">
+            <button class="outliner-nav-back-btn" title="Back" disabled><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
+            <button class="outliner-nav-forward-btn" title="Forward" disabled><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></button>
             <button class="outliner-search-mode-toggle" title="Toggle search mode: Tree / Focus"></button>
             <input type="text" class="outliner-search-input" placeholder="Search... (e.g. #tag, keyword, is:page)" />
             <button class="outliner-undo-btn" title="Undo (Cmd+Z)" disabled></button>

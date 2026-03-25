@@ -36,6 +36,14 @@ var Outliner = (function() {
     var syncDebounceTimer = null;
     var SYNC_DEBOUNCE_MS = 1000;
 
+    // --- Navigation history (Back/Forward) ---
+    var navBackStack = [];
+    var navForwardStack = [];
+    var isNavigating = false;
+    var MAX_NAV_HISTORY = 50;
+    var navBackBtn = null;
+    var navForwardBtn = null;
+
     // --- Daily Notes ---
     var isDailyNotes = false;
     var dailyNavBar = null;
@@ -131,6 +139,8 @@ var Outliner = (function() {
         menuBtn = document.querySelector('.outliner-menu-btn');
         undoBtn = document.querySelector('.outliner-undo-btn');
         redoBtn = document.querySelector('.outliner-redo-btn');
+        navBackBtn = document.querySelector('.outliner-nav-back-btn');
+        navForwardBtn = document.querySelector('.outliner-nav-forward-btn');
 
         // ページタイトル
         pageTitleEl = document.querySelector('.outliner-page-title');
@@ -290,6 +300,38 @@ var Outliner = (function() {
         }
     }
 
+    /** フォーカスモード用: マッチノードの祖先パンくずを生成 */
+    function createFocusAncestryBreadcrumb(nodeId) {
+        var node = model.getNode(nodeId);
+        if (!node || !node.parentId) return null;
+        var ancestors = [];
+        var cur = model.getNode(node.parentId);
+        var stopId = (currentScope.type === 'subtree') ? currentScope.rootId : null;
+        while (cur) {
+            ancestors.unshift(cur);
+            if (stopId && cur.id === stopId) break;
+            cur = cur.parentId ? model.getNode(cur.parentId) : null;
+        }
+        if (ancestors.length === 0) return null;
+        var breadcrumbEl = document.createElement('div');
+        breadcrumbEl.className = 'outliner-focus-ancestry';
+        for (var i = 0; i < ancestors.length; i++) {
+            if (i > 0) {
+                var sep = document.createElement('span');
+                sep.className = 'outliner-focus-ancestry-sep';
+                sep.textContent = ' \u203A ';
+                breadcrumbEl.appendChild(sep);
+            }
+            var item = document.createElement('span');
+            item.className = 'outliner-focus-ancestry-item';
+            var text = (ancestors[i].text || '').replace(/[*_~`]+/g, '').slice(0, 30);
+            item.textContent = text || '(empty)';
+            item.title = ancestors[i].text || '';
+            breadcrumbEl.appendChild(item);
+        }
+        return breadcrumbEl;
+    }
+
     /** フォーカスモード: マッチノードを頂点として、その子孫のみ表示 */
     function renderFocusNodes(parentEl, searchQuery) {
         // マッチノード（子孫でも祖先でもなく、直接マッチしたもの）を検索で再判定
@@ -311,6 +353,11 @@ var Outliner = (function() {
             var matchId = directMatches[m];
             var node = model.getNode(matchId);
             if (!node) { continue; }
+            // 祖先パンくず表示（ノード要素の前）
+            var ancestryEl = createFocusAncestryBreadcrumb(matchId);
+            if (ancestryEl) {
+                parentEl.appendChild(ancestryEl);
+            }
             var nodeEl = createNodeElement(node, 0, searchQuery);
             parentEl.appendChild(nodeEl);
             // 子孫を通常描画 (フィルタなし、全子を表示)
@@ -471,8 +518,12 @@ var Outliner = (function() {
             if (tag) {
                 e.preventDefault();
                 e.stopPropagation();
+                pushNavState();
+                isNavigating = true;
                 searchInput.value = tag.textContent;
                 executeSearch();
+                isNavigating = false;
+                updateNavButtons();
                 searchInput.focus();
             }
         });
@@ -1935,11 +1986,15 @@ var Outliner = (function() {
         // 検索モード切替ボタン
         if (searchModeToggleBtn) {
             searchModeToggleBtn.addEventListener('click', function() {
+                pushNavState();
+                isNavigating = true;
                 searchFocusMode = !searchFocusMode;
                 updateSearchModeButton();
                 if (searchInput.value.trim()) {
                     executeSearch();
                 }
+                isNavigating = false;
+                updateNavButtons();
                 scheduleSyncToHost();
             });
         }
@@ -1960,6 +2015,16 @@ var Outliner = (function() {
         if (redoBtn) {
             redoBtn.addEventListener('mousedown', function(e) { e.preventDefault(); });
             redoBtn.addEventListener('click', function() { redo(); });
+        }
+
+        // Navigation Back/Forward ボタン
+        if (navBackBtn) {
+            navBackBtn.addEventListener('mousedown', function(e) { e.preventDefault(); });
+            navBackBtn.addEventListener('click', function() { navigateBack(); });
+        }
+        if (navForwardBtn) {
+            navForwardBtn.addEventListener('mousedown', function(e) { e.preventDefault(); });
+            navForwardBtn.addEventListener('click', function() { navigateForward(); });
         }
     }
 
@@ -2121,6 +2186,7 @@ var Outliner = (function() {
     }
 
     function executeSearch() {
+        pushNavState();
         var queryStr = searchInput.value.trim();
         if (!queryStr) {
             clearSearch();
@@ -2150,6 +2216,7 @@ var Outliner = (function() {
     }
 
     function clearSearch() {
+        pushNavState();
         searchInput.value = '';
         currentSearchResult = null;
         renderTree();
@@ -2172,7 +2239,96 @@ var Outliner = (function() {
         }
     }
 
+    // --- Navigation history ---
+    function getCurrentNavState() {
+        return {
+            searchText: searchInput ? searchInput.value : '',
+            searchFocusMode: searchFocusMode,
+            scope: currentScope.type === 'subtree'
+                ? { type: 'subtree', rootId: currentScope.rootId }
+                : { type: 'document' }
+        };
+    }
+
+    function pushNavState() {
+        if (isNavigating) return;
+        var entry = getCurrentNavState();
+        if (navBackStack.length > 0) {
+            var last = navBackStack[navBackStack.length - 1];
+            if (last.searchText === entry.searchText &&
+                last.searchFocusMode === entry.searchFocusMode &&
+                last.scope.type === entry.scope.type &&
+                last.scope.rootId === entry.scope.rootId) {
+                return;
+            }
+        }
+        navBackStack.push(entry);
+        if (navBackStack.length > MAX_NAV_HISTORY) {
+            navBackStack.shift();
+        }
+        navForwardStack.length = 0;
+        updateNavButtons();
+    }
+
+    function navigateBack() {
+        if (navBackStack.length === 0) return;
+        navForwardStack.push(getCurrentNavState());
+        var entry = navBackStack.pop();
+        isNavigating = true;
+        restoreNavState(entry);
+        isNavigating = false;
+        updateNavButtons();
+    }
+
+    function navigateForward() {
+        if (navForwardStack.length === 0) return;
+        navBackStack.push(getCurrentNavState());
+        var entry = navForwardStack.pop();
+        isNavigating = true;
+        restoreNavState(entry);
+        isNavigating = false;
+        updateNavButtons();
+    }
+
+    function restoreNavState(entry) {
+        // 1. スコープ復元
+        if (entry.scope.type === 'subtree' && entry.scope.rootId) {
+            if (model.getNode(entry.scope.rootId)) {
+                currentScope = { type: 'subtree', rootId: entry.scope.rootId };
+            } else {
+                currentScope = { type: 'document' };
+            }
+        } else {
+            currentScope = { type: 'document' };
+        }
+        updateBreadcrumb();
+        // 2. 検索モード復元
+        searchFocusMode = entry.searchFocusMode;
+        updateSearchModeButton();
+        // 3. 検索テキスト復元
+        if (searchInput) {
+            searchInput.value = entry.searchText;
+        }
+        // 4. 検索実行 or クリア
+        if (entry.searchText.trim()) {
+            var query = OutlinerSearch.parseQuery(entry.searchText);
+            currentSearchResult = searchEngine.search(query, currentScope, { focusMode: searchFocusMode });
+            expandCollapsedParentsForSearch();
+        } else {
+            currentSearchResult = null;
+        }
+        // 5. ツリー再描画
+        renderTree();
+        updatePinnedTagBar();
+    }
+
+    function updateNavButtons() {
+        if (navBackBtn) { navBackBtn.disabled = (navBackStack.length === 0); }
+        if (navForwardBtn) { navForwardBtn.disabled = (navForwardStack.length === 0); }
+    }
+
     function setScope(scope) {
+        pushNavState();
         var previousRootId = (currentScope.type === 'subtree') ? currentScope.rootId : null;
         currentScope = scope;
         updateBreadcrumb();
@@ -2847,10 +3003,15 @@ var Outliner = (function() {
     function handlePinnedTagClick(e) {
         var tag = e.currentTarget.dataset.tag;
 
+        pushNavState();
+        isNavigating = true;
+
         // トグル: 同じタグで検索中ならクリア
         if (searchInput && searchInput.value.trim() === tag) {
             clearSearch();
             updatePinnedTagBar();
+            isNavigating = false;
+            updateNavButtons();
             return;
         }
 
@@ -2870,6 +3031,8 @@ var Outliner = (function() {
         searchInput.value = tag;
         executeSearch();
         updatePinnedTagBar();
+        isNavigating = false;
+        updateNavButtons();
     }
 
     function setupDailyNavBar() {
@@ -2985,6 +3148,9 @@ var Outliner = (function() {
                     // fileChangeId はNotes用のupdateDataにのみ存在する
                     // 単体.outの外部変更検知（outlinerProvider.ts）ではfileChangeIdがないためリセットしない
                     if (msg.fileChangeId !== undefined) {
+                        navBackStack.length = 0;
+                        navForwardStack.length = 0;
+                        updateNavButtons();
                         if (searchInput) {
                             searchInput.value = '';
                         }

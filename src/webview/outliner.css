@@ -127,6 +127,8 @@ body {
     color: var(--outliner-placeholder);
 }
 
+.outliner-nav-back-btn,
+.outliner-nav-forward-btn,
 .outliner-undo-btn,
 .outliner-redo-btn,
 .outliner-menu-btn {
@@ -144,12 +146,16 @@ body {
     align-items: center;
     justify-content: center;
 }
+.outliner-nav-back-btn:hover:not(:disabled),
+.outliner-nav-forward-btn:hover:not(:disabled),
 .outliner-undo-btn:hover:not(:disabled),
 .outliner-redo-btn:hover:not(:disabled),
 .outliner-menu-btn:hover {
     opacity: 1;
     border-color: var(--vscode-focusBorder, #007acc);
 }
+.outliner-nav-back-btn:disabled,
+.outliner-nav-forward-btn:disabled,
 .outliner-undo-btn:disabled,
 .outliner-redo-btn:disabled {
     opacity: 0.3;
@@ -843,9 +849,6 @@ body {
     gap: 4px;
     flex-wrap: wrap;
 }
-.outliner-pinned-nav-spacer {
-    flex-grow: 1;
-}
 .outliner-daily-nav-area {
     display: none;
     align-items: center;
@@ -1049,3 +1052,19 @@ body {
     color: #fff;
 }
 .outliner-daily-picker-empty { /* spacer cell */ }
+
+/* Focus mode ancestry breadcrumb */
+.outliner-focus-ancestry {
+    font-size: 11px;
+    color: var(--outliner-subtext-color, #888);
+    padding: 2px 16px 0 44px;
+    line-height: 16px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    opacity: 0.7;
+    user-select: none;
+}
+.outliner-focus-ancestry-sep {
+    opacity: 0.5;
+}

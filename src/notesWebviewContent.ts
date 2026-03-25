@@ -160,6 +160,8 @@ export function getNotesWebviewContent(
                 </div>
                 <div class="outliner-search-bar">
                     <button class="notes-panel-toggle-btn" id="notesPanelToggleBtn" title="Show file panel"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg></button>
+                    <button class="outliner-nav-back-btn" title="Back" disabled><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
+                    <button class="outliner-nav-forward-btn" title="Forward" disabled><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></button>
                     <button class="outliner-search-mode-toggle" title="Toggle search mode: Tree / Focus"></button>
                     <input type="text" class="outliner-search-input" placeholder="Search... (e.g. #tag, keyword, is:page)" />
                     <button class="outliner-undo-btn" title="Undo (Cmd+Z)" disabled></button>
@@ -167,8 +169,6 @@ export function getNotesWebviewContent(
                     <button class="outliner-menu-btn" title="Menu"></button>
                 </div>
                 <div class="outliner-pinned-nav-bar" style="display:none">
-                    <div class="outliner-pinned-tags-area"></div>
-                    <div class="outliner-pinned-nav-spacer"></div>
                     <div class="outliner-daily-nav-area" style="display:none">
                         <button class="outliner-daily-btn" id="dailyNavToday">Today</button>
                         <button class="outliner-daily-btn outliner-daily-btn-sm" id="dailyNavPrev">&lt;</button>
@@ -184,6 +184,7 @@ export function getNotesWebviewContent(
                             <div class="outliner-daily-picker-grid" id="dailyPickerGrid"></div>
                         </div>
                     </div>
+                    <div class="outliner-pinned-tags-area"></div>
                 </div>
                 <div class="outliner-breadcrumb"></div>
                 <div class="outliner-tree" role="tree"></div>
