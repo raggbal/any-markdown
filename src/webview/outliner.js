@@ -167,6 +167,7 @@ var Outliner = (function() {
         renderTree();
         setupSearchBar();
         setupDailyNavBar();
+        setupPinnedSettingsButton();
         updatePinnedTagBar();
         setupKeyHandlers();
         setupContextMenu();
@@ -1946,8 +1947,28 @@ var Outliner = (function() {
 
     // --- 検索 ---
 
+    var searchClearBtn = null;
+
+    function updateSearchClearButton() {
+        if (searchClearBtn) {
+            searchClearBtn.style.display = (searchInput && searchInput.value.length > 0) ? '' : 'none';
+        }
+    }
+
     function setupSearchBar() {
         if (!searchInput) { return; }
+
+        // クリアボタン
+        searchClearBtn = document.querySelector('.outliner-search-clear-btn');
+        if (searchClearBtn) {
+            searchClearBtn.addEventListener('mousedown', function(e) { e.preventDefault(); });
+            searchClearBtn.addEventListener('click', function() {
+                clearSearch();
+                updatePinnedTagBar();
+                updateSearchClearButton();
+                if (focusedNodeId) { focusNode(focusedNodeId); }
+            });
+        }
 
         var debounceTimer = null;
         var isSearchComposing = false;
@@ -1959,10 +1980,13 @@ var Outliner = (function() {
             isSearchComposing = false;
             clearTimeout(debounceTimer);
             executeSearch();
+            updateSearchClearButton();
         });
 
         searchInput.addEventListener('input', function() {
             if (isSearchComposing) return;
+            updatePinnedTagBar();
+            updateSearchClearButton();
             clearTimeout(debounceTimer);
             debounceTimer = setTimeout(function() {
                 executeSearch();
@@ -2049,16 +2073,6 @@ var Outliner = (function() {
             dropdown.appendChild(setPageDirItem);
         }
 
-        // 固定タグ設定
-        var pinnedTagsItem = document.createElement('button');
-        pinnedTagsItem.className = 'menu-item';
-        pinnedTagsItem.textContent = i18n.outlinerPinnedTags || 'Pinned tags...';
-        pinnedTagsItem.addEventListener('click', function() {
-            dropdown.remove();
-            openPinnedTagsDialog();
-        });
-        dropdown.appendChild(pinnedTagsItem);
-
         // 検索バーを基準に配置
         var searchBar = document.querySelector('.outliner-search-bar');
         searchBar.style.position = 'relative';
@@ -2102,12 +2116,22 @@ var Outliner = (function() {
         listEl.className = 'pinned-tags-list';
         dialog.appendChild(listEl);
 
+        var dragSrcIdx = null;
+
         function renderTagList() {
             listEl.innerHTML = '';
             for (var i = 0; i < pinnedTags.length; i++) {
                 (function(idx) {
                     var row = document.createElement('div');
                     row.className = 'pinned-tag-row';
+                    row.draggable = true;
+                    row.dataset.idx = idx;
+
+                    // ドラッグハンドル
+                    var handle = document.createElement('span');
+                    handle.className = 'pinned-tag-drag-handle';
+                    handle.textContent = '\u2261'; // ≡ (hamburger)
+
                     var input = document.createElement('input');
                     input.type = 'text';
                     input.className = 'pinned-tag-input';
@@ -2133,6 +2157,60 @@ var Outliner = (function() {
                         updatePinnedTagBar();
                         syncToHostImmediate();
                     });
+
+                    // D&D イベント
+                    row.addEventListener('dragstart', function(e) {
+                        dragSrcIdx = idx;
+                        row.classList.add('is-dragging');
+                        e.dataTransfer.effectAllowed = 'move';
+                    });
+                    row.addEventListener('dragend', function() {
+                        row.classList.remove('is-dragging');
+                        dragSrcIdx = null;
+                        // ドロップインジケーターを全クリア
+                        var rows = listEl.querySelectorAll('.pinned-tag-row');
+                        for (var r = 0; r < rows.length; r++) {
+                            rows[r].classList.remove('drag-over-above', 'drag-over-below');
+                        }
+                    });
+                    row.addEventListener('dragover', function(e) {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'move';
+                        // ドロップ位置インジケーター
+                        var rect = row.getBoundingClientRect();
+                        var midY = rect.top + rect.height / 2;
+                        var rows = listEl.querySelectorAll('.pinned-tag-row');
+                        for (var r = 0; r < rows.length; r++) {
+                            rows[r].classList.remove('drag-over-above', 'drag-over-below');
+                        }
+                        if (e.clientY < midY) {
+                            row.classList.add('drag-over-above');
+                        } else {
+                            row.classList.add('drag-over-below');
+                        }
+                    });
+                    row.addEventListener('dragleave', function() {
+                        row.classList.remove('drag-over-above', 'drag-over-below');
+                    });
+                    row.addEventListener('drop', function(e) {
+                        e.preventDefault();
+                        row.classList.remove('drag-over-above', 'drag-over-below');
+                        if (dragSrcIdx === null || dragSrcIdx === idx) return;
+                        // 挿入位置を計算
+                        var rect = row.getBoundingClientRect();
+                        var midY = rect.top + rect.height / 2;
+                        var targetIdx = e.clientY < midY ? idx : idx + 1;
+                        // 配列を並べ替え
+                        var tag = pinnedTags.splice(dragSrcIdx, 1)[0];
+                        if (dragSrcIdx < targetIdx) { targetIdx--; }
+                        pinnedTags.splice(targetIdx, 0, tag);
+                        dragSrcIdx = null;
+                        renderTagList();
+                        updatePinnedTagBar();
+                        syncToHostImmediate();
+                    });
+
+                    row.appendChild(handle);
                     row.appendChild(input);
                     row.appendChild(delBtn);
                     listEl.appendChild(row);
@@ -2220,6 +2298,7 @@ var Outliner = (function() {
         searchInput.value = '';
         currentSearchResult = null;
         renderTree();
+        updateSearchClearButton();
     }
 
     function updateSearchModeButton() {
@@ -2320,6 +2399,7 @@ var Outliner = (function() {
         // 5. ツリー再描画
         renderTree();
         updatePinnedTagBar();
+        updateSearchClearButton();
     }
 
     function updateNavButtons() {
@@ -2980,7 +3060,7 @@ var Outliner = (function() {
                 btn.className = 'outliner-pinned-tag-btn';
                 btn.textContent = pinnedTags[i];
                 btn.dataset.tag = pinnedTags[i];
-                if (searchInput && searchInput.value.trim() === pinnedTags[i]) {
+                if (isTagInSearchText(searchInput ? searchInput.value.trim() : '', pinnedTags[i])) {
                     btn.classList.add('is-active');
                 }
                 btn.addEventListener('click', handlePinnedTagClick);
@@ -2994,10 +3074,29 @@ var Outliner = (function() {
             dailyArea.style.display = isDailyNotes ? 'flex' : 'none';
         }
 
-        // バー全体の表示制御: 固定タグかDailyNavのどちらかがあれば表示
-        var hasTags = pinnedTags.length > 0;
-        var hasDaily = isDailyNotes;
-        bar.style.display = (hasTags || hasDaily) ? 'flex' : 'none';
+    }
+
+    /** 検索テキスト内にタグがトークンとして含まれているか判定 */
+    function isTagInSearchText(text, tag) {
+        if (!text || !tag) return false;
+        var tokens = text.split(/\s+/);
+        for (var i = 0; i < tokens.length; i++) {
+            if (tokens[i] === tag) return true;
+        }
+        return false;
+    }
+
+    /** 検索テキストからタグトークンを除去（前後のスペースも整理） */
+    function removeTagFromSearchText(text, tag) {
+        if (!text || !tag) return '';
+        var tokens = text.split(/\s+/);
+        var result = [];
+        for (var i = 0; i < tokens.length; i++) {
+            if (tokens[i] !== tag) {
+                result.push(tokens[i]);
+            }
+        }
+        return result.join(' ');
     }
 
     function handlePinnedTagClick(e) {
@@ -3006,33 +3105,50 @@ var Outliner = (function() {
         pushNavState();
         isNavigating = true;
 
-        // トグル: 同じタグで検索中ならクリア
-        if (searchInput && searchInput.value.trim() === tag) {
-            clearSearch();
-            updatePinnedTagBar();
-            isNavigating = false;
-            updateNavButtons();
-            return;
+        var currentText = searchInput ? searchInput.value.trim() : '';
+        var isActive = isTagInSearchText(currentText, tag);
+
+        if (isActive) {
+            // OFF: 検索テキストからタグを除去
+            var newText = removeTagFromSearchText(currentText, tag);
+            searchInput.value = newText;
+            if (newText.trim()) {
+                executeSearch();
+            } else {
+                clearSearch();
+            }
+        } else {
+            // ON: scope out + フォーカスモード + タグ追記
+            if (currentScope.type === 'subtree') {
+                currentScope = { type: 'document' };
+                updateBreadcrumb();
+            }
+            if (!searchFocusMode) {
+                searchFocusMode = true;
+                updateSearchModeButton();
+            }
+            if (currentText) {
+                searchInput.value = currentText + ' ' + tag;
+            } else {
+                searchInput.value = tag;
+            }
+            executeSearch();
         }
 
-        // 1. Scope out
-        if (currentScope.type === 'subtree') {
-            currentScope = { type: 'document' };
-            updateBreadcrumb();
-        }
-
-        // 2. フォーカスモードに切り替え
-        if (!searchFocusMode) {
-            searchFocusMode = true;
-            updateSearchModeButton();
-        }
-
-        // 3. 検索実行
-        searchInput.value = tag;
-        executeSearch();
         updatePinnedTagBar();
+        updateSearchClearButton();
         isNavigating = false;
         updateNavButtons();
+    }
+
+    function setupPinnedSettingsButton() {
+        var pinnedSettingsBtn = document.querySelector('.outliner-pinned-settings-btn');
+        if (pinnedSettingsBtn) {
+            pinnedSettingsBtn.addEventListener('mousedown', function(e) { e.preventDefault(); });
+            pinnedSettingsBtn.addEventListener('click', function() {
+                openPinnedTagsDialog();
+            });
+        }
     }
 
     function setupDailyNavBar() {

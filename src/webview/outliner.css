@@ -107,16 +107,38 @@ body {
     border-color: var(--vscode-focusBorder, #007acc);
 }
 
+.outliner-search-input-wrapper {
+    flex: 1;
+    position: relative;
+    display: flex;
+    align-items: center;
+}
 .outliner-search-input {
     flex: 1;
     background: var(--outliner-search-bg);
     border: 1px solid var(--outliner-search-border);
     border-radius: 4px;
     color: var(--outliner-search-fg);
-    padding: 6px 10px;
+    padding: 6px 26px 6px 10px;
     font-size: 13px;
     outline: none;
     font-family: inherit;
+}
+.outliner-search-clear-btn {
+    position: absolute;
+    right: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 2px;
+    opacity: 0.5;
+    color: var(--outliner-search-fg);
+    line-height: 0;
+}
+.outliner-search-clear-btn:hover {
+    opacity: 1;
 }
 
 .outliner-search-input:focus {
@@ -834,7 +856,7 @@ body {
 
 /* ── Pinned Tags & Daily Notes Nav Bar (統合バー) ── */
 .outliner-pinned-nav-bar {
-    display: none;
+    display: flex;
     align-items: center;
     gap: 6px;
     padding: 4px 16px;
@@ -842,6 +864,22 @@ body {
     flex-shrink: 0;
     position: relative;
     flex-wrap: wrap;
+}
+.outliner-pinned-nav-spacer {
+    flex-grow: 1;
+}
+.outliner-pinned-settings-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 2px 4px;
+    opacity: 0.5;
+    color: var(--outliner-text);
+    flex-shrink: 0;
+    line-height: 0;
+}
+.outliner-pinned-settings-btn:hover {
+    opacity: 1;
 }
 .outliner-pinned-tags-area {
     display: flex;
@@ -922,6 +960,30 @@ body {
     align-items: center;
     gap: 6px;
     margin-bottom: 4px;
+    cursor: grab;
+}
+.pinned-tag-row.is-dragging {
+    opacity: 0.4;
+}
+.pinned-tag-row.drag-over-above {
+    border-top: 2px solid var(--vscode-focusBorder, #007acc);
+    margin-top: -2px;
+}
+.pinned-tag-row.drag-over-below {
+    border-bottom: 2px solid var(--vscode-focusBorder, #007acc);
+    margin-bottom: 2px;
+}
+.pinned-tag-drag-handle {
+    cursor: grab;
+    opacity: 0.4;
+    font-size: 16px;
+    user-select: none;
+    flex-shrink: 0;
+    width: 16px;
+    text-align: center;
+}
+.pinned-tag-drag-handle:hover {
+    opacity: 0.8;
 }
 .pinned-tag-input {
     flex: 1;
