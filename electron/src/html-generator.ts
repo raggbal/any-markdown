@@ -278,6 +278,10 @@ interface ElectronOutlinerConfig {
     enableDebugLogging: boolean;
     mainFolderPath: string;
     panelCollapsed: boolean;
+    structure?: unknown;
+    panelWidth?: number;
+    fileChangeId?: number;
+    outlinerPageTitle?: boolean;
 }
 
 interface OutlinerFileEntry {
@@ -298,6 +302,17 @@ export function generateOutlinerHtml(
     const stylesPath = getResourcePath('src/webview/styles.css');
     const editorStyles = fs.readFileSync(stylesPath, 'utf8')
         .replace('__FONT_SIZE__', String(config.fontSize));
+
+    // Load Notes shared CSS/HTML
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const notesBodyHtml = require(getResourcePath('out/shared/notes-body-html.js'));
+    const { css: notesCss, html: notesHtml } = notesBodyHtml.generateNotesFilePanelHtml({
+        collapsed: config.panelCollapsed,
+    });
+
+    // Load Notes file panel JS
+    const notesFilePanelScript = fs.readFileSync(
+        getResourcePath('out/shared/notes-file-panel.js'), 'utf8');
 
     // Load scripts
     const editorUtilsScript = fs.readFileSync(
@@ -327,7 +342,7 @@ export function generateOutlinerHtml(
     // i18n messages
     const msg = config.webviewMessages || {};
 
-    // Side panel HTML (same structure as outlinerWebviewContent.ts)
+    // Side panel HTML (same structure as notesWebviewContent.ts)
     const sidePanelHtml = `
         <div class="side-panel" id="sidePanel">
             <aside class="side-panel-sidebar" id="sidePanelSidebar">
@@ -362,6 +377,9 @@ export function generateOutlinerHtml(
                         <button class="side-panel-header-btn" data-action="redo" title="Redo"></button>
                         <button class="side-panel-header-btn" data-action="source" title="Source mode"></button>
                     </div>
+                    <button class="side-panel-copy-path" id="sidePanelCopyPath" title="Copy file path">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                    </button>
                     <button class="side-panel-open-tab" id="sidePanelOpenTab" title="Open in new tab">
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
                     </button>
@@ -374,9 +392,6 @@ export function generateOutlinerHtml(
             </div>
         </div>
         <div class="side-panel-overlay" id="sidePanelOverlay"></div>`;
-
-    // Left panel collapsed class
-    const panelClass = config.panelCollapsed ? ' collapsed' : '';
 
     return `<!DOCTYPE html>
 <html lang="en" data-theme="${config.theme}">
@@ -391,90 +406,45 @@ export function generateOutlinerHtml(
     <style>${editorStyles}</style>
     <style>${outlinerCss}</style>
     <link rel="stylesheet" href="${vendorFileUriStr('katex.min.css')}">
-    <style>
-        /* Electron outliner layout */
-        .electron-outliner-layout {
-            display: flex; height: 100vh; overflow: hidden;
-        }
-        .outliner-file-panel {
-            width: 220px; min-width: 0; flex-shrink: 0;
-            border-right: 1px solid var(--outliner-border, #e0e0e0);
-            display: flex; flex-direction: column;
-            background: var(--outliner-bg, #fafafa);
-            transition: width 0.2s;
-            overflow: hidden;
-        }
-        .outliner-file-panel.collapsed { width: 0; border-right: none; }
-        .file-panel-header {
-            display: flex; align-items: center; justify-content: space-between;
-            padding: 12px 12px 8px; border-bottom: 1px solid var(--outliner-border, #e0e0e0);
-            min-height: 44px;
-        }
-        .file-panel-title { font-weight: 600; font-size: 13px; white-space: nowrap; }
-        .file-panel-actions { display: flex; gap: 4px; }
-        .file-panel-btn {
-            background: none; border: none; font-size: 16px; cursor: pointer;
-            padding: 2px 6px; border-radius: 4px; color: inherit; line-height: 1;
-        }
-        .file-panel-btn:hover { background: var(--outliner-hover, #e8e8e8); }
-        .file-panel-list { flex: 1; overflow-y: auto; padding: 4px 0; }
-        .file-panel-item {
-            padding: 8px 12px; cursor: pointer; font-size: 13px;
-            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-            border-radius: 4px; margin: 1px 4px;
-        }
-        .file-panel-item:hover { background: var(--outliner-hover, #e8e8e8); }
-        .file-panel-item.active { background: var(--outliner-active, #d8e8f8); font-weight: 500; }
-        .file-panel-empty {
-            padding: 16px 12px; color: var(--outliner-subtext, #999); font-size: 12px; text-align: center;
-        }
-        .outliner-main-wrapper { flex: 1; overflow: hidden; display: flex; flex-direction: column; position: relative; }
-        .panel-toggle-btn {
-            position: absolute; top: 8px; left: 8px; z-index: 10;
-            background: var(--outliner-bg, #fafafa); border: 1px solid var(--outliner-border, #e0e0e0);
-            border-radius: 4px; cursor: pointer; padding: 4px 6px; font-size: 14px; line-height: 1;
-            display: none; color: inherit;
-        }
-        .outliner-file-panel.collapsed ~ .outliner-main-wrapper .panel-toggle-btn { display: block; }
-        .file-panel-rename-input {
-            width: 100%; padding: 4px 8px; font-size: 13px; border: 1px solid var(--outliner-active, #4a9eff);
-            border-radius: 3px; outline: none; background: var(--outliner-bg, #fff); color: inherit;
-        }
-        .file-panel-context-menu {
-            position: fixed; background: var(--outliner-bg, #fff); border: 1px solid var(--outliner-border, #ddd);
-            border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); padding: 4px 0; z-index: 1000;
-            min-width: 140px;
-        }
-        .file-panel-context-item {
-            padding: 6px 16px; cursor: pointer; font-size: 13px; white-space: nowrap;
-        }
-        .file-panel-context-item:hover { background: var(--outliner-hover, #e8e8e8); }
-        .file-panel-context-item.danger { color: #e55; }
-    </style>
+    <style>${notesCss}</style>
 </head>
 <body>
-    <div class="electron-outliner-layout">
-        <aside class="outliner-file-panel${panelClass}" id="outlinerFilePanel">
-            <div class="file-panel-header">
-                <span class="file-panel-title">Outlines</span>
-                <div class="file-panel-actions">
-                    <button class="file-panel-btn" id="filePanelAdd" title="New Outline">+</button>
-                    <button class="file-panel-btn" id="filePanelCollapse" title="Collapse panel">◀</button>
-                </div>
-            </div>
-            <div class="file-panel-list" id="outlinerFileList"></div>
-        </aside>
-
-        <div class="outliner-main-wrapper">
-            <button class="panel-toggle-btn" id="panelToggleBtn" title="Show file panel">▶</button>
+    <div class="notes-layout">
+        ${notesHtml}
+        <div class="notes-main-wrapper">
             <div class="outliner-container">
-                <div class="outliner-page-title" style="display:none;">
+                <div class="outliner-page-title" style="${config.outlinerPageTitle !== false ? '' : 'display:none;'}">
                     <input type="text" class="outliner-page-title-input" placeholder="Untitled" />
                 </div>
                 <div class="outliner-search-bar">
+                    <button class="notes-panel-toggle-btn" id="notesPanelToggleBtn" title="Show file panel"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg></button>
+                    <button class="outliner-nav-back-btn" title="Back" disabled><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
+                    <button class="outliner-nav-forward-btn" title="Forward" disabled><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></button>
                     <button class="outliner-search-mode-toggle" title="Toggle search mode: Tree / Focus"></button>
-                    <input type="text" class="outliner-search-input" placeholder="Search... (e.g. #tag, keyword, is:page)" />
+                    <div class="outliner-search-input-wrapper"><input type="text" class="outliner-search-input" placeholder="Search... (e.g. #tag, keyword, is:page)" /><button class="outliner-search-clear-btn" style="display:none" title="Clear search"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+                    <button class="outliner-undo-btn" title="Undo (Cmd+Z)" disabled></button>
+                    <button class="outliner-redo-btn" title="Redo (Cmd+Shift+Z)" disabled></button>
                     <button class="outliner-menu-btn" title="Menu"></button>
+                </div>
+                <div class="outliner-pinned-nav-bar">
+                    <div class="outliner-daily-nav-area" style="display:none">
+                        <button class="outliner-daily-btn" id="dailyNavToday">Today</button>
+                        <button class="outliner-daily-btn outliner-daily-btn-sm" id="dailyNavPrev">&lt;</button>
+                        <button class="outliner-daily-btn outliner-daily-btn-sm" id="dailyNavNext">&gt;</button>
+                        <button class="outliner-daily-btn outliner-daily-btn-sm" id="dailyNavCalendar"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></button>
+                        <div class="outliner-daily-picker" id="dailyNavPicker" style="display:none">
+                            <div class="outliner-daily-picker-header">
+                                <button class="outliner-daily-picker-nav" id="dailyPickerPrevMonth">&lt;</button>
+                                <span class="outliner-daily-picker-title" id="dailyPickerTitle"></span>
+                                <button class="outliner-daily-picker-nav" id="dailyPickerNextMonth">&gt;</button>
+                            </div>
+                            <div class="outliner-daily-picker-weekdays"><span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span></div>
+                            <div class="outliner-daily-picker-grid" id="dailyPickerGrid"></div>
+                        </div>
+                    </div>
+                    <div class="outliner-pinned-tags-area"></div>
+                    <div class="outliner-pinned-nav-spacer"></div>
+                    <button class="outliner-pinned-settings-btn" title="Pinned tag settings"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
                 </div>
                 <div class="outliner-breadcrumb"></div>
                 <div class="outliner-tree" role="tree"></div>
@@ -492,12 +462,14 @@ export function generateOutlinerHtml(
     <script>
         window.__SKIP_EDITOR_AUTO_INIT__ = true;
         window.__outlinerMessages = ${JSON.stringify(config.webviewMessages || {})};
+        window.__initialFileChangeId = ${config.fileChangeId || 0};
     </script>
     <script>${editorUtilsScript}</script>
     <script>${editorScript}</script>
     <script>${outlinerModelScript}</script>
     <script>${outlinerSearchScript}</script>
     <script>${outlinerScript}</script>
+    <script>${notesFilePanelScript}</script>
     <script>
         try {
             var initialData = JSON.parse(decodeURIComponent(escape(atob('${base64Content}'))));
@@ -506,178 +478,26 @@ export function generateOutlinerHtml(
             console.error('[Outliner] Failed to initialize:', e);
             Outliner.init({ version: 1, rootIds: [], nodes: {} });
         }
-    </script>
-    <script>
-        // Left file panel management
-        (function() {
-            var fileList = ${JSON.stringify(fileList)};
-            var currentFile = ${JSON.stringify(currentFilePath)};
-            var listEl = document.getElementById('outlinerFileList');
-            var panelEl = document.getElementById('outlinerFilePanel');
-            var addBtn = document.getElementById('filePanelAdd');
-            var collapseBtn = document.getElementById('filePanelCollapse');
-            var toggleBtn = document.getElementById('panelToggleBtn');
-            var contextMenu = null;
+        // Initialize notes file panel (shared with VSCode)
+        notesFilePanel.init(
+            window.notesHostBridge,
+            ${JSON.stringify(fileList)},
+            ${JSON.stringify(currentFilePath)},
+            ${JSON.stringify(config.structure || null)},
+            ${JSON.stringify(config.panelWidth || null)}
+        );
 
-            function renderList(files, activeFilePath) {
-                listEl.innerHTML = '';
-                if (files.length === 0) {
-                    listEl.innerHTML = '<div class="file-panel-empty">No outlines yet.<br>Click + to create one.</div>';
-                    return;
-                }
-                files.forEach(function(f) {
-                    var item = document.createElement('div');
-                    item.className = 'file-panel-item' + (f.filePath === activeFilePath ? ' active' : '');
-                    item.textContent = f.title || 'Untitled';
-                    item.title = f.filePath;
-                    item.dataset.filePath = f.filePath;
-                    item.addEventListener('click', function() {
-                        if (f.filePath !== currentFile) {
-                            window.outlinerFilePanelBridge.openFile(f.filePath);
-                        }
-                    });
-                    item.addEventListener('dblclick', function(e) {
-                        e.stopPropagation();
-                        startRename(item, f);
-                    });
-                    item.addEventListener('contextmenu', function(e) {
-                        e.preventDefault();
-                        showContextMenu(e, f);
-                    });
-                    listEl.appendChild(item);
-                });
-            }
-
-            function startRename(itemEl, file) {
-                var input = document.createElement('input');
-                input.className = 'file-panel-rename-input';
-                input.value = file.title || '';
-                input.type = 'text';
-                itemEl.textContent = '';
-                itemEl.appendChild(input);
-                input.focus();
-                input.select();
-                var done = false;
-                function finish() {
-                    if (done) return;
-                    done = true;
-                    var val = input.value.trim();
-                    if (val && val !== file.title) {
-                        window.outlinerFilePanelBridge.renameTitle(file.filePath, val);
-                    } else {
-                        itemEl.textContent = file.title || 'Untitled';
-                    }
-                }
-                input.addEventListener('blur', finish);
-                input.addEventListener('keydown', function(e) {
-                    if (e.key === 'Enter') { finish(); }
-                    if (e.key === 'Escape') { done = true; itemEl.textContent = file.title || 'Untitled'; }
-                });
-            }
-
-            function showContextMenu(e, file) {
-                closeContextMenu();
-                contextMenu = document.createElement('div');
-                contextMenu.className = 'file-panel-context-menu';
-                contextMenu.style.left = e.clientX + 'px';
-                contextMenu.style.top = e.clientY + 'px';
-
-                var renameItem = document.createElement('div');
-                renameItem.className = 'file-panel-context-item';
-                renameItem.textContent = 'Rename';
-                renameItem.addEventListener('click', function() {
-                    closeContextMenu();
-                    var itemEl = listEl.querySelector('[data-file-path="' + CSS.escape(file.filePath) + '"]');
-                    if (itemEl) startRename(itemEl, file);
-                });
-
-                var deleteItem = document.createElement('div');
-                deleteItem.className = 'file-panel-context-item danger';
-                deleteItem.textContent = 'Delete';
-                deleteItem.addEventListener('click', function() {
-                    closeContextMenu();
-                    window.outlinerFilePanelBridge.deleteFile(file.filePath);
-                });
-
-                contextMenu.appendChild(renameItem);
-                contextMenu.appendChild(deleteItem);
-                document.body.appendChild(contextMenu);
-
-                setTimeout(function() {
-                    document.addEventListener('click', closeContextMenu, { once: true });
-                }, 0);
-            }
-
-            function closeContextMenu() {
-                if (contextMenu && contextMenu.parentNode) {
-                    contextMenu.parentNode.removeChild(contextMenu);
-                    contextMenu = null;
+        // File drop support
+        document.addEventListener('dragover', function(e) { e.preventDefault(); });
+        document.addEventListener('drop', function(e) {
+            e.preventDefault();
+            if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                var filePath = e.dataTransfer.files[0].path;
+                if (filePath) {
+                    window.fileDrop.open(filePath);
                 }
             }
-
-            addBtn.addEventListener('click', function() {
-                // Create inline input in the file list for title entry
-                var inputRow = document.createElement('div');
-                inputRow.className = 'file-panel-item active';
-                var input = document.createElement('input');
-                input.className = 'file-panel-rename-input';
-                input.type = 'text';
-                input.value = '';
-                input.placeholder = 'Enter title...';
-                inputRow.appendChild(input);
-                listEl.insertBefore(inputRow, listEl.firstChild);
-                input.focus();
-                var done = false;
-                function finish() {
-                    if (done) return;
-                    done = true;
-                    var val = input.value.trim();
-                    if (inputRow.parentNode) inputRow.parentNode.removeChild(inputRow);
-                    if (val) {
-                        window.outlinerFilePanelBridge.createFile(val);
-                    }
-                }
-                input.addEventListener('blur', finish);
-                input.addEventListener('keydown', function(e) {
-                    if (e.key === 'Enter') { finish(); }
-                    if (e.key === 'Escape') { done = true; if (inputRow.parentNode) inputRow.parentNode.removeChild(inputRow); }
-                });
-            });
-
-            collapseBtn.addEventListener('click', function() {
-                panelEl.classList.add('collapsed');
-                window.outlinerFilePanelBridge.togglePanel(true);
-            });
-
-            toggleBtn.addEventListener('click', function() {
-                panelEl.classList.remove('collapsed');
-                window.outlinerFilePanelBridge.togglePanel(false);
-            });
-
-            // Listen for file list updates from main process
-            window.outlinerFilePanelBridge.onFileListChanged(function(newList, newCurrentFile) {
-                fileList = newList;
-                if (newCurrentFile) currentFile = newCurrentFile;
-                renderList(fileList, currentFile);
-            });
-
-            // File list updates are handled by onFileListChanged callback below.
-
-            // Initial render
-            renderList(fileList, currentFile);
-
-            // File drop support
-            document.addEventListener('dragover', function(e) { e.preventDefault(); });
-            document.addEventListener('drop', function(e) {
-                e.preventDefault();
-                if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-                    var filePath = e.dataTransfer.files[0].path;
-                    if (filePath) {
-                        window.fileDrop.open(filePath);
-                    }
-                }
-            });
-        })();
+        });
     </script>
 </body>
 </html>`;

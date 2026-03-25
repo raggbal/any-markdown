@@ -14,9 +14,16 @@ export interface ElectronSettings {
     imageDefaultDir: string;
     forceRelativeImagePath: boolean;
     enableDebugLogging: boolean;
+    // Outliner settings
+    outlinerPageTitle: boolean;
+    linkOpenMode: string;
+    // S3 settings
+    s3AccessKeyId: string;
+    s3SecretAccessKey: string;
+    s3Region: string;
+    // Window state
     windowBounds?: { x: number; y: number; width: number; height: number };
     recentFiles?: string[];
-    // Outliner settings
     outlinerPanelCollapsed?: boolean;
     lastOutlinerFolder?: string;
     lastOutlinerFile?: string;
@@ -30,6 +37,11 @@ const DEFAULTS: ElectronSettings = {
     imageDefaultDir: '',
     forceRelativeImagePath: false,
     enableDebugLogging: false,
+    outlinerPageTitle: true,
+    linkOpenMode: 'sidePanel',
+    s3AccessKeyId: '',
+    s3SecretAccessKey: '',
+    s3Region: 'us-east-1',
     recentFiles: [],
 };
 
@@ -75,7 +87,7 @@ export class SettingsManager {
 
         this.settingsWindow = new BrowserWindow({
             width: 480,
-            height: 540,
+            height: 780,
             parent: parentWindow,
             modal: false,
             resizable: false,
@@ -171,6 +183,35 @@ export class SettingsManager {
         <input type="checkbox" id="forceRelativeImagePath" ${settings.forceRelativeImagePath ? 'checked' : ''} onchange="save('forceRelativeImagePath', this.checked)">
     </div>
     <div class="field-desc">When enabled, image paths in Markdown are always saved as relative paths, even if Default Dir is absolute.</div>
+
+    <h2>Outliner</h2>
+    <div class="field">
+        <label>Show Page Title</label>
+        <input type="checkbox" id="outlinerPageTitle" ${settings.outlinerPageTitle ? 'checked' : ''} onchange="save('outlinerPageTitle', this.checked)">
+    </div>
+    <div class="field-desc">Show the page title input field at the top of the outliner.</div>
+    <div class="field">
+        <label>Link Open Mode</label>
+        <select id="linkOpenMode" onchange="save('linkOpenMode', this.value)">
+            <option value="sidePanel" ${settings.linkOpenMode === 'sidePanel' ? 'selected' : ''}>Side Panel</option>
+            <option value="tab" ${settings.linkOpenMode === 'tab' ? 'selected' : ''}>New Tab</option>
+        </select>
+    </div>
+    <div class="field-desc">How to open linked Markdown files from the editor.</div>
+
+    <h2>S3 Sync</h2>
+    <div class="field field-text">
+        <label>Access Key ID</label>
+        <input type="text" id="s3AccessKeyId" value="${settings.s3AccessKeyId}" onchange="save('s3AccessKeyId', this.value)" placeholder="AKIA...">
+    </div>
+    <div class="field field-text">
+        <label>Secret Access Key</label>
+        <input type="password" id="s3SecretAccessKey" value="${settings.s3SecretAccessKey}" onchange="save('s3SecretAccessKey', this.value)" placeholder="(hidden)">
+    </div>
+    <div class="field field-text">
+        <label>Region</label>
+        <input type="text" id="s3Region" value="${settings.s3Region}" onchange="save('s3Region', this.value)" placeholder="us-east-1">
+    </div>
 
     <h2>Advanced</h2>
     <div class="field">

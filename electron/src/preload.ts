@@ -53,39 +53,62 @@ contextBridge.exposeInMainWorld('welcomeBridge', {
     createOutlinerFolder: () => ipcRenderer.send('welcome-create-outliner-folder'),
 });
 
-// Outliner host bridge (outliner.js expects window.outlinerHostBridge)
+// ── fileChangeId tracking (for stale syncData prevention) ──
+let currentFileChangeId = 0;
+ipcRenderer.on('host-message', (_event: unknown, message: unknown) => {
+    const msg = message as Record<string, unknown>;
+    if (msg && msg.type === 'updateData' && msg.fileChangeId !== undefined) {
+        currentFileChangeId = msg.fileChangeId as number;
+    }
+});
+
+// ── Outliner flush helper ──
+// notes-host-bridge.js calls Outliner.flushSync() before file switches.
+// In Electron preload, we can't call into the renderer's Outliner object directly,
+// but the notes-message handler on the main process calls fileManager.flushSave()
+// before file switches, so this is handled server-side.
+
+/**
+ * Outliner host bridge (outliner.js expects window.outlinerHostBridge)
+ * Sends messages through 'notes-message' IPC channel to be handled
+ * by handleNotesMessage() in main process.
+ */
 contextBridge.exposeInMainWorld('outlinerHostBridge', {
     // Data sync
-    syncData: (json: string) => ipcRenderer.send('outliner-sync-data', json),
-    save: () => ipcRenderer.send('outliner-save'),
+    syncData: (json: string) => ipcRenderer.send('notes-message', {
+        type: 'syncData', content: json, fileChangeId: currentFileChangeId
+    }),
+    save: () => ipcRenderer.send('notes-message', { type: 'save' }),
 
     // Page operations
     makePage: (nodeId: string, pageId: string, title: string) =>
-        ipcRenderer.send('outliner-make-page', nodeId, pageId, title),
-    openPage: (nodeId: string, pageId: string) =>
-        ipcRenderer.send('outliner-open-page', nodeId, pageId),
-    removePage: (nodeId: string, pageId: string) =>
-        ipcRenderer.send('outliner-remove-page', nodeId, pageId),
-    setPageDir: () => ipcRenderer.send('outliner-set-page-dir'),
-    openPageInSidePanel: (nodeId: string, pageId: string) =>
-        ipcRenderer.send('outliner-open-page-in-side-panel', nodeId, pageId),
+        ipcRenderer.send('notes-message', { type: 'makePage', nodeId, pageId, title }),
+    openPage: (_nodeId: string, pageId: string) =>
+        ipcRenderer.send('notes-message', { type: 'openPage', pageId }),
+    removePage: (_nodeId: string, pageId: string) =>
+        ipcRenderer.send('notes-message', { type: 'removePage', pageId }),
+    setPageDir: () => ipcRenderer.send('notes-message', { type: 'setPageDir' }),
+    openPageInSidePanel: (_nodeId: string, pageId: string) =>
+        ipcRenderer.send('notes-message', { type: 'openPageInSidePanel', pageId }),
 
-    // Side panel (reuse existing IPC channels)
+    // Side panel
     saveSidePanelFile: (filePath: string, content: string) =>
-        ipcRenderer.send('save-side-panel-file', filePath, content),
-    notifySidePanelClosed: () => ipcRenderer.send('side-panel-closed'),
+        ipcRenderer.send('notes-message', { type: 'saveSidePanelFile', filePath, content }),
+    notifySidePanelClosed: () =>
+        ipcRenderer.send('notes-message', { type: 'sidePanelClosed' }),
     sidePanelOpenLink: (href: string, spPath: string) =>
-        ipcRenderer.send('side-panel-open-link', href, spPath),
-    openLinkInTab: (href: string) => ipcRenderer.send('open-link-in-tab', href),
+        ipcRenderer.send('notes-message', { type: 'sidePanelOpenLink', href, sidePanelFilePath: spPath }),
+    openLinkInTab: (href: string) =>
+        ipcRenderer.send('notes-message', { type: 'openLinkInTab', href }),
     getSidePanelImageDir: (spPath: string) =>
-        ipcRenderer.send('outliner-get-side-panel-image-dir', spPath),
+        ipcRenderer.send('notes-message', { type: 'getSidePanelImageDir', sidePanelFilePath: spPath }),
     requestInsertImage: (spPath: string) =>
-        ipcRenderer.send('outliner-insert-image', spPath),
+        ipcRenderer.send('notes-message', { type: 'insertImage', sidePanelFilePath: spPath }),
     requestSetImageDir: (_spPath: string) => { /* no-op in outliner */ },
     saveImageAndInsert: (dataUrl: string, fileName: string, spPath: string) =>
-        ipcRenderer.send('outliner-save-image', dataUrl, fileName, spPath),
+        ipcRenderer.send('notes-message', { type: 'saveImageAndInsert', dataUrl, fileName, sidePanelFilePath: spPath }),
     readAndInsertImage: (filePath: string, spPath: string) =>
-        ipcRenderer.send('outliner-read-insert-image', filePath, spPath),
+        ipcRenderer.send('notes-message', { type: 'readAndInsertImage', filePath, sidePanelFilePath: spPath }),
     searchFiles: (query: string) => ipcRenderer.send('search-files', query),
 
     // No-ops (called by EditorInstance in side panel but not needed in outliner)
@@ -93,10 +116,21 @@ contextBridge.exposeInMainWorld('outlinerHostBridge', {
     createPageAuto: () => {},
     updatePageH1: () => {},
 
+    // Daily Notes navigation (called by outliner.js)
+    postDailyNotes: (type: string, dayOffset: unknown, currentDate?: string) => {
+        // Flush outliner sync before navigation
+        ipcRenderer.send('notes-message', { type: 'save' });
+        if (type === 'notesNavigateToDate') {
+            ipcRenderer.send('notes-message', { type: 'notesNavigateToDate', targetDate: dayOffset });
+        } else {
+            ipcRenderer.send('notes-message', { type, dayOffset: dayOffset || 0, currentDate: currentDate || null });
+        }
+    },
+
     // Links & focus
-    openLink: (href: string) => ipcRenderer.send('open-link', href),
-    reportFocus: () => ipcRenderer.send('focus'),
-    reportBlur: () => ipcRenderer.send('blur'),
+    openLink: (href: string) => ipcRenderer.send('notes-message', { type: 'openLink', href }),
+    reportFocus: () => ipcRenderer.send('notes-message', { type: 'webviewFocus' }),
+    reportBlur: () => ipcRenderer.send('notes-message', { type: 'webviewBlur' }),
 
     // Host message receiver
     onMessage: (handler: (message: unknown) => void) => {
@@ -104,17 +138,144 @@ contextBridge.exposeInMainWorld('outlinerHostBridge', {
     },
 });
 
-// Left file panel bridge (Electron outliner only)
-contextBridge.exposeInMainWorld('outlinerFilePanelBridge', {
-    listFiles: () => ipcRenderer.sendSync('outliner-list-files'),
-    openFile: (filePath: string) => ipcRenderer.send('outliner-open-file', filePath),
-    createFile: (title: string) => ipcRenderer.send('outliner-create-file', title),
-    deleteFile: (filePath: string) => ipcRenderer.send('outliner-delete-file', filePath),
+/**
+ * Notes file panel bridge (notes-file-panel.js expects window.notesHostBridge)
+ * Mirrors the interface defined in notes-host-bridge.js but uses Electron IPC.
+ */
+contextBridge.exposeInMainWorld('notesHostBridge', {
+    // File operations
+    openFile: (filePath: string) => {
+        // Flush outliner sync before file switch
+        ipcRenderer.send('notes-message', { type: 'save' });
+        ipcRenderer.send('notes-message', { type: 'notesOpenFile', filePath });
+    },
+    createFile: (title: string, parentId?: string) =>
+        ipcRenderer.send('notes-message', { type: 'notesCreateFile', title, parentId: parentId || null }),
+    deleteFile: (filePath: string) =>
+        ipcRenderer.send('notes-message', { type: 'notesDeleteFile', filePath }),
     renameTitle: (filePath: string, newTitle: string) =>
-        ipcRenderer.send('outliner-rename-title', filePath, newTitle),
-    togglePanel: (collapsed: boolean) => ipcRenderer.send('outliner-toggle-panel', collapsed),
-    onFileListChanged: (handler: (list: unknown, currentFilePath?: string) => void) =>
-        ipcRenderer.on('outliner-file-list-changed', (_e: unknown, list: unknown, currentFilePath?: string) => handler(list, currentFilePath)),
+        ipcRenderer.send('notes-message', { type: 'notesRenameTitle', filePath, newTitle }),
+    togglePanel: (collapsed: boolean) =>
+        ipcRenderer.send('notes-message', { type: 'notesTogglePanel', collapsed }),
+
+    // Folder operations
+    createFolder: (title: string, parentId?: string) =>
+        ipcRenderer.send('notes-message', { type: 'notesCreateFolder', title, parentId: parentId || null }),
+    deleteFolder: (folderId: string) =>
+        ipcRenderer.send('notes-message', { type: 'notesDeleteFolder', folderId }),
+    renameFolder: (folderId: string, newTitle: string) =>
+        ipcRenderer.send('notes-message', { type: 'notesRenameFolder', folderId, newTitle }),
+    toggleFolder: (folderId: string) =>
+        ipcRenderer.send('notes-message', { type: 'notesToggleFolder', folderId }),
+
+    // D&D move
+    moveItem: (itemId: string, targetParentId: string | null, index: number) =>
+        ipcRenderer.send('notes-message', { type: 'notesMoveItem', itemId, targetParentId, index }),
+
+    // Daily Notes
+    openDailyNotes: () => {
+        ipcRenderer.send('notes-message', { type: 'save' });
+        ipcRenderer.send('notes-message', { type: 'notesOpenDailyNotes' });
+    },
+    navigateDailyNotes: (dayOffset: number, currentDate?: string) => {
+        ipcRenderer.send('notes-message', { type: 'save' });
+        ipcRenderer.send('notes-message', { type: 'notesNavigateDailyNotes', dayOffset, currentDate: currentDate || null });
+    },
+
+    // Panel width
+    savePanelWidth: (width: number) =>
+        ipcRenderer.send('notes-message', { type: 'notesSavePanelWidth', width }),
+
+    // Search
+    search: (query: string, options: { caseSensitive: boolean; wholeWord: boolean; useRegex: boolean }) => {
+        ipcRenderer.send('notes-message', { type: 'save' });
+        ipcRenderer.send('notes-message', {
+            type: 'notesSearch', query,
+            caseSensitive: options.caseSensitive,
+            wholeWord: options.wholeWord,
+            useRegex: options.useRegex,
+        });
+    },
+    jumpToNode: (fileId: string, nodeId: string) => {
+        ipcRenderer.send('notes-message', { type: 'save' });
+        ipcRenderer.send('notes-message', { type: 'notesJumpToNode', fileId, nodeId });
+    },
+    jumpToMdPage: (outFileId: string, pageId: string, lineNumber?: number) => {
+        ipcRenderer.send('notes-message', { type: 'save' });
+        ipcRenderer.send('notes-message', { type: 'notesJumpToMdPage', outFileId, pageId, lineNumber });
+    },
+    openMdFileExternal: (filePath: string) =>
+        ipcRenderer.send('notes-message', { type: 'notesOpenMdExternal', filePath }),
+
+    // Search event listeners
+    onSearchStart: (handler: (searchId: number, query: string) => void) => {
+        ipcRenderer.on('host-message', (_event: unknown, message: unknown) => {
+            const msg = message as Record<string, unknown>;
+            if (msg && msg.type === 'notesSearchStart') {
+                handler(msg.searchId as number, msg.query as string);
+            }
+        });
+    },
+    onSearchPartial: (handler: (searchId: number, result: unknown) => void) => {
+        ipcRenderer.on('host-message', (_event: unknown, message: unknown) => {
+            const msg = message as Record<string, unknown>;
+            if (msg && msg.type === 'notesSearchPartial') {
+                handler(msg.searchId as number, msg.result);
+            }
+        });
+    },
+    onSearchEnd: (handler: (searchId: number) => void) => {
+        ipcRenderer.on('host-message', (_event: unknown, message: unknown) => {
+            const msg = message as Record<string, unknown>;
+            if (msg && msg.type === 'notesSearchEnd') {
+                handler(msg.searchId as number);
+            }
+        });
+    },
+
+    // File list changed listener
+    onFileListChanged: (handler: (fileList: unknown, currentFile: unknown, structure: unknown) => void) => {
+        ipcRenderer.on('host-message', (_event: unknown, message: unknown) => {
+            const msg = message as Record<string, unknown>;
+            if (msg && msg.type === 'notesFileListChanged') {
+                handler(msg.fileList, msg.currentFile, msg.structure);
+            }
+        });
+    },
+
+    // S3 Sync
+    s3Sync: (bucketPath: string) => {
+        ipcRenderer.send('notes-message', { type: 'save' });
+        ipcRenderer.send('notes-message', { type: 'notesS3Sync', bucketPath });
+    },
+    s3RemoteDeleteAndUpload: (bucketPath: string) => {
+        ipcRenderer.send('notes-message', { type: 'save' });
+        ipcRenderer.send('notes-message', { type: 'notesS3RemoteDeleteUpload', bucketPath });
+    },
+    s3LocalDeleteAndDownload: (bucketPath: string) => {
+        ipcRenderer.send('notes-message', { type: 'save' });
+        ipcRenderer.send('notes-message', { type: 'notesS3LocalDeleteDownload', bucketPath });
+    },
+    s3SaveBucketPath: (bucketPath: string) =>
+        ipcRenderer.send('notes-message', { type: 'notesS3SaveBucketPath', bucketPath }),
+    s3GetStatus: () =>
+        ipcRenderer.send('notes-message', { type: 'notesS3GetStatus' }),
+    onS3Progress: (handler: (data: unknown) => void) => {
+        ipcRenderer.on('host-message', (_event: unknown, message: unknown) => {
+            const msg = message as Record<string, unknown>;
+            if (msg && msg.type === 'notesS3Progress') {
+                handler(msg);
+            }
+        });
+    },
+    onS3Status: (handler: (data: unknown) => void) => {
+        ipcRenderer.on('host-message', (_event: unknown, message: unknown) => {
+            const msg = message as Record<string, unknown>;
+            if (msg && msg.type === 'notesS3Status') {
+                handler(msg);
+            }
+        });
+    },
 });
 
 // File drop bridge (shared by all modes)

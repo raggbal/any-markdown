@@ -1,6 +1,6 @@
 {
   "name": "any-markdown-desktop",
-  "version": "0.195.503",
+  "version": "0.195.534",
   "description": "Any Markdown — WYSIWYG Markdown editor for desktop",
   "main": "out/main.js",
   "author": {
@@ -59,7 +59,18 @@
       {
         "from": "../out/shared",
         "to": "out/shared",
-        "filter": ["editor-body-html.js"]
+        "filter": [
+          "editor-body-html.js",
+          "notes-body-html.js",
+          "notes-file-panel.js",
+          "notes-file-manager.js",
+          "notes-message-handler.js",
+          "notes-host-bridge.js"
+        ]
+      },
+      {
+        "from": "../out/notes-s3-sync.js",
+        "to": "out/notes-s3-sync.js"
       }
     ],
     "mac": {

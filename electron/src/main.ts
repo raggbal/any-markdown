@@ -4,7 +4,6 @@ import * as fs from 'fs';
 import { FileManager } from './file-manager';
 import { SettingsManager } from './settings-manager';
 import { generateEditorHtml, generateOutlinerHtml, generateWelcomeHtml, extractToc, writeHtmlToTempFile } from './html-generator';
-import { OutlinerFileManager } from './outliner-file-manager';
 import { buildMenu } from './menu';
 import { setupUpdateChecker, checkForUpdates } from './updater';
 import * as chokidar from 'chokidar';
@@ -15,7 +14,31 @@ import * as chokidar from 'chokidar';
 
 const settingsManager = new SettingsManager();
 const windows = new Map<BrowserWindow, FileManager>();
-const outlinerManagers = new Map<BrowserWindow, OutlinerFileManager>();
+
+// ── Shared module loading ──
+
+function getSharedModulePath(relativePath: string): string {
+    // Dev: project root / relativePath
+    const devPath = path.join(__dirname, '..', '..', relativePath);
+    if (fs.existsSync(devPath)) return devPath;
+    // Packaged: resourcesPath / relativePath
+    const resPath = process.resourcesPath || '';
+    const prodPath = path.join(resPath, relativePath);
+    if (fs.existsSync(prodPath)) return prodPath;
+    console.error(`[main] Shared module NOT FOUND: ${relativePath}`);
+    return devPath; // fallback
+}
+
+// Load shared NotesFileManager and handleNotesMessage at startup
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { NotesFileManager } = require(getSharedModulePath('out/shared/notes-file-manager.js'));
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { handleNotesMessage } = require(getSharedModulePath('out/shared/notes-message-handler.js'));
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { s3Sync: s3SyncFn, s3RemoteDeleteAndUpload: s3RemoteDeleteAndUploadFn, s3LocalDeleteAndDownload: s3LocalDeleteAndDownloadFn } = require(getSharedModulePath('out/notes-s3-sync.js'));
+
+// NotesFileManager instances per window
+const notesManagers = new Map<BrowserWindow, InstanceType<typeof NotesFileManager>>();
 
 // ── Side Panel File Watcher ──
 const sidePanelWatchers = new Map<BrowserWindow, { watcher: chokidar.FSWatcher; filePath: string; isOwnWrite: boolean }>();
@@ -65,8 +88,6 @@ function generateUniqueFileName(dir: string, extension: string): string {
     }
 }
 
-/** サイドパネル用の設定を生成 */
-
 /** .md/.markdown ファイルをサイドパネルで開く */
 function openInSidePanel(win: BrowserWindow, resolvedPath: string): void {
     try {
@@ -74,7 +95,6 @@ function openInSidePanel(win: BrowserWindow, resolvedPath: string): void {
         const fileName = path.basename(resolvedPath);
         const fileDir = path.dirname(resolvedPath);
         const toc = extractToc(content);
-        // Send markdown directly — editor.js creates EditorInstance in same webview
         const documentBaseUri = 'file://' + (fileDir.startsWith('/') ? '' : '/') + fileDir.replace(/\\/g, '/') + '/';
         win.webContents.send('host-message', {
             type: 'openSidePanel',
@@ -100,11 +120,8 @@ function getI18nMessages(): Record<string, string> {
     };
     const localeKey = localeMap[lang] || lang.split('-')[0];
 
-    // Try multiple paths for compiled locale .js files
     const tryPaths = [
-        // Dev: root project out/locales/
         path.join(__dirname, '..', '..', 'out', 'locales', `${localeKey}.js`),
-        // Packaged: extraResources/locales/
         path.join(process.resourcesPath || '', 'locales', `${localeKey}.js`),
     ];
 
@@ -113,7 +130,6 @@ function getI18nMessages(): Record<string, string> {
             try {
                 delete require.cache[require.resolve(p)];
                 const mod = require(p);
-                // Locale files export: { messages, webviewMessages }
                 if (mod.webviewMessages) {
                     console.log(`[i18n] Loaded ${localeKey} from ${p}`);
                     return mod.webviewMessages;
@@ -128,41 +144,305 @@ function getI18nMessages(): Record<string, string> {
     return {};
 }
 
+// ── Notes Platform Actions (Electron implementation) ──
+
+function createNotesSender(win: BrowserWindow): { postMessage: (msg: unknown) => void } {
+    return {
+        postMessage: (msg: unknown) => {
+            if (!win.isDestroyed()) {
+                win.webContents.send('host-message', msg);
+            }
+        }
+    };
+}
+
+function createNotesPlatformActions(win: BrowserWindow): Record<string, unknown> {
+    const sender: S3Sender = {
+        postMessage: (message: unknown) => {
+            if (!win.isDestroyed()) win.webContents.send('host-message', message);
+        }
+    };
+    return {
+        openExternalLink: (href: string) => {
+            if (href.startsWith('http://') || href.startsWith('https://')) {
+                shell.openExternal(href);
+            }
+        },
+        openFileInEditor: (filePath: string) => {
+            createWindow(filePath);
+        },
+        openPageInSidePanel: (filePath: string, _lineNumber?: number) => {
+            if (fs.existsSync(filePath)) {
+                openInSidePanel(win, filePath);
+            }
+        },
+        requestInsertImage: async (sidePanelFilePath: string) => {
+            const result = await dialog.showOpenDialog(win, {
+                filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp'] }],
+                properties: ['openFile'],
+            });
+            if (result.canceled || result.filePaths.length === 0) return;
+            const srcFile = result.filePaths[0];
+            const spDir = path.dirname(sidePanelFilePath);
+            const imageDir = path.join(spDir, 'images');
+            if (!fs.existsSync(imageDir)) fs.mkdirSync(imageDir, { recursive: true });
+            const fileName = path.basename(srcFile);
+            const destPath = path.join(imageDir, fileName);
+            try {
+                fs.copyFileSync(srcFile, destPath);
+                const markdownPath = `images/${fileName}`;
+                const displayUri = fileUri(destPath);
+                win.webContents.send('host-message', {
+                    type: 'sidePanelMessage',
+                    data: { type: 'insertImageHtml', markdownPath, displayUri }
+                });
+            } catch (e) {
+                console.error('[notes-insert-image] Error:', e);
+            }
+        },
+        savePanelCollapsed: (collapsed: boolean) => {
+            settingsManager.set('outlinerPanelCollapsed', collapsed);
+        },
+        requestSetPageDir: async () => {
+            const nfm = notesManagers.get(win);
+            if (!nfm || !nfm.getCurrentFilePath()) return;
+            const result = await dialog.showOpenDialog(win, {
+                properties: ['openDirectory'],
+                title: 'Select Page Directory',
+            });
+            if (result.canceled || result.filePaths.length === 0) return;
+            const selectedDir = result.filePaths[0];
+            try {
+                const content = fs.readFileSync(nfm.getCurrentFilePath()!, 'utf8');
+                const data = JSON.parse(content);
+                const outDir = path.dirname(nfm.getCurrentFilePath()!);
+                const relPath = path.relative(outDir, selectedDir);
+                data.pageDir = relPath.startsWith('.') ? relPath : './' + relPath;
+                const newJson = JSON.stringify(data, null, 2);
+                fs.writeFileSync(nfm.getCurrentFilePath()!, newJson, 'utf8');
+                win.webContents.send('host-message', { type: 'pageDirChanged', pageDir: data.pageDir });
+            } catch (e) {
+                console.error('[notes-set-page-dir] Error:', e);
+            }
+        },
+        saveImageToDir: (dataUrl: string, fileName: string, sidePanelFilePath: string) => {
+            const spDir = path.dirname(sidePanelFilePath);
+            const imageDir = path.join(spDir, 'images');
+            if (!fs.existsSync(imageDir)) fs.mkdirSync(imageDir, { recursive: true });
+            const name = fileName || generateUniqueFileName(imageDir, 'png');
+            const destPath = path.join(imageDir, name);
+            try {
+                const matches = dataUrl.match(/^data:image\/\w+;base64,(.+)$/);
+                if (!matches) return;
+                fs.writeFileSync(destPath, Buffer.from(matches[1], 'base64'));
+                const markdownPath = `images/${name}`;
+                const displayUri = fileUri(destPath);
+                win.webContents.send('host-message', {
+                    type: 'sidePanelMessage',
+                    data: { type: 'insertImageHtml', markdownPath, displayUri }
+                });
+            } catch (e) {
+                console.error('[notes-save-image] Error:', e);
+            }
+        },
+        readAndInsertImage: (filePath: string, sidePanelFilePath: string) => {
+            const spDir = path.dirname(sidePanelFilePath);
+            const imageDir = path.join(spDir, 'images');
+            if (!fs.existsSync(imageDir)) fs.mkdirSync(imageDir, { recursive: true });
+            const fileName = path.basename(filePath);
+            const destPath = path.join(imageDir, fileName);
+            try {
+                fs.copyFileSync(filePath, destPath);
+                const markdownPath = `images/${fileName}`;
+                const displayUri = fileUri(destPath);
+                win.webContents.send('host-message', {
+                    type: 'sidePanelMessage',
+                    data: { type: 'insertImageHtml', markdownPath, displayUri }
+                });
+            } catch (e) {
+                console.error('[notes-read-insert-image] Error:', e);
+            }
+        },
+        sendSidePanelImageDir: (sidePanelFilePath: string) => {
+            const spDir = path.dirname(sidePanelFilePath);
+            const imageDir = path.join(spDir, 'images');
+            const docBaseUri = 'file://' + (spDir.startsWith('/') ? '' : '/') + spDir.replace(/\\/g, '/') + '/';
+            win.webContents.send('host-message', {
+                type: 'sidePanelMessage',
+                data: {
+                    type: 'setImageDir',
+                    dirPath: imageDir,
+                    forceRelativePath: true,
+                    documentBaseUri: docBaseUri,
+                }
+            });
+        },
+        saveSidePanelFile: async (filePath: string, content: string) => {
+            const state = sidePanelWatchers.get(win);
+            if (state) state.isOwnWrite = true;
+            try {
+                fs.writeFileSync(filePath, content, 'utf8');
+            } catch (e) {
+                console.error('[notes-save-side-panel-file] Error:', e);
+            }
+            if (state) setTimeout(() => { state.isOwnWrite = false; }, 200);
+        },
+        handleSidePanelOpenLink: (href: string, sidePanelFilePath: string) => {
+            if (href.startsWith('http://') || href.startsWith('https://')) {
+                shell.openExternal(href);
+            } else if (href.startsWith('#')) {
+                win.webContents.send('host-message', {
+                    type: 'sidePanelMessage',
+                    data: { type: 'scrollToAnchor', anchor: href.substring(1) }
+                });
+            } else {
+                const spDir = path.dirname(sidePanelFilePath);
+                const resolvedPath = href.startsWith('/') ? href : path.resolve(spDir, href);
+                const lc = resolvedPath.toLowerCase();
+                if (lc.endsWith('.md') || lc.endsWith('.markdown')) {
+                    openInSidePanel(win, resolvedPath);
+                } else {
+                    shell.openPath(resolvedPath);
+                }
+            }
+        },
+        handleSidePanelClosed: () => {
+            disposeSidePanelWatcher(win);
+        },
+        openFileExternal: (filePath: string) => {
+            shell.openPath(filePath);
+        },
+        saveLastOpenedFile: (filePath: string) => {
+            settingsManager.set('lastOutlinerFile', filePath);
+        },
+        searchFiles: (query: string) => {
+            // Legacy search — not used for Notes search (which uses notesSearch message)
+            const fm = windows.get(win);
+            const docDir = fm?.getDocumentDir() || process.cwd();
+            const results = FileManager.searchMdFiles(docDir, query, 10);
+            win.webContents.send('host-message', {
+                type: 'fileSearchResults', results, query
+            });
+        },
+        // S3 Sync
+        s3Sync: (bucketPath: string) => {
+            runElectronS3Operation('s3Sync', bucketPath, win, sender);
+        },
+        s3RemoteDeleteAndUpload: (bucketPath: string) => {
+            runElectronS3Operation('s3RemoteDeleteAndUpload', bucketPath, win, sender);
+        },
+        s3LocalDeleteAndDownload: (bucketPath: string) => {
+            runElectronS3Operation('s3LocalDeleteAndDownload', bucketPath, win, sender);
+        },
+        s3GetStatus: () => {
+            const nfm = notesManagers.get(win);
+            if (!nfm) return;
+            const bucketPath = nfm.getS3BucketPath() || '';
+            const accessKey = settingsManager.get('s3AccessKeyId') || '';
+            const secretKey = settingsManager.get('s3SecretAccessKey') || '';
+            const hasCredentials = !!(accessKey && secretKey);
+            sender.postMessage({
+                type: 'notesS3Status',
+                bucketPath,
+                hasCredentials,
+                region: settingsManager.get('s3Region') || 'us-east-1',
+            });
+        },
+    };
+}
+
+// ── S3 Sync Helper ──
+
+interface S3Sender { postMessage(message: unknown): void; }
+
+async function runElectronS3Operation(
+    op: 's3Sync' | 's3RemoteDeleteAndUpload' | 's3LocalDeleteAndDownload',
+    bucketPath: string,
+    win: BrowserWindow,
+    sender: S3Sender,
+): Promise<void> {
+    const nfm = notesManagers.get(win);
+    if (!nfm) return;
+    nfm.flushSave();
+
+    const accessKeyId = settingsManager.get('s3AccessKeyId') || '';
+    const secretAccessKey = settingsManager.get('s3SecretAccessKey') || '';
+    const region = settingsManager.get('s3Region') || 'us-east-1';
+    if (!accessKeyId || !secretAccessKey) {
+        sender.postMessage({ type: 'notesS3Progress', phase: 'error', message: 'AWS credentials not configured. Set them in Preferences.' });
+        return;
+    }
+
+    const folderPath = (win as any).__outlinerFolderPath;
+    if (!folderPath) return;
+
+    const config = { accessKeyId, secretAccessKey, region, bucketPath, localPath: folderPath };
+    const onProgress = (p: { phase: string; message: string; currentFile?: string; filesProcessed?: number }) => {
+        sender.postMessage({ type: 'notesS3Progress', ...p });
+    };
+
+    try {
+        if (op === 's3Sync') {
+            await s3SyncFn(config, onProgress);
+        } else if (op === 's3RemoteDeleteAndUpload') {
+            await s3RemoteDeleteAndUploadFn(config, onProgress);
+        } else {
+            await s3LocalDeleteAndDownloadFn(config, onProgress);
+            sender.postMessage({ type: 'notesS3Progress', phase: 'complete', message: 'Local delete & download complete. Reopening...' });
+            await loadOutlinerMode(win, folderPath);
+            return;
+        }
+    } catch (e: unknown) {
+        const message = e instanceof Error ? e.message : String(e);
+        sender.postMessage({ type: 'notesS3Progress', phase: 'error', message });
+    }
+}
+
 // ── Outliner Mode ──
 
 async function loadOutlinerMode(win: BrowserWindow, folderPath: string, openFilePath?: string): Promise<void> {
-    // Dispose previous outliner manager if any
-    const oldOfm = outlinerManagers.get(win);
-    if (oldOfm) {
-        oldOfm.flushSave();
-        oldOfm.dispose();
+    // Dispose previous notes manager if any
+    const oldNfm = notesManagers.get(win);
+    if (oldNfm) {
+        oldNfm.flushSave();
+        oldNfm.dispose();
     }
 
-    const ofm = new OutlinerFileManager(win, folderPath);
-    outlinerManagers.set(win, ofm);
+    const nfm = new NotesFileManager(folderPath);
+    notesManagers.set(win, nfm);
+
+    // Load structure (creates outline.note if needed)
+    const structure = nfm.loadStructure();
 
     // Determine which file to open
     let filePath = openFilePath;
     if (!filePath) {
-        const files = ofm.listFiles();
-        if (files.length > 0) filePath = files[0].filePath;
+        const firstId = nfm.findFirstFileId();
+        if (firstId) {
+            filePath = nfm.getFilePathById(firstId);
+        }
     }
 
     let outJson = '';
     if (filePath) {
-        const content = ofm.openFile(filePath);
+        const content = nfm.openFile(filePath);
         outJson = content || '';
     }
 
-    const fileList = ofm.listFiles();
+    const fileList = nfm.listFiles();
+    const panelWidth = structure.panelWidth || undefined;
     const settings = settingsManager.getAll();
-    const html = generateOutlinerHtml(outJson, fileList, ofm.getCurrentFilePath(), {
+    const html = generateOutlinerHtml(outJson, fileList, nfm.getCurrentFilePath(), {
         theme: settings.theme,
         fontSize: settings.fontSize,
         webviewMessages: getI18nMessages(),
         enableDebugLogging: settings.enableDebugLogging,
         mainFolderPath: folderPath,
         panelCollapsed: settingsManager.get('outlinerPanelCollapsed') || false,
+        structure: structure,
+        panelWidth: panelWidth,
+        fileChangeId: nfm.getFileChangeId(),
+        outlinerPageTitle: settings.outlinerPageTitle !== false,
     });
     const tempFile = writeHtmlToTempFile(html);
     await win.loadFile(tempFile);
@@ -213,7 +493,7 @@ function createWindow(filePath?: string): BrowserWindow {
 
     // Capture renderer errors in main process console
     win.webContents.on('console-message', (_event, level, message) => {
-        if (level >= 2) { // warning and error
+        if (level >= 2) {
             console.error(`[renderer] ${message}`);
         }
     });
@@ -239,7 +519,6 @@ function createWindow(filePath?: string): BrowserWindow {
         const tempFile = writeHtmlToTempFile(html);
         console.log('[main] Loading tempFile:', tempFile);
         await win.loadFile(tempFile);
-        // Open DevTools for debugging (remove after stable)
         if (!app.isPackaged) {
             win.webContents.openDevTools();
         }
@@ -253,7 +532,6 @@ function createWindow(filePath?: string): BrowserWindow {
             }
         });
     } else {
-        // Show welcome screen when no file specified
         const settings = settingsManager.getAll();
         const welcomeHtml = generateWelcomeHtml(settings.theme);
         const tempFile = writeHtmlToTempFile(welcomeHtml);
@@ -263,11 +541,11 @@ function createWindow(filePath?: string): BrowserWindow {
     // Close handling
     win.on('close', async (e) => {
         // Outliner mode: flush save and close
-        const ofm = outlinerManagers.get(win);
-        if (ofm) {
-            if (ofm.isDirtyState()) {
+        const nfm = notesManagers.get(win);
+        if (nfm) {
+            if (nfm.isDirtyState()) {
                 e.preventDefault();
-                ofm.saveCurrentFileImmediate();
+                nfm.saveCurrentFileImmediate();
                 win.destroy();
             }
             return;
@@ -290,17 +568,16 @@ function createWindow(filePath?: string): BrowserWindow {
             } else if (response === 1) {
                 win.destroy();
             }
-            // response === 2 → Cancel, do nothing
         }
     });
 
     win.on('closed', () => {
         disposeSidePanelWatcher(win);
-        // Cleanup outliner manager
-        const ofm = outlinerManagers.get(win);
-        if (ofm) {
-            ofm.dispose();
-            outlinerManagers.delete(win);
+        // Cleanup notes manager
+        const nfm = notesManagers.get(win);
+        if (nfm) {
+            nfm.dispose();
+            notesManagers.delete(win);
         }
         fileManager.dispose();
         windows.delete(win);
@@ -313,7 +590,7 @@ function createWindow(filePath?: string): BrowserWindow {
     return win;
 }
 
-// ── IPC Handlers ──
+// ── IPC Handlers (Editor Mode) ──
 
 ipcMain.on('sync-content', (event, markdown: string) => {
     const win = BrowserWindow.fromWebContents(event.sender);
@@ -376,8 +653,6 @@ ipcMain.on('open-link-in-tab', (event, href: string) => {
 ipcMain.on('insert-link', async (event, text: string) => {
     const win = BrowserWindow.fromWebContents(event.sender);
     if (!win) return;
-    // Simple prompt using dialog (Electron has no built-in input dialog)
-    // Use executeJavaScript as a workaround
     const url = await win.webContents.executeJavaScript(
         `window.prompt('Enter URL:', 'https://')`
     );
@@ -466,7 +741,7 @@ ipcMain.on('open-in-text-editor', (event) => {
     if (fm) fm.openInTextEditor();
 });
 
-// ── Side Panel IPC ──
+// ── Side Panel IPC (Editor Mode) ──
 
 ipcMain.on('save-side-panel-file', (event, filePath: string, content: string) => {
     const win = BrowserWindow.fromWebContents(event.sender);
@@ -655,10 +930,11 @@ ipcMain.on('welcome-create-outliner-folder', async (event) => {
     });
     if (result.canceled || result.filePaths.length === 0) return;
     const folderPath = result.filePaths[0];
-    // Create an initial .out file
-    const tempOfm = new OutlinerFileManager(win, folderPath);
-    const filePath = tempOfm.createFile('default');
-    tempOfm.dispose();
+    // Create an initial .out file via NotesFileManager
+    const tempNfm = new NotesFileManager(folderPath);
+    tempNfm.loadStructure();
+    const filePath = tempNfm.createFile('default');
+    tempNfm.dispose();
     await loadOutlinerMode(win, folderPath, filePath);
 });
 
@@ -666,280 +942,20 @@ ipcMain.on('editing-state', () => { /* no-op for Electron */ });
 ipcMain.on('focus', () => { /* no-op */ });
 ipcMain.on('blur', () => { /* no-op */ });
 
-// ── Outliner IPC: Core Data ──
+// ── Notes Message Handler (unified IPC for outliner mode) ──
 
-ipcMain.on('outliner-sync-data', (event, json: string) => {
+ipcMain.on('notes-message', (event, message: any) => {
     const win = BrowserWindow.fromWebContents(event.sender);
     if (!win) return;
-    const ofm = outlinerManagers.get(win);
-    if (ofm) ofm.saveCurrentFile(json);
+    const nfm = notesManagers.get(win);
+    if (!nfm) return;
+
+    const sender = createNotesSender(win);
+    const platform = createNotesPlatformActions(win);
+    handleNotesMessage(message, nfm, sender, platform);
 });
 
-ipcMain.on('outliner-save', (event) => {
-    const win = BrowserWindow.fromWebContents(event.sender);
-    if (!win) return;
-    const ofm = outlinerManagers.get(win);
-    if (ofm) ofm.flushSave();
-});
-
-// ── Outliner IPC: Page Operations ──
-
-ipcMain.on('outliner-make-page', (event, _nodeId: string, pageId: string, title: string) => {
-    const win = BrowserWindow.fromWebContents(event.sender);
-    if (!win) return;
-    const ofm = outlinerManagers.get(win);
-    if (!ofm) return;
-    const pagesDir = ofm.getPagesDirPath();
-    if (!fs.existsSync(pagesDir)) fs.mkdirSync(pagesDir, { recursive: true });
-    const pagePath = path.join(pagesDir, `${pageId}.md`);
-    try {
-        fs.writeFileSync(pagePath, `# ${title}\n`, 'utf8');
-        win.webContents.send('host-message', { type: 'pageCreated', nodeId: _nodeId, pageId });
-    } catch (e) {
-        console.error('[outliner-make-page] Error:', e);
-    }
-});
-
-ipcMain.on('outliner-open-page', (event, _nodeId: string, pageId: string) => {
-    const win = BrowserWindow.fromWebContents(event.sender);
-    if (!win) return;
-    const ofm = outlinerManagers.get(win);
-    if (!ofm) return;
-    const pagePath = ofm.getPageFilePath(pageId);
-    if (fs.existsSync(pagePath)) {
-        createWindow(pagePath);
-    }
-});
-
-ipcMain.on('outliner-remove-page', (event, _nodeId: string, pageId: string) => {
-    const win = BrowserWindow.fromWebContents(event.sender);
-    if (!win) return;
-    const ofm = outlinerManagers.get(win);
-    if (!ofm) return;
-    const pagePath = ofm.getPageFilePath(pageId);
-    if (fs.existsSync(pagePath)) {
-        shell.trashItem(pagePath).catch(e => {
-            console.error('[outliner-remove-page] Trash error:', e);
-            try { fs.unlinkSync(pagePath); } catch { /* ignore */ }
-        });
-    }
-});
-
-ipcMain.on('outliner-set-page-dir', async (event) => {
-    const win = BrowserWindow.fromWebContents(event.sender);
-    if (!win) return;
-    const ofm = outlinerManagers.get(win);
-    if (!ofm || !ofm.getCurrentFilePath()) return;
-    const result = await dialog.showOpenDialog(win, {
-        properties: ['openDirectory'],
-        title: 'Select Page Directory',
-    });
-    if (result.canceled || result.filePaths.length === 0) return;
-    const selectedDir = result.filePaths[0];
-    // Update the .out file JSON
-    try {
-        const content = fs.readFileSync(ofm.getCurrentFilePath()!, 'utf8');
-        const data = JSON.parse(content);
-        // Store as relative path from .out file location
-        const outDir = path.dirname(ofm.getCurrentFilePath()!);
-        const relPath = path.relative(outDir, selectedDir);
-        data.pageDir = relPath.startsWith('.') ? relPath : './' + relPath;
-        const newJson = JSON.stringify(data, null, 2);
-        fs.writeFileSync(ofm.getCurrentFilePath()!, newJson, 'utf8');
-        win.webContents.send('host-message', { type: 'pageDirChanged', pageDir: data.pageDir });
-    } catch (e) {
-        console.error('[outliner-set-page-dir] Error:', e);
-    }
-});
-
-// ── Outliner IPC: Side Panel ──
-
-ipcMain.on('outliner-open-page-in-side-panel', (event, _nodeId: string, pageId: string) => {
-    const win = BrowserWindow.fromWebContents(event.sender);
-    if (!win) return;
-    const ofm = outlinerManagers.get(win);
-    if (!ofm) return;
-    const pagePath = ofm.getPageFilePath(pageId);
-    if (fs.existsSync(pagePath)) {
-        openInSidePanel(win, pagePath);
-    }
-});
-
-ipcMain.on('outliner-get-side-panel-image-dir', (event, spPath: string) => {
-    const win = BrowserWindow.fromWebContents(event.sender);
-    if (!win) return;
-    const spDir = path.dirname(spPath);
-    const imageDir = path.join(spDir, 'images');
-    const docBaseUri = 'file://' + (spDir.startsWith('/') ? '' : '/') + spDir.replace(/\\/g, '/') + '/';
-    win.webContents.send('host-message', {
-        type: 'sidePanelMessage',
-        data: {
-            type: 'setImageDir',
-            dirPath: imageDir,
-            forceRelativePath: true,
-            documentBaseUri: docBaseUri,
-        }
-    });
-});
-
-ipcMain.on('outliner-insert-image', async (event, spPath: string) => {
-    const win = BrowserWindow.fromWebContents(event.sender);
-    if (!win) return;
-    const result = await dialog.showOpenDialog(win, {
-        filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp'] }],
-        properties: ['openFile'],
-    });
-    if (result.canceled || result.filePaths.length === 0) return;
-    const srcFile = result.filePaths[0];
-    const spDir = path.dirname(spPath);
-    const imageDir = path.join(spDir, 'images');
-    if (!fs.existsSync(imageDir)) fs.mkdirSync(imageDir, { recursive: true });
-    const fileName = path.basename(srcFile);
-    const destPath = path.join(imageDir, fileName);
-    try {
-        fs.copyFileSync(srcFile, destPath);
-        const markdownPath = `images/${fileName}`;
-        const displayUri = fileUri(destPath);
-        win.webContents.send('host-message', {
-            type: 'sidePanelMessage',
-            data: { type: 'insertImageHtml', markdownPath, displayUri }
-        });
-    } catch (e) {
-        console.error('[outliner-insert-image] Error:', e);
-    }
-});
-
-ipcMain.on('outliner-save-image', (event, dataUrl: string, fileName: string, spPath: string) => {
-    const win = BrowserWindow.fromWebContents(event.sender);
-    if (!win) return;
-    const spDir = path.dirname(spPath);
-    const imageDir = path.join(spDir, 'images');
-    if (!fs.existsSync(imageDir)) fs.mkdirSync(imageDir, { recursive: true });
-    const name = fileName || generateUniqueFileName(imageDir, 'png');
-    const destPath = path.join(imageDir, name);
-    try {
-        const matches = dataUrl.match(/^data:image\/\w+;base64,(.+)$/);
-        if (!matches) return;
-        fs.writeFileSync(destPath, Buffer.from(matches[1], 'base64'));
-        const markdownPath = `images/${name}`;
-        const displayUri = fileUri(destPath);
-        win.webContents.send('host-message', {
-            type: 'sidePanelMessage',
-            data: { type: 'insertImageHtml', markdownPath, displayUri }
-        });
-    } catch (e) {
-        console.error('[outliner-save-image] Error:', e);
-    }
-});
-
-ipcMain.on('outliner-read-insert-image', (event, filePath: string, spPath: string) => {
-    const win = BrowserWindow.fromWebContents(event.sender);
-    if (!win) return;
-    const spDir = path.dirname(spPath);
-    const imageDir = path.join(spDir, 'images');
-    if (!fs.existsSync(imageDir)) fs.mkdirSync(imageDir, { recursive: true });
-    const fileName = path.basename(filePath);
-    const destPath = path.join(imageDir, fileName);
-    try {
-        fs.copyFileSync(filePath, destPath);
-        const markdownPath = `images/${fileName}`;
-        const displayUri = fileUri(destPath);
-        win.webContents.send('host-message', {
-            type: 'sidePanelMessage',
-            data: { type: 'insertImageHtml', markdownPath, displayUri }
-        });
-    } catch (e) {
-        console.error('[outliner-read-insert-image] Error:', e);
-    }
-});
-
-// ── Outliner IPC: Left File Panel ──
-
-ipcMain.on('outliner-list-files', (event) => {
-    const win = BrowserWindow.fromWebContents(event.sender);
-    if (!win) { event.returnValue = []; return; }
-    const ofm = outlinerManagers.get(win);
-    event.returnValue = ofm ? ofm.listFiles() : [];
-});
-
-ipcMain.on('outliner-open-file', (event, filePath: string) => {
-    const win = BrowserWindow.fromWebContents(event.sender);
-    if (!win) return;
-    const ofm = outlinerManagers.get(win);
-    if (!ofm) return;
-    // Flush current file before switching
-    ofm.flushSave();
-    const content = ofm.openFile(filePath);
-    if (content !== null) {
-        settingsManager.set('lastOutlinerFile', filePath);
-        const data = JSON.parse(content);
-        win.webContents.send('outliner-file-list-changed', ofm.listFiles(), filePath);
-        win.webContents.send('host-message', { type: 'updateData', data });
-    }
-});
-
-ipcMain.on('outliner-create-file', (event, title: string) => {
-    const win = BrowserWindow.fromWebContents(event.sender);
-    if (!win) return;
-    const ofm = outlinerManagers.get(win);
-    if (!ofm) return;
-    ofm.flushSave();
-    const filePath = ofm.createFile(title || 'Untitled');
-    const content = ofm.openFile(filePath);
-    if (content !== null) {
-        settingsManager.set('lastOutlinerFile', filePath);
-        const data = JSON.parse(content);
-        // Notify file list update
-        const fileList = ofm.listFiles();
-        win.webContents.send('outliner-file-list-changed', fileList, filePath);
-        win.webContents.send('host-message', { type: 'updateData', data });
-    }
-});
-
-ipcMain.on('outliner-delete-file', (event, filePath: string) => {
-    const win = BrowserWindow.fromWebContents(event.sender);
-    if (!win) return;
-    const ofm = outlinerManagers.get(win);
-    if (!ofm) return;
-    const wasCurrent = ofm.getCurrentFilePath() === filePath;
-    ofm.deleteFile(filePath);
-    const fileList = ofm.listFiles();
-    win.webContents.send('outliner-file-list-changed', fileList);
-    if (wasCurrent) {
-        if (fileList.length > 0) {
-            // Switch to first file
-            const content = ofm.openFile(fileList[0].filePath);
-            if (content !== null) {
-                settingsManager.set('lastOutlinerFile', fileList[0].filePath);
-                const data = JSON.parse(content);
-                win.webContents.send('outliner-file-list-changed', fileList, fileList[0].filePath);
-                win.webContents.send('host-message', { type: 'updateData', data });
-            }
-        } else {
-            // No files left — send empty state
-            win.webContents.send('host-message', {
-                type: 'updateData',
-                data: { title: '', rootIds: [], nodes: {} }
-            });
-        }
-    }
-});
-
-ipcMain.on('outliner-rename-title', (event, filePath: string, newTitle: string) => {
-    const win = BrowserWindow.fromWebContents(event.sender);
-    if (!win) return;
-    const ofm = outlinerManagers.get(win);
-    if (!ofm) return;
-    ofm.renameTitle(filePath, newTitle);
-    const fileList = ofm.listFiles();
-    win.webContents.send('outliner-file-list-changed', fileList);
-});
-
-ipcMain.on('outliner-toggle-panel', (_event, collapsed: boolean) => {
-    settingsManager.set('outlinerPanelCollapsed', collapsed);
-});
-
-// ── Outliner IPC: File Drop ──
+// ── File Drop IPC ──
 
 ipcMain.on('file-drop-open', (event, filePath: string) => {
     const win = BrowserWindow.fromWebContents(event.sender);
@@ -949,12 +965,11 @@ ipcMain.on('file-drop-open', (event, filePath: string) => {
         const folderPath = path.dirname(filePath);
         loadOutlinerMode(win, folderPath, filePath);
     } else if (lc.endsWith('.md') || lc.endsWith('.markdown')) {
-        // Open in new editor window
         createWindow(filePath);
     }
 });
 
-// ── Outliner IPC: Side panel image dir (for md mode, reused for insert-image) ──
+// ── Side panel image dir (for md mode) ──
 
 ipcMain.on('get-side-panel-image-dir', (event, spPath: string) => {
     const win = BrowserWindow.fromWebContents(event.sender);
@@ -992,13 +1007,13 @@ ipcMain.on('settings-save', async (_event, key: string, value: unknown) => {
         }
     }
     // Reload outliner windows
-    for (const [win, ofm] of outlinerManagers) {
+    for (const [win, nfm] of notesManagers) {
         if (win.isDestroyed()) continue;
         try {
-            ofm.flushSave();
+            nfm.flushSave();
             const reloadFn = (win as any).__loadOutlinerMode;
             if (reloadFn) {
-                await reloadFn(ofm.getCurrentFilePath() || undefined);
+                await reloadFn(nfm.getCurrentFilePath() || undefined);
             }
         } catch (e) {
             console.error('[settings-save] Failed to reload outliner window:', e);
@@ -1085,7 +1100,7 @@ app.whenReady().then(() => {
     if (outPaths.length > 0) {
         outPaths.forEach(fp => {
             const resolved = path.resolve(fp);
-            const w = createWindow(); // create window first (welcome screen)
+            const w = createWindow();
             if (!firstWindow) firstWindow = w;
             loadOutlinerMode(w, path.dirname(resolved), resolved);
         });
