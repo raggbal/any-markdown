@@ -826,15 +826,144 @@ body {
     transition: background 2s ease-out;
 }
 
-/* ── Daily Notes Nav Bar ── */
-.outliner-daily-nav {
+/* ── Pinned Tags & Daily Notes Nav Bar (統合バー) ── */
+.outliner-pinned-nav-bar {
     display: none;
     align-items: center;
     gap: 6px;
-    padding: 6px 16px;
+    padding: 4px 16px;
     border-bottom: 1px solid var(--outliner-border);
     flex-shrink: 0;
     position: relative;
+    flex-wrap: wrap;
+}
+.outliner-pinned-tags-area {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+.outliner-pinned-nav-spacer {
+    flex-grow: 1;
+}
+.outliner-daily-nav-area {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    position: relative;
+}
+.outliner-pinned-tag-btn {
+    padding: 2px 8px;
+    border: 1px solid var(--outliner-search-border, rgba(128,128,128,0.3));
+    border-radius: 12px;
+    background: var(--outliner-search-bg, transparent);
+    cursor: pointer;
+    font-size: 11px;
+    color: var(--outliner-tag-color, #0969da);
+    white-space: nowrap;
+    line-height: 1.4;
+}
+.outliner-pinned-tag-btn:hover {
+    border-color: var(--vscode-focusBorder, #007acc);
+}
+.outliner-pinned-tag-btn.is-active {
+    background: var(--vscode-focusBorder, #007acc);
+    color: #fff;
+    border-color: var(--vscode-focusBorder, #007acc);
+}
+
+/* ── Pinned Tags Dialog ── */
+.pinned-tags-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.3);
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.pinned-tags-dialog {
+    background: var(--outliner-bg, #fff);
+    border: 1px solid var(--outliner-border, #ddd);
+    border-radius: 8px;
+    padding: 16px;
+    min-width: 300px;
+    max-width: 400px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+}
+.pinned-tags-dialog-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    font-size: 14px;
+    font-weight: 600;
+}
+.pinned-tags-close {
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 18px;
+    opacity: 0.6;
+    color: inherit;
+    padding: 0 4px;
+}
+.pinned-tags-close:hover { opacity: 1; }
+.pinned-tags-list {
+    max-height: 300px;
+    overflow-y: auto;
+    margin-bottom: 8px;
+}
+.pinned-tag-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+}
+.pinned-tag-input {
+    flex: 1;
+    padding: 4px 8px;
+    border: 1px solid var(--outliner-search-border, rgba(128,128,128,0.3));
+    border-radius: 4px;
+    background: var(--outliner-search-bg, transparent);
+    color: inherit;
+    font-size: 13px;
+}
+.pinned-tag-delete {
+    border: none;
+    background: none;
+    cursor: pointer;
+    color: inherit;
+    opacity: 0.5;
+    font-size: 16px;
+    padding: 2px 6px;
+}
+.pinned-tag-delete:hover { opacity: 1; color: #d00; }
+.pinned-tags-add-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.pinned-tag-add-input {
+    flex: 1;
+    padding: 4px 8px;
+    border: 1px solid var(--outliner-search-border, rgba(128,128,128,0.3));
+    border-radius: 4px;
+    background: var(--outliner-search-bg, transparent);
+    color: inherit;
+    font-size: 13px;
+}
+.pinned-tag-add-btn {
+    padding: 4px 12px;
+    border: 1px solid var(--outliner-search-border, rgba(128,128,128,0.3));
+    border-radius: 4px;
+    background: var(--outliner-search-bg, transparent);
+    cursor: pointer;
+    font-size: 12px;
+    color: inherit;
+}
+.pinned-tag-add-btn:hover {
+    border-color: var(--vscode-focusBorder, #007acc);
 }
 .outliner-daily-btn {
     padding: 4px 10px;

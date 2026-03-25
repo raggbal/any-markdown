@@ -149,6 +149,9 @@ export function getOutlinerWebviewContent(
             <button class="outliner-redo-btn" title="Redo (Cmd+Shift+Z)" disabled></button>
             <button class="outliner-menu-btn" title="Menu"></button>
         </div>
+        <div class="outliner-pinned-nav-bar" style="display:none">
+            <div class="outliner-pinned-tags-area"></div>
+        </div>
         <div class="outliner-breadcrumb"></div>
         <div class="outliner-tree" role="tree"></div>
     </div>

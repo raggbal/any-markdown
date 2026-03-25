@@ -166,19 +166,23 @@ export function getNotesWebviewContent(
                     <button class="outliner-redo-btn" title="Redo (Cmd+Shift+Z)" disabled></button>
                     <button class="outliner-menu-btn" title="Menu"></button>
                 </div>
-                <div class="outliner-daily-nav" style="display:none">
-                    <button class="outliner-daily-btn" id="dailyNavToday">Today</button>
-                    <button class="outliner-daily-btn outliner-daily-btn-sm" id="dailyNavPrev">&lt;</button>
-                    <button class="outliner-daily-btn outliner-daily-btn-sm" id="dailyNavNext">&gt;</button>
-                    <button class="outliner-daily-btn outliner-daily-btn-sm" id="dailyNavCalendar"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></button>
-                    <div class="outliner-daily-picker" id="dailyNavPicker" style="display:none">
-                        <div class="outliner-daily-picker-header">
-                            <button class="outliner-daily-picker-nav" id="dailyPickerPrevMonth">&lt;</button>
-                            <span class="outliner-daily-picker-title" id="dailyPickerTitle"></span>
-                            <button class="outliner-daily-picker-nav" id="dailyPickerNextMonth">&gt;</button>
+                <div class="outliner-pinned-nav-bar" style="display:none">
+                    <div class="outliner-pinned-tags-area"></div>
+                    <div class="outliner-pinned-nav-spacer"></div>
+                    <div class="outliner-daily-nav-area" style="display:none">
+                        <button class="outliner-daily-btn" id="dailyNavToday">Today</button>
+                        <button class="outliner-daily-btn outliner-daily-btn-sm" id="dailyNavPrev">&lt;</button>
+                        <button class="outliner-daily-btn outliner-daily-btn-sm" id="dailyNavNext">&gt;</button>
+                        <button class="outliner-daily-btn outliner-daily-btn-sm" id="dailyNavCalendar"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></button>
+                        <div class="outliner-daily-picker" id="dailyNavPicker" style="display:none">
+                            <div class="outliner-daily-picker-header">
+                                <button class="outliner-daily-picker-nav" id="dailyPickerPrevMonth">&lt;</button>
+                                <span class="outliner-daily-picker-title" id="dailyPickerTitle"></span>
+                                <button class="outliner-daily-picker-nav" id="dailyPickerNextMonth">&gt;</button>
+                            </div>
+                            <div class="outliner-daily-picker-weekdays"><span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span></div>
+                            <div class="outliner-daily-picker-grid" id="dailyPickerGrid"></div>
                         </div>
-                        <div class="outliner-daily-picker-weekdays"><span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span></div>
-                        <div class="outliner-daily-picker-grid" id="dailyPickerGrid"></div>
                     </div>
                 </div>
                 <div class="outliner-breadcrumb"></div>

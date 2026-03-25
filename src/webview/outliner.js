@@ -26,6 +26,7 @@ var Outliner = (function() {
     var searchFocusMode = false;     // true: マッチノード頂点+子のみ, false: ルートまで表示
     var pageDir = null;              // outファイル個別のpageDir設定
     var sidePanelWidthSetting = null; // outファイル個別のサイドパネル幅
+    var pinnedTags = [];             // 固定タグ配列 (例: ['#TASK', '#TODO'])
     var searchModeToggleBtn = null;  // toggle button element
     var menuBtn = null;              // menu button element
     var undoBtn = null;              // undo button element
@@ -118,6 +119,10 @@ var Outliner = (function() {
         if (data && data.pageDir) {
             pageDir = data.pageDir;
         }
+        // JSONからpinnedTagsを復元
+        if (data && data.pinnedTags) {
+            pinnedTags = data.pinnedTags;
+        }
 
         treeEl = document.querySelector('.outliner-tree');
         searchInput = document.querySelector('.outliner-search-input');
@@ -152,6 +157,7 @@ var Outliner = (function() {
         renderTree();
         setupSearchBar();
         setupDailyNavBar();
+        updatePinnedTagBar();
         setupKeyHandlers();
         setupContextMenu();
         setupHostMessages();
@@ -1978,6 +1984,16 @@ var Outliner = (function() {
             dropdown.appendChild(setPageDirItem);
         }
 
+        // 固定タグ設定
+        var pinnedTagsItem = document.createElement('button');
+        pinnedTagsItem.className = 'menu-item';
+        pinnedTagsItem.textContent = i18n.outlinerPinnedTags || 'Pinned tags...';
+        pinnedTagsItem.addEventListener('click', function() {
+            dropdown.remove();
+            openPinnedTagsDialog();
+        });
+        dropdown.appendChild(pinnedTagsItem);
+
         // 検索バーを基準に配置
         var searchBar = document.querySelector('.outliner-search-bar');
         searchBar.style.position = 'relative';
@@ -1990,6 +2006,118 @@ var Outliner = (function() {
                 document.removeEventListener('click', closeMenu);
             }, { once: true });
         }, 0);
+    }
+
+    // --- 固定タグ設定ダイアログ ---
+
+    function openPinnedTagsDialog() {
+        // オーバーレイ
+        var overlay = document.createElement('div');
+        overlay.className = 'pinned-tags-overlay';
+
+        // ダイアログ
+        var dialog = document.createElement('div');
+        dialog.className = 'pinned-tags-dialog';
+
+        // ヘッダー
+        var header = document.createElement('div');
+        header.className = 'pinned-tags-dialog-header';
+        var title = document.createElement('span');
+        title.textContent = i18n.outlinerPinnedTags || 'Pinned Tags';
+        var closeBtn = document.createElement('button');
+        closeBtn.className = 'pinned-tags-close';
+        closeBtn.textContent = '\u00d7';
+        closeBtn.addEventListener('click', function() { overlay.remove(); });
+        header.appendChild(title);
+        header.appendChild(closeBtn);
+        dialog.appendChild(header);
+
+        // タグリスト
+        var listEl = document.createElement('div');
+        listEl.className = 'pinned-tags-list';
+        dialog.appendChild(listEl);
+
+        function renderTagList() {
+            listEl.innerHTML = '';
+            for (var i = 0; i < pinnedTags.length; i++) {
+                (function(idx) {
+                    var row = document.createElement('div');
+                    row.className = 'pinned-tag-row';
+                    var input = document.createElement('input');
+                    input.type = 'text';
+                    input.className = 'pinned-tag-input';
+                    input.value = pinnedTags[idx];
+                    input.addEventListener('change', function() {
+                        var val = input.value.trim();
+                        if (!val) {
+                            pinnedTags.splice(idx, 1);
+                            renderTagList();
+                        } else {
+                            if (val.charAt(0) !== '#') { val = '#' + val; }
+                            pinnedTags[idx] = val;
+                        }
+                        updatePinnedTagBar();
+                        syncToHostImmediate();
+                    });
+                    var delBtn = document.createElement('button');
+                    delBtn.className = 'pinned-tag-delete';
+                    delBtn.textContent = '\u00d7';
+                    delBtn.addEventListener('click', function() {
+                        pinnedTags.splice(idx, 1);
+                        renderTagList();
+                        updatePinnedTagBar();
+                        syncToHostImmediate();
+                    });
+                    row.appendChild(input);
+                    row.appendChild(delBtn);
+                    listEl.appendChild(row);
+                })(i);
+            }
+        }
+        renderTagList();
+
+        // 追加行
+        var addRow = document.createElement('div');
+        addRow.className = 'pinned-tags-add-row';
+        var addInput = document.createElement('input');
+        addInput.type = 'text';
+        addInput.className = 'pinned-tag-add-input';
+        addInput.placeholder = '#tagname';
+        var addBtn = document.createElement('button');
+        addBtn.className = 'pinned-tag-add-btn';
+        addBtn.textContent = 'Add';
+
+        function addTag() {
+            var val = addInput.value.trim();
+            if (!val) { return; }
+            if (val.charAt(0) !== '#') { val = '#' + val; }
+            // 重複チェック
+            for (var j = 0; j < pinnedTags.length; j++) {
+                if (pinnedTags[j] === val) { addInput.value = ''; return; }
+            }
+            pinnedTags.push(val);
+            addInput.value = '';
+            renderTagList();
+            updatePinnedTagBar();
+            syncToHostImmediate();
+        }
+
+        addBtn.addEventListener('click', addTag);
+        addInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') { e.preventDefault(); addTag(); }
+        });
+        addRow.appendChild(addInput);
+        addRow.appendChild(addBtn);
+        dialog.appendChild(addRow);
+
+        // オーバーレイクリックで閉じる
+        overlay.addEventListener('click', function(e) {
+            if (e.target === overlay) { overlay.remove(); }
+        });
+
+        overlay.appendChild(dialog);
+        document.body.appendChild(overlay);
+        addInput.focus();
     }
 
     function executeSearch() {
@@ -2677,18 +2805,75 @@ var Outliner = (function() {
         data.searchFocusMode = searchFocusMode;
         if (pageDir) { data.pageDir = pageDir; }
         if (sidePanelWidthSetting) { data.sidePanelWidth = sidePanelWidthSetting; }
+        if (pinnedTags && pinnedTags.length > 0) { data.pinnedTags = pinnedTags; }
         host.syncData(JSON.stringify(data, null, 2));
     }
 
-    // --- Daily Notes ナビバー ---
+    // --- 固定タグバー & Daily Notes ナビバー (統合) ---
 
-    function updateDailyNavBar() {
-        if (!dailyNavBar) return;
-        dailyNavBar.style.display = isDailyNotes ? 'flex' : 'none';
+    function updatePinnedTagBar() {
+        var bar = document.querySelector('.outliner-pinned-nav-bar');
+        if (!bar) return;
+
+        // 固定タグボタン生成
+        var tagsArea = bar.querySelector('.outliner-pinned-tags-area');
+        if (tagsArea) {
+            tagsArea.innerHTML = '';
+            for (var i = 0; i < pinnedTags.length; i++) {
+                var btn = document.createElement('button');
+                btn.className = 'outliner-pinned-tag-btn';
+                btn.textContent = pinnedTags[i];
+                btn.dataset.tag = pinnedTags[i];
+                if (searchInput && searchInput.value.trim() === pinnedTags[i]) {
+                    btn.classList.add('is-active');
+                }
+                btn.addEventListener('click', handlePinnedTagClick);
+                tagsArea.appendChild(btn);
+            }
+        }
+
+        // Daily Nav表示制御
+        var dailyArea = bar.querySelector('.outliner-daily-nav-area');
+        if (dailyArea) {
+            dailyArea.style.display = isDailyNotes ? 'flex' : 'none';
+        }
+
+        // バー全体の表示制御: 固定タグかDailyNavのどちらかがあれば表示
+        var hasTags = pinnedTags.length > 0;
+        var hasDaily = isDailyNotes;
+        bar.style.display = (hasTags || hasDaily) ? 'flex' : 'none';
+    }
+
+    function handlePinnedTagClick(e) {
+        var tag = e.currentTarget.dataset.tag;
+
+        // トグル: 同じタグで検索中ならクリア
+        if (searchInput && searchInput.value.trim() === tag) {
+            clearSearch();
+            updatePinnedTagBar();
+            return;
+        }
+
+        // 1. Scope out
+        if (currentScope.type === 'subtree') {
+            currentScope = { type: 'document' };
+            updateBreadcrumb();
+        }
+
+        // 2. フォーカスモードに切り替え
+        if (!searchFocusMode) {
+            searchFocusMode = true;
+            updateSearchModeButton();
+        }
+
+        // 3. 検索実行
+        searchInput.value = tag;
+        executeSearch();
+        updatePinnedTagBar();
     }
 
     function setupDailyNavBar() {
-        dailyNavBar = document.querySelector('.outliner-daily-nav');
+        dailyNavBar = document.querySelector('.outliner-pinned-nav-bar');
         if (!dailyNavBar) return;
 
         var todayBtn = document.getElementById('dailyNavToday');
@@ -2787,6 +2972,7 @@ var Outliner = (function() {
                     searchEngine = new OutlinerSearch.SearchEngine(model);
                     pageDir = msg.data.pageDir || null;
                     sidePanelWidthSetting = msg.data.sidePanelWidth || null;
+                    pinnedTags = msg.data.pinnedTags || [];
                     // モデルが入れ替わったのでundo/redoスタックをクリア
                     // (別ファイルのスナップショットでundo→データ上書きを防止)
                     undoStack.length = 0;
@@ -2794,7 +2980,7 @@ var Outliner = (function() {
                     updateUndoRedoButtons();
                     // Daily Notes 表示切替
                     isDailyNotes = !!msg.isDailyNotes;
-                    updateDailyNavBar();
+                    updatePinnedTagBar();
                     // Notes モードのファイル切替時: 検索・スコープをリセット
                     // fileChangeId はNotes用のupdateDataにのみ存在する
                     // 単体.outの外部変更検知（outlinerProvider.ts）ではfileChangeIdがないためリセットしない
@@ -2805,6 +2991,7 @@ var Outliner = (function() {
                         currentSearchResult = null;
                         currentScope = { type: 'document' };
                         updateBreadcrumb();
+                        updatePinnedTagBar(); // タグのis-activeをリセット
                     }
                     if (pageTitleInput && document.activeElement !== pageTitleInput) {
                         pageTitleInput.value = model.title || '';
