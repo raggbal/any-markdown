@@ -3272,6 +3272,14 @@ var Outliner = (function() {
                         }
                         currentSearchResult = null;
                         currentScope = { type: 'document' };
+                        // scopeToNodeId がある場合は renderTree() 前にスコープを設定
+                        // （scope out → scope in のチラつきを防止）
+                        if (msg.scopeToNodeId) {
+                            var preScopeTarget = model.getNode(msg.scopeToNodeId);
+                            if (preScopeTarget) {
+                                currentScope = { type: 'subtree', rootId: msg.scopeToNodeId };
+                            }
+                        }
                         updateBreadcrumb();
                         updatePinnedTagBar(); // タグのis-activeをリセット
                     }
@@ -3286,18 +3294,12 @@ var Outliner = (function() {
                         syncData();
                     } else {
                         renderTree();
-                        if (savedFocus && model.getNode(savedFocus)) {
+                        // scopeToNodeId適用済みならそのノードにフォーカス、そうでなければ元のフォーカスを復元
+                        if (msg.scopeToNodeId && currentScope.type === 'subtree') {
+                            focusNode(msg.scopeToNodeId);
+                        } else if (savedFocus && model.getNode(savedFocus)) {
                             focusNode(savedFocus);
                         }
-                    }
-                    // Daily Notes 等: 特定ノードに scope in
-                    if (msg.scopeToNodeId) {
-                        setTimeout(function() {
-                            var scopeTarget = model.getNode(msg.scopeToNodeId);
-                            if (scopeTarget) {
-                                setScope({ type: 'subtree', rootId: msg.scopeToNodeId });
-                            }
-                        }, 50);
                     }
                     // dailyCurrentDate を scopeToNodeId のノード階層から復元
                     if (msg.scopeToNodeId && isDailyNotes) {
