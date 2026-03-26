@@ -76,7 +76,7 @@ A Dynalist-like outliner built into VS Code.
 
 ---
 
-### Notes Manager (.note)
+### Note (.note)
 
 A 3-pane note management experience, accessed from the **Activity Bar**.
 
@@ -147,7 +147,7 @@ npm run compile
 1. Open any `.out` file — it opens directly in the outliner
 2. Or create a new `.out` file with `{}` as content to start fresh
 
-### Notes Manager
+### Notes (Fractal)
 1. Click the **Notes** icon in the Activity Bar (left sidebar)
 2. Add a folder to register it as a notes workspace
 3. Click a folder to open the 3-pane Notes UI

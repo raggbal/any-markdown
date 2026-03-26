@@ -108,57 +108,69 @@ function generateEditorBodyHtml(messages, platform) {
                 <div class="editor" id="editor" contenteditable="true" spellcheck="true"></div>
                 <textarea class="source-editor" id="sourceEditor" style="display: none;"></textarea>
             </div>
-            <div class="side-panel" id="sidePanel">
-                <div class="side-panel-resize-handle" id="sidePanelResizeHandle"></div>
-                <aside class="side-panel-sidebar" id="sidePanelSidebar">
-                    <div class="sidebar-header">
-                        <h3>Outline</h3>
-                        <button class="sidebar-toggle" id="sidePanelSidebarClose" title="${m('closeOutline')}">&#9776;</button>
-                    </div>
-                    <nav class="side-panel-toc" id="sidePanelToc"></nav>
-                    <div class="side-panel-toc-footer">
-                        <div class="side-panel-imagedir" id="sidePanelImageDir">
-                            <div class="imagedir-header">
-                                <span class="imagedir-label">${m('imageDirLabel')}</span>
-                                <span class="imagedir-source" id="sidePanelImageDirSource"></span>
-                                <button class="imagedir-settings-btn" id="sidePanelImageDirBtn" title="${m('setImageDir')}">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
-                                </button>
-                            </div>
-                            <div class="imagedir-info">
-                                <span class="imagedir-path" id="sidePanelImageDirPath"></span>
-                            </div>
-                        </div>
-                    </div>
-                </aside>
-                <div class="side-panel-editor-container">
-                    <div class="side-panel-header">
-                        <button class="menu-btn side-panel-outline-btn" id="sidePanelOpenOutline" title="${m('openOutline')}">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg>
-                        </button>
-                        <span class="side-panel-filename" id="sidePanelFilename"></span>
-                        <div class="side-panel-header-actions">
-                            <button class="side-panel-header-btn" data-action="undo" title="Undo"></button>
-                            <button class="side-panel-header-btn" data-action="redo" title="Redo"></button>
-                            <button class="side-panel-header-btn" data-action="source" title="Source mode"></button>
-                        </div>
-                        <button class="side-panel-open-tab" id="sidePanelOpenTab" title="Open in new tab">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-                        </button>
-                        <button class="side-panel-copy-path" id="sidePanelCopyPath" title="Copy file path">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                        </button>
-                        <button class="side-panel-expand" id="sidePanelExpand" title="Expand">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
-                        </button>
-                        <button class="side-panel-close" id="sidePanelClose" title="Close">&times;</button>
-                    </div>
-                    <div class="side-panel-iframe-container" id="sidePanelIframeContainer"></div>
-                </div>
-            </div>
-            <div class="side-panel-overlay" id="sidePanelOverlay"></div>
+            ${generateSidePanelHtml(msg)}
         </main>
     </div>`;
 }
 
-module.exports = { generateEditorBodyHtml };
+/**
+ * サイドパネルHTML生成（全エディタ共通）
+ *
+ * @param {Record<string, string>} messages - i18n メッセージ
+ * @returns {string} side-panel + overlay の HTML文字列
+ */
+function generateSidePanelHtml(messages) {
+    const msg = messages || {};
+    return `
+        <div class="side-panel" id="sidePanel">
+            <div class="side-panel-resize-handle" id="sidePanelResizeHandle"></div>
+            <aside class="side-panel-sidebar" id="sidePanelSidebar">
+                <div class="sidebar-header">
+                    <h3>Outline</h3>
+                    <button class="sidebar-toggle" id="sidePanelSidebarClose" title="${msg.closeOutline || 'Close Outline'}">&#9776;</button>
+                </div>
+                <nav class="side-panel-toc" id="sidePanelToc"></nav>
+                <div class="side-panel-toc-footer">
+                    <div class="side-panel-imagedir" id="sidePanelImageDir">
+                        <div class="imagedir-header">
+                            <span class="imagedir-label">${msg.imageDirLabel || 'Image save directory:'}</span>
+                            <span class="imagedir-source" id="sidePanelImageDirSource"></span>
+                            <button class="imagedir-settings-btn" id="sidePanelImageDirBtn" title="${msg.setImageDir || 'Set Image Directory'}">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+                            </button>
+                        </div>
+                        <div class="imagedir-info">
+                            <span class="imagedir-path" id="sidePanelImageDirPath"></span>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+            <div class="side-panel-editor-container">
+                <div class="side-panel-header">
+                    <button class="menu-btn side-panel-outline-btn" id="sidePanelOpenOutline" title="${msg.openOutline || 'Open Outline'}">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg>
+                    </button>
+                    <span class="side-panel-filename" id="sidePanelFilename"></span>
+                    <div class="side-panel-header-actions">
+                        <button class="side-panel-header-btn" data-action="undo" title="Undo"></button>
+                        <button class="side-panel-header-btn" data-action="redo" title="Redo"></button>
+                        <button class="side-panel-header-btn" data-action="source" title="Source mode"></button>
+                    </div>
+                    <button class="side-panel-open-tab" id="sidePanelOpenTab" title="Open in new tab">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                    </button>
+                    <button class="side-panel-copy-path" id="sidePanelCopyPath" title="Copy file path">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                    </button>
+                    <button class="side-panel-expand" id="sidePanelExpand" title="Expand">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+                    </button>
+                    <button class="side-panel-close" id="sidePanelClose" title="Close">&times;</button>
+                </div>
+                <div class="side-panel-iframe-container" id="sidePanelIframeContainer"></div>
+            </div>
+        </div>
+        <div class="side-panel-overlay" id="sidePanelOverlay"></div>`;
+}
+
+module.exports = { generateEditorBodyHtml, generateSidePanelHtml };

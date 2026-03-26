@@ -5,6 +5,16 @@ All notable changes to the "Any Markdown Editor" extension will be documented in
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.195.539] - 2026-03-26
+
+### Added
+
+- **Copy Pathボタン** — ツールバー右端とサイドパネルヘッダーに、編集中ファイルのパスをクリップボードにコピーするボタンを追加
+
+### Changed
+
+- **サイドパネルHTML共通化** — 4箇所に重複していたサイドパネルHTMLを `generateSidePanelHtml()` に一元化
+
 ## [0.195.536] - 2026-03-26
 
 ### Fixed
