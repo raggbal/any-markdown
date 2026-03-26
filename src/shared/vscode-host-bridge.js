@@ -52,6 +52,9 @@
         openInTextEditor: function() {
             api.postMessage({ type: 'openInTextEditor' });
         },
+        copyFilePath: function() {
+            api.postMessage({ type: 'copyFilePath' });
+        },
         sendToChat: function(startLine, endLine, selectedMarkdown) {
             api.postMessage({ type: 'sendToChat', startLine: startLine, endLine: endLine, selectedMarkdown: selectedMarkdown });
         },

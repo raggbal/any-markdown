@@ -5,6 +5,13 @@ All notable changes to the "Any Markdown Editor" extension will be documented in
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.195.536] - 2026-03-26
+
+### Fixed
+
+- **Outliner/Notes: CSS変数の不整合修正** — 未定義だったCSS変数を全7テーマに追加し、ハードコード色をCSS変数化
+- **Electron: i18n英語フォールバック追加** — ロケールファイル未検出時に英語にフォールバック
+
 ## [0.195.526] - 2026-03-25
 
 ### Added
@@ -166,7 +173,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **Outliner: Cmd+B toggles VSCode sidebar** — Added stopPropagation to prevent Cmd+B/I/E/Shift+S from triggering VSCode shortcuts
-- **Outliner: `**text*` incorrectly rendered as italic** — Fixed italic regex to not match `*` that is part of `**` bold markers
+- **Outliner: **`**text*`** incorrectly rendered as italic** — Fixed italic regex to not match `*` that is part of `**` bold markers
 - **Outliner: Cursor jumps to end after inline formatting** — Fixed offset mismatch between rendered text and source text by separating editing mode (raw markers) and display mode (formatted)
 - **Outliner: Enter splits text incorrectly with inline markers** — Same root cause as cursor jump; editing mode now uses source text offsets directly
 
@@ -193,7 +200,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **Image in list item treated as empty** — Fixed Enter/Backspace on list items containing only images incorrectly treating them as empty (outdenting instead of creating new sibling).
-- **Image paste misalignment in lists** — Fixed pasted images appearing visually offset from the bullet due to a trailing `<br>` element.
+- **Image paste misalignment in lists** — Fixed pasted images appearing visually offset from the bullet due to a trailing  element.
 - **Image bullet disappears in lists** — Fixed list bullet (marker) disappearing for list items containing images due to `display: block` on images.
 
 ## [0.195.432] - 2026-03-15
@@ -313,7 +320,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.195.376] - 2026-03-04
 
 ### Added
-- **Mermaid/Math toolbar & palette buttons** — Added dedicated toolbar buttons and command palette items for inserting Mermaid diagrams and Math blocks directly, without needing to type `` ```mermaid `` or `` ```math ``.
+- **Mermaid/Math toolbar & palette buttons** — Added dedicated toolbar buttons and command palette items for inserting Mermaid diagrams and Math blocks directly, without needing to type ````` ```mermaid ````` or ````` ```math `````.
 
 ## [0.195.375] - 2026-03-04
 
@@ -323,7 +330,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.195.374] - 2026-03-04
 
 ### Changed
-- **Toolbar default mode is now `simple`** — With the Action Palette (`Cmd+/`) available, the toolbar defaults to simple mode. Set `"any-markdown.toolbarMode": "full"` to restore the full toolbar.
+- **Toolbar default mode is now **`simple` — With the Action Palette (`Cmd+/`) available, the toolbar defaults to simple mode. Set `"any-markdown.toolbarMode": "full"` to restore the full toolbar.
 - **Open in Text Editor shortcut changed** — `Cmd+,` / `Ctrl+,` → `Cmd+Shift+.` / `Ctrl+Shift+.` to avoid conflict with VS Code's Settings shortcut. Now paired with `Cmd+.` (Source Mode toggle).
 - **README redesigned** — Added Important Changes section, fixed incorrect shortcut documentation, added emoji to section headings, updated screenshots.
 

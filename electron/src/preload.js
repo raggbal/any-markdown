@@ -18,6 +18,7 @@ electron_1.contextBridge.exposeInMainWorld('hostBridge', {
     saveImageAndInsert: (dataUrl, fileName) => electron_1.ipcRenderer.send('save-image', dataUrl, fileName),
     readAndInsertImage: (filePath) => electron_1.ipcRenderer.send('read-insert-image', filePath),
     openInTextEditor: () => electron_1.ipcRenderer.send('open-in-text-editor'),
+    copyFilePath: () => electron_1.ipcRenderer.send('copy-file-path'),
     sendToChat: () => { },
     onMessage: (handler) => {
         electron_1.ipcRenderer.on('host-message', (_event, message) => handler(message));

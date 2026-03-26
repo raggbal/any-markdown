@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('hostBridge', {
     readAndInsertImage: (filePath: string, sidePanelFilePath?: string) =>
         ipcRenderer.send('read-insert-image', filePath, sidePanelFilePath),
     openInTextEditor: () => ipcRenderer.send('open-in-text-editor'),
+    copyFilePath: () => ipcRenderer.send('copy-file-path'),
     sendToChat: () => { /* no-op in Electron */ },
 
     // Side Panel

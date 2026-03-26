@@ -32,6 +32,7 @@ export const webviewMessages = {
   openOutline: '打开大纲',
   openInTextEditor: '在文本编辑器中打开',
   toggleSourceMode: '切换源代码模式',
+  copyPath: '复制路径',
   bold: '粗体 (Ctrl+B)',
   italic: '斜体 (Ctrl+I)',
   strikethrough: '删除线 (Ctrl+Shift+S)',

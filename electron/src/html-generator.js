@@ -149,6 +149,7 @@ function generateEditorHtml(content, config) {
                     <div class="toolbar-group" data-group="utility">
                         <button data-action="openInTextEditor" title="${config.webviewMessages.openInTextEditor || 'Open in Text Editor'} (${process.platform === 'darwin' ? 'Cmd+Shift+.' : 'Ctrl+Shift+.'})"></button>
                         <button data-action="source" title="${config.webviewMessages.toggleSourceMode || 'Source Mode'} (${process.platform === 'darwin' ? 'Cmd' : 'Ctrl'}+.)"></button>
+                        <button data-action="copyPath" title="${config.webviewMessages.copyPath || 'Copy Path'}"></button>
                     </div>
                 </div>
                 <button class="toolbar-scroll-btn toolbar-scroll-btn--right hidden" id="toolbarScrollRight">&#x276F;</button>

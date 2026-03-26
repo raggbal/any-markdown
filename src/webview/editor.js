@@ -34,6 +34,7 @@ class SidePanelHostBridge {
         this._mainHost.readAndInsertImage(filePath, this.filePath);
     }
     openInTextEditor() {}
+    copyFilePath() {}
     sendToChat() {}
     notifySidePanelClosed() {}
     searchFiles(query) { this._mainHost.searchFiles(query); }
@@ -221,7 +222,7 @@ class EditorInstance {
         math: i18n.mathBlock, hr: i18n.horizontalRule, link: i18n.insertLink,
         image: i18n.insertImage, table: i18n.insertTable, source: i18n.toggleSourceMode,
         openInTextEditor: i18n.openInTextEditor, openOutline: i18n.openOutline,
-        imageDir: i18n.setImageDir
+        imageDir: i18n.setImageDir, copyPath: i18n.copyPath
     };
     if (toolbar) {
         toolbar.querySelectorAll('button[data-action]').forEach(function(btn) {
@@ -11045,6 +11046,9 @@ class EditorInstance {
                 break;
             case 'source':
                 toggleSourceMode();
+                break;
+            case 'copyPath':
+                host.copyFilePath();
                 break;
             default:
                 // Shared actions (toolbar + command palette)

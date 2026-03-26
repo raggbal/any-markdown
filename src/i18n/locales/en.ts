@@ -32,6 +32,7 @@ export const webviewMessages = {
   openOutline: 'Open Outline',
   openInTextEditor: 'Open in Text Editor',
   toggleSourceMode: 'Toggle Source Mode',
+  copyPath: 'Copy Path',
   bold: 'Bold (Ctrl+B)',
   italic: 'Italic (Ctrl+I)',
   strikethrough: 'Strikethrough (Ctrl+Shift+S)',

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, Menu, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, Menu, shell, clipboard } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 import { FileManager } from './file-manager';
@@ -136,6 +136,29 @@ function getI18nMessages(): Record<string, string> {
                 }
             } catch (e) {
                 console.error(`[i18n] Failed to load ${p}:`, e);
+            }
+        }
+    }
+
+    // Fallback to English if requested locale not found
+    if (localeKey !== 'en') {
+        console.log(`[i18n] No locale found for ${localeKey}, falling back to English`);
+        const enPaths = [
+            path.join(__dirname, '..', '..', 'out', 'locales', 'en.js'),
+            path.join(process.resourcesPath || '', 'locales', 'en.js'),
+        ];
+        for (const p of enPaths) {
+            if (fs.existsSync(p)) {
+                try {
+                    delete require.cache[require.resolve(p)];
+                    const mod = require(p);
+                    if (mod.webviewMessages) {
+                        console.log(`[i18n] Loaded English fallback from ${p}`);
+                        return mod.webviewMessages;
+                    }
+                } catch (e) {
+                    console.error(`[i18n] Failed to load English fallback ${p}:`, e);
+                }
             }
         }
     }
@@ -804,6 +827,18 @@ ipcMain.on('open-in-text-editor', (event) => {
     if (!win) return;
     const fm = windows.get(win);
     if (fm) fm.openInTextEditor();
+});
+
+ipcMain.on('copy-file-path', (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win) return;
+    const fm = windows.get(win);
+    if (fm) {
+        const filePath = fm.getFilePath();
+        if (filePath) {
+            clipboard.writeText(filePath);
+        }
+    }
 });
 
 // ── Side Panel IPC (Editor Mode) ──

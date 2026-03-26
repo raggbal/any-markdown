@@ -32,6 +32,7 @@ export const webviewMessages = {
   openOutline: 'Ouvrir le plan',
   openInTextEditor: 'Ouvrir dans l\'éditeur de texte',
   toggleSourceMode: 'Basculer le mode source',
+  copyPath: 'Copier le chemin',
   bold: 'Gras (Ctrl+B)',
   italic: 'Italique (Ctrl+I)',
   strikethrough: 'Barré (Ctrl+Shift+S)',

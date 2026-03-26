@@ -35,6 +35,7 @@ export interface WebviewMessages {
   openOutline: string;
   openInTextEditor: string;
   toggleSourceMode: string;
+  copyPath: string;
   bold: string;
   italic: string;
   strikethrough: string;

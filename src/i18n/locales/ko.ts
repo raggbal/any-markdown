@@ -32,6 +32,7 @@ export const webviewMessages = {
   openOutline: '개요 열기',
   openInTextEditor: '텍스트 편집기에서 열기',
   toggleSourceMode: '소스 모드 전환',
+  copyPath: '경로 복사',
   bold: '굵게 (Ctrl+B)',
   italic: '기울임 (Ctrl+I)',
   strikethrough: '취소선 (Ctrl+Shift+S)',

@@ -32,6 +32,7 @@ export const webviewMessages = {
   openOutline: 'Abrir esquema',
   openInTextEditor: 'Abrir en editor de texto',
   toggleSourceMode: 'Alternar modo fuente',
+  copyPath: 'Copiar ruta',
   bold: 'Negrita (Ctrl+B)',
   italic: 'Cursiva (Ctrl+I)',
   strikethrough: 'Tachado (Ctrl+Shift+S)',

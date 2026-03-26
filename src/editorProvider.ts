@@ -852,6 +852,10 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
                     await vscode.commands.executeCommand('vscode.openWith', document.uri, 'default');
                     break;
 
+                case 'copyFilePath':
+                    await vscode.env.clipboard.writeText(document.uri.fsPath);
+                    break;
+
                 case 'saveSidePanelFile':
                     await sidePanel.handleSave(message.filePath, message.content);
                     break;

@@ -291,6 +291,18 @@ electron_1.ipcMain.on('open-in-text-editor', (event) => {
     if (fm)
         fm.openInTextEditor();
 });
+electron_1.ipcMain.on('copy-file-path', (event) => {
+    const win = electron_1.BrowserWindow.fromWebContents(event.sender);
+    if (!win)
+        return;
+    const fm = windows.get(win);
+    if (fm) {
+        const filePath = fm.getFilePath();
+        if (filePath) {
+            electron_1.clipboard.writeText(filePath);
+        }
+    }
+});
 electron_1.ipcMain.on('editing-state', () => { });
 electron_1.ipcMain.on('focus', () => { });
 electron_1.ipcMain.on('blur', () => { });

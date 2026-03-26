@@ -59,6 +59,9 @@
         openInTextEditor: function() {
             window.__testApi.messages.push({ type: 'openInTextEditor' });
         },
+        copyFilePath: function() {
+            window.__testApi.messages.push({ type: 'copyFilePath' });
+        },
         sendToChat: function(startLine, endLine, selectedMarkdown) {
             window.__testApi.messages.push({ type: 'sendToChat', startLine: startLine, endLine: endLine, selectedMarkdown: selectedMarkdown });
         },

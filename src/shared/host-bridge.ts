@@ -25,6 +25,7 @@ export interface HostBridge {
     saveImageAndInsert(dataUrl: string, fileName?: string, sidePanelFilePath?: string): void;
     readAndInsertImage(filePath: string, sidePanelFilePath?: string): void;
     openInTextEditor(): void;
+    copyFilePath(): void;
     sendToChat(startLine: number, endLine: number, selectedMarkdown: string): void;
     saveSidePanelFile(filePath: string, content: string): void;
     sidePanelOpenLink(href: string, sidePanelFilePath: string): void;

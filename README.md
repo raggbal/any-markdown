@@ -1,80 +1,92 @@
-<img src="media/icon.png" alt="Any Markdown" width="48" align="absmiddle"> Any Markdown - AI-Friendly WYSIWYG Markdown Editor for VS Code
+<img src="media/icon.png" alt="Fractal" width="48" align="absmiddle"> Fractal - Note App for VS Code
 =
 
-A WYSIWYG markdown editor designed for the AI coding era. Edit markdown visually while AI assistants (Claude Code, Cursor, GitHub Copilot, etc.) modify the same file in real-time — your edits and AI's edits coexist safely.
+A note app that lives in your VS Code Activity Bar. Add folders, organize outlines, write markdown pages — all without leaving the editor. Fractal combines a **Dynalist-like outliner** and a **Typora-like WYSIWYG markdown editor** into a single, integrated note-taking experience with Daily Notes, full-text search, and S3 cloud sync. The markdown editor is **AI-friendly** — edit visually while AI assistants (Claude Code, Cursor, etc.) modify the same file in real-time, with your edits and AI's edits coexisting safely.
 
-![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/imaken.any-markdown?label=VS%20Code%20Marketplace)
-![Open VSX](https://img.shields.io/open-vsx/v/imaken/any-markdown?label=Open%20VSX)
+Each `.out` (outliner) and `.md` (markdown) file also works standalone — but the real power is in the **Notes manager**, where everything comes together.
+
+![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/imaken.fractal?label=VS%20Code%20Marketplace)
+![Open VSX](https://img.shields.io/open-vsx/v/imaken/fractal?label=Open%20VSX)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![GitHub Sponsors](https://img.shields.io/github/sponsors/raggbal?label=Sponsor)
 
 **New: Redesigned for simplicity. **![assets/images/1772631963888.png](assets/images/1772631963888.png)
 **New: Action Palette (Cmd+/ / Ctrl+/)**
 ![assets/images/1772632052456.png](assets/images/1772632052456.png)
+
+<!-- TODO: Add Outliner mode screenshot -->
+<!-- TODO: Add Notes manager screenshot -->
+
 ## 🎬 Demo (gif)
 
 You can freely use markdown using only the keyboard.
-lists, tables, code blocks, and everything else!And when you want to request AI Chat, select the range and press cmd+l (ctr+l).
+lists, tables, code blocks, and everything else! And when you want to request AI Chat, select the range and press cmd+l (ctr+l).
 ![Demo](assets/videos/movie.gif)
 > Note: The editor design shown in the gif above is from an older version.
-
-## 🆕 Important Changes
-
-### Action Palette (Cmd+/ or Ctrl+/)
-
-You can now press `Cmd+/` (macOS) or `Ctrl+/` (Windows/Linux) to open the **Action Palette** — a floating command menu that gives you quick access to all formatting and insertion actions (headings, lists, code blocks, Mermaid diagrams, math blocks, tables, etc.).
-
-### Add Page (Cmd+N)
-
-Press `Cmd+N` (macOS) or `Ctrl+N` (Windows/Linux) to open the **Add Page** panel. Two options:
-- **Add Page** — Creates a new `.md` file in a `pages/` subfolder with an auto-generated timestamp filename and inserts a link at the cursor.
-- **Add Page at Path** — Type a path with autocomplete suggestions from your workspace. Select an existing file or create a new one, then confirm the link name.
-
-### Toolbar Mode: Simple is now the default
-
-With the Action Palette available, the toolbar has been simplified by default. The new `simple` mode shows only essential buttons (outline, undo/redo, open in text editor, source mode toggle) for a cleaner editing experience.
-
-If you prefer the previous full toolbar with all formatting buttons, change the setting:
-
-```json
-{
-  "any-markdown.toolbarMode": "full"
-}
-```
 
 ---
 
 ## ✨ Features
 
-### AI-Friendly Editing
+### Markdown Editor (.md files)
 
-**Edit markdown visually while AI modifies the same file — your edits and AI's edits coexist safely.**
+A Typora / Notion-style WYSIWYG markdown editor.
 
-- `Cmd+L`** / **`Ctrl+L` — Select text in the WYSIWYG editor, press `Cmd+L`, and the source file opens in VS Code's text editor with the exact lines selected (even within lists and tables). Press `Cmd+L` again to send to AI chat. Works with VS Code, Cursor, Kiro, and more.
-- **Real-time external change sync** — When AI assistants modify the file, only changed blocks are patched via block-level DOM diff. Your cursor position and in-progress edits are preserved. No "file modified externally" dialogs.
+- **Seamless live preview** — Edit markdown in a beautifully rendered view. No split windows
+- **Source mode toggle** — Switch between WYSIWYG and raw markdown with one click
+- **AI-friendly editing** — Edit visually while AI assistants (Claude Code, Cursor, etc.) modify the same file. Your edits and AI's edits coexist safely
+- `Cmd+L` / `Ctrl+L` — Select text, press `Cmd+L` to open the source file in VS Code's text editor with the exact lines selected. Press `Cmd+L` again to send to AI chat. Works with VS Code, Cursor, Kiro, and more
+- **Real-time external change sync** — When AI modifies the file, only changed blocks are patched via block-level DOM diff. Cursor position and in-progress edits are preserved
+- **Headers** (H1-H6) with outline navigation
+- **Text formatting** — Bold, Italic, Strikethrough, Inline Code
+- **Lists** — Ordered, Unordered, Task Lists with checkboxes
+- **Tables** — Column resize, alignment, Tab/Shift+Tab cell navigation
+- **Code blocks** — Syntax highlighting for 24+ languages, expand to VS Code editor tab
+- **Blockquotes** and **Horizontal rules**
+- **Links and Images** — Drag & drop, paste, smart link creation (select text + paste URL)
+- **Notion-style side panel** — Click a `.md` link to open it in a side peek panel with full WYSIWYG editing. Cmd+Click to open in a new tab instead
+- **Mermaid diagrams** — Rendered inline, click to edit source
+- **KaTeX math equations** — Display-mode equations with live re-rendering
+- **YAML Front Matter** support
+- **Action Palette** (`Cmd+/`) — Quick access to all formatting and insertion actions
+
+<!-- TODO: Add Markdown editor screenshot -->
 
 ---
 
-### Seamless Live Preview
-- **WYSIWYG Editing** - Edit markdown in a beautifully rendered view
-- **No Split Windows** - Everything in one unified editor
-- **Source Mode Toggle** - Switch between WYSIWYG and raw markdown with one click
+### Outliner (.out files)
 
-### Rich Markdown Support
-- Headers (H1-H6) with outline navigation
-- Text formatting (Bold, Italic, Strikethrough)
-- Lists (Ordered, Unordered, Task Lists with checkboxes)
-- Tables with column resize and alignment
-- Code blocks with syntax highlighting
-- Blockquotes
-- Horizontal rules
-- Links and Images (drag & drop, paste support)
-- Smart link creation — select text and paste a URL to create `[selected text](URL)`
-- **Notion-style side panel** — Click a `.md` link to open it in a side peek panel with full WYSIWYG editing. Cmd+Click to open in a new tab instead.
-- Mermaid diagrams
-- KaTeX math equations
-- YAML Front Matter
+A Dynalist-like outliner built into VS Code.
 
+- **Tree editing** — Unlimited nesting with bullet points. Enter, Backspace, Tab, Shift+Tab work as you expect
+- **Collapse / Expand** — Click bullets to fold branches. `Ctrl+.` to toggle, `Ctrl+Shift+.` to toggle all
+- **Subtree scoping** — Focus on any branch with breadcrumb navigation. `Cmd+]` to scope in, `Cmd+[` to scope out
+- **Tags** — `#tag` and `@tag` are auto-highlighted and clickable for instant search
+- **Pinned tags** — Pin frequently used tags for one-click filtering
+- **Search** — Dynalist-compatible queries: AND, OR, NOT, `"phrase"`, `#tag`, `in:title`, `has:children`, `is:page`, `is:task`. Tree mode and focus mode
+- **Page nodes** — Turn any bullet into a page with a full WYSIWYG markdown editor in a resizable side panel
+- **Task nodes** — `- [ ]` / `- [x]` checkboxes with toggle support
+- **Inline formatting** — Bold (`Cmd+B`), italic (`Cmd+I`), strikethrough (`Cmd+Shift+S`), inline code (`Cmd+E`)
+- **Move nodes** — `Ctrl+Shift+↑/↓` to reorder
+- **Subtext** — `Shift+Enter` to add notes below any bullet
+- **Navigation history** — Back / forward buttons to revisit previous search and scope states
+- **Undo / Redo** — Full undo/redo with `Cmd+Z` / `Cmd+Shift+Z`
+
+<!-- TODO: Add Outliner feature screenshot -->
+
+---
+
+### Notes Manager (.note)
+
+A 3-pane note management experience, accessed from the **Activity Bar**.
+
+- **Multi-file management** — Organize multiple `.out` files in virtual folders with drag & drop
+- **Full-text search** — Search across all outlines, pages, and standalone `.md` files. Streaming results with click-to-jump
+- **Daily Notes** — One-click daily journal. Auto-creates year/month/day hierarchy. Navigate with `<` `>` buttons or a calendar picker
+- **S3 cloud sync** — Sync your notes to AWS S3 with one click. Supports backup, full upload, and full download
+- **Resizable panels** — Drag to resize left panel and side panel. Widths are saved per folder
+
+<!-- TODO: Add Notes manager feature screenshot -->
 
 ---
 
@@ -84,24 +96,24 @@ If you prefer the previous full toolbar with all formatting buttons, change the 
 
 1. Open VS Code
 2. Go to Extensions (`Ctrl+Shift+X`)
-3. Search for **"Any Markdown Editor"**
+3. Search for **"Fractal"**
 4. Click **Install**
 
-Or install directly: [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=imaken.any-markdown)
+Or install directly: [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=imaken.fractal)
 
 ### From Open VSX (VSCodium / Gitpod / Eclipse Theia)
 
-[Open VSX Registry](https://open-vsx.org/extension/imaken/any-markdown)
+[Open VSX Registry](https://open-vsx.org/extension/imaken/fractal)
 
 ### From VSIX
 ```bash
-code --install-extension any-markdown-{version}.vsix
+code --install-extension fractal-{version}.vsix
 ```
 
 ### From Source
 ```bash
-git clone https://github.com/raggbal/any-markdown
-cd any-markdown
+git clone https://github.com/raggbal/fractal
+cd fractal
 npm install
 npm run compile
 # Press F5 to launch in debug mode
@@ -109,22 +121,36 @@ npm run compile
 
 ---
 
-## ⚙️ Set as Default Editor for Markdown Files
+## ⚙️ Set as Default Editor
 
-To always open `.md` files with Any Markdown Editor:
+### For Markdown Files (.md)
 
 1. Right-click any `.md` file in the Explorer
 2. Select **"Open With..."**
 3. Select **"Configure default editor for '*.md'..."**
-4. Select **"Any Markdown"**
+4. Select **"Fractal"**
+
+### For Outline Files (.out)
+
+`.out` files open with Fractal automatically when the extension is installed.
 
 ---
 
 ## 🚀 Usage
 
+### Markdown Editor
 1. Open any `.md` or `.markdown` file
-2. Right-click and select **"Open with Any Markdown Editor"**
-3. Or use Command Palette: `Any Markdown: Open with Any Markdown Editor`
+2. Right-click and select **"Open with Fractal"**
+3. Or use Command Palette: `Fractal: Open with Fractal`
+
+### Outliner
+1. Open any `.out` file — it opens directly in the outliner
+2. Or create a new `.out` file with `{}` as content to start fresh
+
+### Notes Manager
+1. Click the **Notes** icon in the Activity Bar (left sidebar)
+2. Add a folder to register it as a notes workspace
+3. Click a folder to open the 3-pane Notes UI
 
 ---
 
@@ -166,9 +192,9 @@ To always open `.md` files with Any Markdown Editor:
 
 ## ⌨️ Special Operations
 
-### General Shortcuts
+### Markdown Editor Shortcuts
 
-These shortcuts are active when the Any Markdown editor is focused:
+These shortcuts are active when the Fractal markdown editor is focused:
 
 | Shortcut | Action |
 | --- | --- |
@@ -185,6 +211,33 @@ These shortcuts are active when the Any Markdown editor is focused:
 | `Ctrl/Cmd + F` | Find |
 | `Ctrl/Cmd + H` | Find and replace |
 | `Ctrl/Cmd + L` | Open source file with selected lines in text editor |
+
+### Outliner Shortcuts
+
+These shortcuts are active when the Fractal outliner is focused:
+
+| Shortcut | Action |
+| --- | --- |
+| `Enter` | Create new sibling node |
+| `Option+Enter` / `Alt+Enter` | Create child node |
+| `Shift+Enter` | Add/focus subtext |
+| `Tab` | Indent node |
+| `Shift+Tab` | Outdent node |
+| `Backspace` at start | Merge with previous node |
+| `↑` / `↓` | Navigate between nodes |
+| `Ctrl+Shift+↑` / `Ctrl+Shift+↓` | Move node up / down |
+| `Ctrl+.` | Toggle collapse/expand |
+| `Ctrl+Shift+.` | Toggle all collapse/expand |
+| `Cmd+]` / `Ctrl+]` | Scope into current node |
+| `Cmd+[` / `Ctrl+[` | Scope out (back to document) |
+| `Cmd+B` | Bold toggle |
+| `Cmd+I` | Italic toggle |
+| `Cmd+E` | Inline code toggle |
+| `Cmd+Shift+S` | Strikethrough toggle |
+| `Ctrl+F` | Focus search bar |
+| `Ctrl+N` | Add new node at end |
+| `Cmd+Z` | Undo |
+| `Cmd+Shift+Z` | Redo |
 
 ### Escaping Block Elements
 
@@ -358,10 +411,14 @@ FORCE_RELATIVE_PATH: true
 | `any-markdown.imageDefaultDir` | Default directory for saved images | `""` (same as markdown file) |
 | `any-markdown.forceRelativeImagePath` | Force relative paths for images | `false` |
 | `any-markdown.language` | UI language (`default`, `en`, `ja`, `zh-cn`, `zh-tw`, `ko`, `es`, `fr`) | `default` |
-| `any-markdown.toolbarMode` | Toolbar display mode (`full`, `simple`). Simple shows only undo/redo and utility buttons (use `Cmd+/` for other operations) | `simple` |
+| `any-markdown.toolbarMode` | Toolbar display mode (`full`, `simple`) | `simple` |
+| `any-markdown.outlinerPageDir` | Default page directory for outliner | `./pages` |
+| `any-markdown.outlinerPageTitle` | Show page title input in outliner | `false` |
 | `any-markdown.enableDebugLogging` | Enable debug logging in browser console | `false` |
 
 ### Themes
+
+All 7 themes apply to both the markdown editor and the outliner:
 
 | Theme | Description |
 | --- | --- |
@@ -399,20 +456,20 @@ Available in Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`):
 
 | Command | Description |
 | --- | --- |
-| `Any MD: Open with Any Markdown Editor` | Open markdown file in WYSIWYG editor |
-| `Any MD: Insert Table` | Insert a new table |
-| `Any MD: Insert TOC` | Insert table of contents |
-| `Any MD: Open as Text` | Open in standard text editor |
-| `Any MD: Compare as Text` | Compare with text version |
-| `Any MD: Toggle Source Mode` | Switch between WYSIWYG and source mode |
-| `Any MD: Undo` | Undo last edit |
-| `Any MD: Redo` | Redo last undone edit |
+| `Fractal: Open with Fractal` | Open markdown file in WYSIWYG editor |
+| `Fractal: Insert Table` | Insert a new table |
+| `Fractal: Insert TOC` | Insert table of contents |
+| `Fractal: Open as Text` | Open in standard text editor |
+| `Fractal: Compare as Text` | Compare with text version |
+| `Fractal: Toggle Source Mode` | Switch between WYSIWYG and source mode |
+| `Fractal: Undo` | Undo last edit |
+| `Fractal: Redo` | Redo last undone edit |
 
 ---
 
 ## 🔄 External File Changes
 
-When another tool (e.g., AI coding assistants like Claude Code, Cursor, etc.) modifies the same markdown file while you have it open in Any Markdown:
+When another tool (e.g., AI coding assistants like Claude Code, Cursor, etc.) modifies the same markdown file while you have it open in Fractal:
 
 - **Block-level DOM diff**: Only changed blocks are updated — your cursor position and in-progress edits are preserved.
 - **Toast notification**: A notification appears allowing you to review and accept or dismiss external changes.
@@ -446,8 +503,8 @@ vsce package --no-dependencies
 If you find this extension useful, please consider:
 
 - [**Sponsor** on GitHub](https://github.com/sponsors/raggbal) - Help keep this project maintained
-- **Star** this repository on [GitHub](https://github.com/raggbal/any-markdown)
-- **Report issues** or suggest features on [Issues](https://github.com/raggbal/any-markdown/issues)
+- **Star** this repository on [GitHub](https://github.com/raggbal/fractal)
+- **Report issues** or suggest features on [Issues](https://github.com/raggbal/fractal/issues)
 - **Contribute** with pull requests
 
 Your support helps keep this project maintained and improved!
