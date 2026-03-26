@@ -875,24 +875,28 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
                         const chatEndLine = message.endLine as number;
                         if (chatStartLine == null || chatEndLine == null) break;
 
-                        // Open the file in VS Code's text editor
-                        const textDoc = await vscode.workspace.openTextDocument(document.uri);
-                        const textEditor = await vscode.window.showTextDocument(textDoc, { preview: false });
+                        const chatSidePanelFilePath = message.sidePanelFilePath as string | undefined;
+                        if (chatSidePanelFilePath) {
+                            // サイドパネル → 共通ハンドラ
+                            await sidePanel.handleSendToChat(chatSidePanelFilePath, chatStartLine, chatEndLine, message.selectedMarkdown || '');
+                        } else {
+                            // スタンドアロン → 既存ロジック（document.uri を使用）
+                            const textDoc = await vscode.workspace.openTextDocument(document.uri);
+                            const textEditor = await vscode.window.showTextDocument(textDoc, { preview: false });
 
-                        // Clamp line numbers to document range
-                        const maxLine = textDoc.lineCount - 1;
-                        const startLine = Math.max(0, Math.min(chatStartLine, maxLine));
-                        const endLine = Math.max(startLine, Math.min(chatEndLine, maxLine));
+                            const maxLine = textDoc.lineCount - 1;
+                            const startLine = Math.max(0, Math.min(chatStartLine, maxLine));
+                            const endLine = Math.max(startLine, Math.min(chatEndLine, maxLine));
 
-                        const startPos = new vscode.Position(startLine, 0);
-                        const endPos = textDoc.lineAt(endLine).range.end;
-                        textEditor.selection = new vscode.Selection(startPos, endPos);
-                        textEditor.revealRange(new vscode.Range(startPos, endPos), vscode.TextEditorRevealType.InCenter);
+                            const startPos = new vscode.Position(startLine, 0);
+                            const endPos = textDoc.lineAt(endLine).range.end;
+                            textEditor.selection = new vscode.Selection(startPos, endPos);
+                            textEditor.revealRange(new vscode.Range(startPos, endPos), vscode.TextEditorRevealType.InCenter);
 
-                        // Copy selected markdown to clipboard
-                        const selectedMd = message.selectedMarkdown as string;
-                        if (selectedMd) {
-                            await vscode.env.clipboard.writeText(selectedMd);
+                            const selectedMd = message.selectedMarkdown as string;
+                            if (selectedMd) {
+                                await vscode.env.clipboard.writeText(selectedMd);
+                            }
                         }
                     } catch (err) {
                         console.error('[Any MD] sendToChat error:', err);

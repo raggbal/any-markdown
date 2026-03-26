@@ -197,6 +197,20 @@ export class OutlinerProvider implements vscode.CustomTextEditorProvider {
                         await sidePanel.handleOpenLink(message.href, message.sidePanelFilePath);
                         break;
 
+                    case 'sendToChat': {
+                        const spFilePath = message.sidePanelFilePath as string;
+                        if (spFilePath && message.startLine != null && message.endLine != null) {
+                            try {
+                                await sidePanel.handleSendToChat(
+                                    spFilePath, message.startLine, message.endLine, message.selectedMarkdown || ''
+                                );
+                            } catch (err) {
+                                console.error('[Outliner] sendToChat error:', err);
+                            }
+                        }
+                        break;
+                    }
+
                     case 'openLinkInTab': {
                         const uri = vscode.Uri.file(message.href);
                         vscode.commands.executeCommand('vscode.openWith', uri, 'any-markdown.editor');

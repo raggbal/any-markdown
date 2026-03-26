@@ -55,8 +55,8 @@
         copyFilePath: function() {
             api.postMessage({ type: 'copyFilePath' });
         },
-        sendToChat: function(startLine, endLine, selectedMarkdown) {
-            api.postMessage({ type: 'sendToChat', startLine: startLine, endLine: endLine, selectedMarkdown: selectedMarkdown });
+        sendToChat: function(startLine, endLine, selectedMarkdown, sidePanelFilePath) {
+            api.postMessage({ type: 'sendToChat', startLine: startLine, endLine: endLine, selectedMarkdown: selectedMarkdown, sidePanelFilePath: sidePanelFilePath });
         },
         saveSidePanelFile: function(filePath, content) {
             api.postMessage({ type: 'saveSidePanelFile', filePath: filePath, content: content });

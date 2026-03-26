@@ -276,6 +276,13 @@ export class NotesEditorProvider {
             handleSidePanelClosed: () => {
                 sidePanel.handleClose();
             },
+            sendToChatFromSidePanel: async (sidePanelFilePath: string, startLine: number, endLine: number, selectedMarkdown: string) => {
+                try {
+                    await sidePanel.handleSendToChat(sidePanelFilePath, startLine, endLine, selectedMarkdown);
+                } catch (err) {
+                    console.error('[Notes] sendToChat error:', err);
+                }
+            },
             saveLastOpenedFile: (filePath: string) => {
                 if (this.currentFolderPath) {
                     this.context.globalState.update(

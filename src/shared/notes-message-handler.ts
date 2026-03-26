@@ -39,6 +39,8 @@ export interface NotesPlatformActions {
     handleSidePanelOpenLink(href: string, sidePanelFilePath: string): void;
     /** サイドパネルが閉じられた */
     handleSidePanelClosed(): void;
+    /** サイドパネルの sendToChat を処理（テキストエディタで開いて行選択） */
+    sendToChatFromSidePanel?(sidePanelFilePath: string, startLine: number, endLine: number, selectedMarkdown: string): Promise<void>;
     /** 外部エディタでファイルを開く */
     openFileExternal?(filePath: string): void;
     /** 最後に開いたファイルを記録 */
@@ -153,6 +155,14 @@ export function handleNotesMessage(
 
         case 'sidePanelOpenLink':
             platform.handleSidePanelOpenLink(message.href, message.sidePanelFilePath);
+            break;
+
+        case 'sendToChat':
+            if (message.sidePanelFilePath && message.startLine != null && message.endLine != null) {
+                platform.sendToChatFromSidePanel?.(
+                    message.sidePanelFilePath, message.startLine, message.endLine, message.selectedMarkdown || ''
+                );
+            }
             break;
 
         case 'getSidePanelImageDir':

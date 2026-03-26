@@ -62,8 +62,8 @@
         copyFilePath: function() {
             window.__testApi.messages.push({ type: 'copyFilePath' });
         },
-        sendToChat: function(startLine, endLine, selectedMarkdown) {
-            window.__testApi.messages.push({ type: 'sendToChat', startLine: startLine, endLine: endLine, selectedMarkdown: selectedMarkdown });
+        sendToChat: function(startLine, endLine, selectedMarkdown, sidePanelFilePath) {
+            window.__testApi.messages.push({ type: 'sendToChat', startLine: startLine, endLine: endLine, selectedMarkdown: selectedMarkdown, sidePanelFilePath: sidePanelFilePath });
         },
         saveSidePanelFile: function(filePath, content) {
             window.__testApi.messages.push({ type: 'saveSidePanelFile', filePath: filePath, content: content });

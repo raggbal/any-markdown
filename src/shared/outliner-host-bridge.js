@@ -67,6 +67,11 @@
             api.postMessage({ type: 'searchFiles', query: query });
         },
 
+        // sendToChat (サイドパネルからの呼び出し)
+        sendToChat: function(startLine, endLine, selectedMarkdown, sidePanelFilePath) {
+            api.postMessage({ type: 'sendToChat', startLine: startLine, endLine: endLine, selectedMarkdown: selectedMarkdown, sidePanelFilePath: sidePanelFilePath });
+        },
+
         // ページ管理 (サイドパネル内EditorInstanceから呼ばれる — outlinerでは未使用)
         createPageAtPath: function() { /* no-op in outliner */ },
         createPageAuto: function() { /* no-op in outliner */ },

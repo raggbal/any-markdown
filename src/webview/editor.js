@@ -35,7 +35,9 @@ class SidePanelHostBridge {
     }
     openInTextEditor() {}
     copyFilePath() {}
-    sendToChat() {}
+    sendToChat(startLine, endLine, selectedMarkdown) {
+        this._mainHost.sendToChat(startLine, endLine, selectedMarkdown, this.filePath);
+    }
     notifySidePanelClosed() {}
     searchFiles(query) { this._mainHost.searchFiles(query); }
     createPageAtPath(path) { this._mainHost.createPageAtPath(path); }

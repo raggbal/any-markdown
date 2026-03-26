@@ -247,6 +247,40 @@ export class SidePanelManager {
         }
     }
 
+    // --- sendToChat (テキストエディタで開いて行選択) ---
+
+    /**
+     * サイドパネルの sendToChat を処理する。
+     * 対象ファイルをテキストエディタで開き、該当行を選択状態にし、
+     * 選択テキストをクリップボードにコピーする。
+     */
+    async handleSendToChat(
+        sidePanelFilePath: string,
+        startLine: number,
+        endLine: number,
+        selectedMarkdown: string
+    ): Promise<void> {
+        const uri = vscode.Uri.file(sidePanelFilePath);
+        const textDoc = await vscode.workspace.openTextDocument(uri);
+        const textEditor = await vscode.window.showTextDocument(textDoc, { preview: false });
+
+        const maxLine = textDoc.lineCount - 1;
+        const clampedStart = Math.max(0, Math.min(startLine, maxLine));
+        const clampedEnd = Math.max(clampedStart, Math.min(endLine, maxLine));
+
+        const startPos = new vscode.Position(clampedStart, 0);
+        const endPos = textDoc.lineAt(clampedEnd).range.end;
+        textEditor.selection = new vscode.Selection(startPos, endPos);
+        textEditor.revealRange(
+            new vscode.Range(startPos, endPos),
+            vscode.TextEditorRevealType.InCenter
+        );
+
+        if (selectedMarkdown) {
+            await vscode.env.clipboard.writeText(selectedMarkdown);
+        }
+    }
+
     // --- ユーティリティ ---
 
     /**
