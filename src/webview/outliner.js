@@ -2541,13 +2541,14 @@ var Outliner = (function() {
         contextMenuEl.style.left = x + 'px';
         contextMenuEl.style.top = y + 'px';
 
+        // --- ページ操作 ---
         if (node.isPage) {
-            addMenuItem(contextMenuEl, i18n.outlinerRemovePage || 'Remove Page', function() {
-                removePage(nodeId);
-                hideContextMenu();
-            });
             addMenuItem(contextMenuEl, i18n.outlinerOpenPage || 'Open Page', function() {
                 openPage(nodeId);
+                hideContextMenu();
+            }, modLabel + '+Enter');
+            addMenuItem(contextMenuEl, i18n.outlinerDeletePage || 'Delete Page', function() {
+                removePage(nodeId);
                 hideContextMenu();
             });
         } else {
@@ -2559,6 +2560,45 @@ var Outliner = (function() {
 
         addMenuSeparator(contextMenuEl);
 
+        // --- ノード追加 ---
+        addMenuItem(contextMenuEl, i18n.outlinerAddSibling || 'Add Sibling Node', function() {
+            hideContextMenu();
+            var textEl = document.querySelector('.outliner-node[data-id="' + nodeId + '"] .outliner-text');
+            if (textEl) {
+                var len = textEl.textContent.length;
+                handleEnter(node, textEl, len);
+            }
+        }, 'Enter');
+        addMenuItem(contextMenuEl, i18n.outlinerAddChild || 'Add Child Node', function() {
+            hideContextMenu();
+            var textEl = document.querySelector('.outliner-node[data-id="' + nodeId + '"] .outliner-text');
+            if (textEl) {
+                var len = textEl.textContent.length;
+                handleShiftEnter(node, textEl, len);
+            }
+        }, isMacPlatform ? 'Option+Enter' : 'Alt+Enter');
+
+        addMenuSeparator(contextMenuEl);
+
+        // --- インデント ---
+        addMenuItem(contextMenuEl, i18n.outlinerIndent || 'Indent', function() {
+            var textEl = document.querySelector('.outliner-node[data-id="' + nodeId + '"] .outliner-text');
+            if (textEl) {
+                handleTab(node, textEl);
+            }
+            hideContextMenu();
+        }, 'Tab');
+        addMenuItem(contextMenuEl, i18n.outlinerDedent || 'Dedent', function() {
+            var textEl = document.querySelector('.outliner-node[data-id="' + nodeId + '"] .outliner-text');
+            if (textEl) {
+                handleShiftTab(node, textEl);
+            }
+            hideContextMenu();
+        }, 'Shift+Tab');
+
+        addMenuSeparator(contextMenuEl);
+
+        // --- チェックボックス ---
         if (node.checked !== null && node.checked !== undefined) {
             addMenuItem(contextMenuEl, i18n.outlinerRemoveCheckbox || 'Remove Checkbox', function() {
                 saveSnapshot();
@@ -2579,31 +2619,30 @@ var Outliner = (function() {
             });
         }
 
-        addMenuSeparator(contextMenuEl);
-
-        // サブテキスト
+        // --- サブテキスト ---
         var subtextLabel = (node.subtext) ? (i18n.outlinerEditSubtext || 'Edit Subtext') : (i18n.outlinerAddSubtext || 'Add Subtext');
         addMenuItem(contextMenuEl, subtextLabel, function() {
             hideContextMenu();
             openSubtext(nodeId);
-        });
+        }, 'Shift+Enter');
 
         addMenuSeparator(contextMenuEl);
 
-        // スコープ
+        // --- スコープ ---
         addMenuItem(contextMenuEl, i18n.outlinerScope || 'Scope', function() {
             setScope({ type: 'subtree', rootId: nodeId });
             hideContextMenu();
-        });
+        }, modLabel + '+]');
         if (currentScope.type !== 'document') {
             addMenuItem(contextMenuEl, i18n.outlinerClearScope || 'Clear Scope', function() {
                 setScope({ type: 'document' });
                 hideContextMenu();
-            });
+            }, modLabel + '+Shift+]');
         }
 
         addMenuSeparator(contextMenuEl);
 
+        // --- 移動 ---
         addMenuItem(contextMenuEl, i18n.outlinerMoveUp || 'Move Up', function() {
             saveSnapshot();
             if (model.moveUp(nodeId)) {
@@ -2612,7 +2651,7 @@ var Outliner = (function() {
                 scheduleSyncToHost();
             }
             hideContextMenu();
-        });
+        }, modLabel + '+Shift+↑');
         addMenuItem(contextMenuEl, i18n.outlinerMoveDown || 'Move Down', function() {
             saveSnapshot();
             if (model.moveDown(nodeId)) {
@@ -2621,14 +2660,14 @@ var Outliner = (function() {
                 scheduleSyncToHost();
             }
             hideContextMenu();
-        });
+        }, modLabel + '+Shift+↓');
 
         addMenuSeparator(contextMenuEl);
 
-        // スコープヘッダーノードは削除不可
+        // --- 削除 (スコープヘッダーノードは削除不可) ---
         var isCtxScopeHeader = (currentScope.type === 'subtree' && currentScope.rootId === nodeId);
         if (!isCtxScopeHeader) {
-            addMenuItem(contextMenuEl, i18n.outlinerDelete || 'Delete', function() {
+            addMenuItem(contextMenuEl, i18n.outlinerDeleteNode || 'Delete Node', function() {
                 saveSnapshot();
                 var nextId = model.getNextVisibleId(nodeId) || model.getPreviousVisibleId(nodeId);
                 model.removeNode(nodeId);
@@ -2639,7 +2678,7 @@ var Outliner = (function() {
                 if (nextId && model.getNode(nextId)) { focusNode(nextId); }
                 scheduleSyncToHost();
                 hideContextMenu();
-            });
+            }, 'Backspace');
         }
 
         document.body.appendChild(contextMenuEl);
@@ -2653,10 +2692,22 @@ var Outliner = (function() {
         }
     }
 
-    function addMenuItem(parent, text, handler) {
+    var isMacPlatform = navigator.platform.indexOf('Mac') !== -1;
+    var modLabel = isMacPlatform ? 'Cmd' : 'Ctrl';
+
+    function addMenuItem(parent, text, handler, shortcut) {
         var item = document.createElement('div');
         item.className = 'outliner-context-menu-item';
-        item.textContent = text;
+        var labelSpan = document.createElement('span');
+        labelSpan.className = 'context-menu-label';
+        labelSpan.textContent = text;
+        item.appendChild(labelSpan);
+        if (shortcut) {
+            var kbdSpan = document.createElement('span');
+            kbdSpan.className = 'context-menu-shortcut';
+            kbdSpan.textContent = shortcut;
+            item.appendChild(kbdSpan);
+        }
         item.addEventListener('click', handler);
         parent.appendChild(item);
     }

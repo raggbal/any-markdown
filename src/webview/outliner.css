@@ -561,13 +561,32 @@ body {
 }
 
 .outliner-context-menu-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     padding: 6px 16px;
     cursor: pointer;
     font-size: 13px;
+    gap: 12px;
 }
 
 .outliner-context-menu-item:hover {
     background: var(--outliner-hover-bg);
+}
+
+.context-menu-label {
+    flex: 1;
+    white-space: nowrap;
+}
+
+.context-menu-shortcut {
+    font-size: 11px;
+    color: #999;
+    background: rgba(255,255,255,0.08);
+    border-radius: 3px;
+    padding: 1px 6px;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .outliner-context-menu-separator {
