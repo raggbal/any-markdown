@@ -25,6 +25,7 @@ var notesFilePanel = (function() {
     var listEl = null;
     var panelEl = null;
     var contextMenu = null;
+    var i18n = window.__outlinerMessages || {};
 
     // D&D state (module-scope, VSCode webview の dataTransfer 制限回避)
     var dragItemId = null;
@@ -154,7 +155,7 @@ var notesFilePanel = (function() {
         header.className = 'file-panel-folder-header';
         header.draggable = true;
         header.innerHTML = ICON_CHEVRON + ICON_FOLDER +
-            '<span class="file-panel-folder-title">' + escapeHtml(folder.title || 'Untitled') + '</span>';
+            '<span class="file-panel-folder-title">' + escapeHtml(folder.title || (i18n.notesUntitled || 'Untitled')) + '</span>';
 
         // クリックで展開/折りたたみ
         header.addEventListener('click', function() {
@@ -238,13 +239,13 @@ var notesFilePanel = (function() {
             if (val && val !== file.title) {
                 bridge.renameTitle(file.filePath, val);
             } else {
-                itemEl.textContent = file.title || 'Untitled';
+                itemEl.textContent = file.title || (i18n.notesUntitled || 'Untitled');
             }
         }
         input.addEventListener('blur', finish);
         input.addEventListener('keydown', function(e) {
             if (e.key === 'Enter') { finish(); }
-            if (e.key === 'Escape') { done = true; itemEl.textContent = file.title || 'Untitled'; }
+            if (e.key === 'Escape') { done = true; itemEl.textContent = file.title || (i18n.notesUntitled || 'Untitled'); }
         });
     }
 
@@ -291,12 +292,12 @@ var notesFilePanel = (function() {
         contextMenu.style.left = e.clientX + 'px';
         contextMenu.style.top = e.clientY + 'px';
 
-        addContextItem(contextMenu, 'Rename', function() {
+        addContextItem(contextMenu, i18n.notesRename || 'Rename', function() {
             closeContextMenu();
             var itemEl = listEl.querySelector('[data-file-path="' + CSS.escape(file.filePath) + '"]');
             if (itemEl) startRenameFile(itemEl, file);
         });
-        addContextItem(contextMenu, 'Delete', function() {
+        addContextItem(contextMenu, i18n.notesDelete || 'Delete', function() {
             closeContextMenu();
             bridge.deleteFile(file.filePath);
         }, true);
@@ -312,15 +313,15 @@ var notesFilePanel = (function() {
         contextMenu.style.left = e.clientX + 'px';
         contextMenu.style.top = e.clientY + 'px';
 
-        addContextItem(contextMenu, 'New Outline here', function() {
+        addContextItem(contextMenu, i18n.notesNewOutline || 'New Outline here', function() {
             closeContextMenu();
             promptNewFile(folder.id);
         });
-        addContextItem(contextMenu, 'New Subfolder', function() {
+        addContextItem(contextMenu, i18n.notesNewFolder || 'New Subfolder', function() {
             closeContextMenu();
             promptNewFolder(folder.id);
         });
-        addContextItem(contextMenu, 'Rename', function() {
+        addContextItem(contextMenu, i18n.notesRename || 'Rename', function() {
             closeContextMenu();
             var folderEl = listEl.querySelector('[data-folder-id="' + CSS.escape(folder.id) + '"]');
             if (folderEl) {
@@ -328,7 +329,7 @@ var notesFilePanel = (function() {
                 if (header) startRenameFolder(header, folder);
             }
         });
-        addContextItem(contextMenu, 'Delete Folder', function() {
+        addContextItem(contextMenu, i18n.notesDeleteFolder || 'Delete Folder', function() {
             closeContextMenu();
             bridge.deleteFolder(folder.id);
         }, true);
@@ -682,7 +683,7 @@ var notesFilePanel = (function() {
         currentSearchId = searchId;
         searchTotalCount = 0;
         if (searchResultsEl) searchResultsEl.innerHTML = '';
-        if (searchCountEl) searchCountEl.textContent = 'Searching...';
+        if (searchCountEl) searchCountEl.textContent = i18n.notesSearching || 'Searching...';
     }
 
     function onSearchPartial(searchId, fileResult) {
@@ -729,7 +730,7 @@ var notesFilePanel = (function() {
     function onSearchEnd(searchId) {
         if (searchId !== currentSearchId) return;
         if (searchCountEl) {
-            searchCountEl.textContent = searchTotalCount + ' result' + (searchTotalCount !== 1 ? 's' : '');
+            searchCountEl.textContent = searchTotalCount + ' ' + (i18n.notesResults || 'results');
         }
     }
 
@@ -991,12 +992,12 @@ var notesFilePanel = (function() {
         btnRow.style.cssText = 'display:flex;gap:8px;justify-content:flex-end;';
 
         var cancelBtn = document.createElement('button');
-        cancelBtn.textContent = 'Cancel';
+        cancelBtn.textContent = i18n.notesS3Cancel || 'Cancel';
         cancelBtn.style.cssText = 'padding:6px 16px;border:1px solid var(--outliner-border,#ccc);border-radius:4px;background:transparent;color:inherit;cursor:pointer;font-size:13px;';
         cancelBtn.addEventListener('click', function() { overlay.remove(); });
 
         var confirmBtn = document.createElement('button');
-        confirmBtn.textContent = 'Continue';
+        confirmBtn.textContent = i18n.notesS3Continue || 'Continue';
         confirmBtn.style.cssText = 'padding:6px 16px;border:none;border-radius:4px;background:#c44;color:#fff;cursor:pointer;font-size:13px;font-weight:500;';
         confirmBtn.addEventListener('click', function() { overlay.remove(); onConfirm(); });
 

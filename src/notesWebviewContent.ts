@@ -42,6 +42,7 @@ export function getNotesWebviewContent(
     const notesBodyHtml = require(path.join(__dirname, 'shared', 'notes-body-html.js'));
     const { css: notesCss, html: notesHtml } = notesBodyHtml.generateNotesFilePanelHtml({
         collapsed: initData.panelCollapsed,
+        messages: config.webviewMessages || {},
     });
 
     // Load Notes file panel JS

@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { getOutlinerWebviewContent } from './outlinerWebviewContent';
-import { getWebviewMessages } from './i18n/messages';
+import { getWebviewMessages, initLocale } from './i18n/messages';
 import { SidePanelManager } from './shared/sidePanelManager';
 
 /**
@@ -361,9 +361,14 @@ export class OutlinerProvider implements vscode.CustomTextEditorProvider {
         // --- 設定変更 ---
         disposables.push(
             vscode.workspace.onDidChangeConfiguration((e) => {
+                if (e.affectsConfiguration('any-markdown.language')) {
+                    const langConfig = vscode.workspace.getConfiguration('any-markdown');
+                    initLocale(langConfig.get<string>('language', 'default'), vscode.env.language);
+                }
                 if (e.affectsConfiguration('any-markdown.theme') ||
                     e.affectsConfiguration('any-markdown.fontSize') ||
-                    e.affectsConfiguration('any-markdown.outlinerPageTitle')) {
+                    e.affectsConfiguration('any-markdown.outlinerPageTitle') ||
+                    e.affectsConfiguration('any-markdown.language')) {
                     updateWebview();
                 }
             })

@@ -91,6 +91,29 @@ export interface WebviewMessages {
   imageDirSourceFile: string;
   imageDirSourceSettings: string;
   imageDirSourceDefault: string;
+  // Notes left panel
+  notesTabNotes: string;
+  notesTabSearch: string;
+  notesNewFolder: string;
+  notesNewOutline: string;
+  notesToday: string;
+  notesCollapsePanel: string;
+  notesSearchPlaceholder: string;
+  notesMatchCase: string;
+  notesWholeWord: string;
+  notesUseRegex: string;
+  notesSearching: string;
+  notesResults: string;
+  notesRename: string;
+  notesDelete: string;
+  notesDeleteFolder: string;
+  notesUntitled: string;
+  notesS3Save: string;
+  notesS3Sync: string;
+  notesS3RemoteDeleteUpload: string;
+  notesS3LocalDeleteDownload: string;
+  notesS3Cancel: string;
+  notesS3Continue: string;
 }
 
 // Supported locales
@@ -224,7 +247,9 @@ export function getLocale(): string {
  * Get webview messages for current locale
  */
 export function getWebviewMessages(): WebviewMessages {
-  return currentMessages?.webviewMessages || fallbackMessages?.webviewMessages || {} as WebviewMessages;
+  const msgs = currentMessages?.webviewMessages || fallbackMessages?.webviewMessages || {} as WebviewMessages;
+  console.log(`[Any MD] getWebviewMessages: locale=${currentLocale} bold="${msgs.bold}" outlinerMakePage="${(msgs as any).outlinerMakePage}"`);
+  return msgs;
 }
 
 /**

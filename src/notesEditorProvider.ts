@@ -4,7 +4,7 @@ import * as path from 'path';
 import { NotesFileManager } from './shared/notes-file-manager';
 import { handleNotesMessage, NotesSender, NotesPlatformActions } from './shared/notes-message-handler';
 import { getNotesWebviewContent } from './notesWebviewContent';
-import { getWebviewMessages } from './i18n/messages';
+import { getWebviewMessages, initLocale } from './i18n/messages';
 import { SidePanelManager } from './shared/sidePanelManager';
 import { s3Sync, s3RemoteDeleteAndUpload, s3LocalDeleteAndDownload, S3SyncConfig } from './notes-s3-sync';
 
@@ -342,9 +342,14 @@ export class NotesEditorProvider {
         // テーマ変更対応 (N-50b)
         this.disposables.push(
             vscode.workspace.onDidChangeConfiguration((e) => {
+                if (e.affectsConfiguration('any-markdown.language')) {
+                    const langConfig = vscode.workspace.getConfiguration('any-markdown');
+                    initLocale(langConfig.get<string>('language', 'default'), vscode.env.language);
+                }
                 if (e.affectsConfiguration('any-markdown.theme') ||
                     e.affectsConfiguration('any-markdown.fontSize') ||
-                    e.affectsConfiguration('any-markdown.outlinerPageTitle')) {
+                    e.affectsConfiguration('any-markdown.outlinerPageTitle') ||
+                    e.affectsConfiguration('any-markdown.language')) {
                     this.refreshPanel();
                 }
             })
