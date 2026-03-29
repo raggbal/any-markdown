@@ -129,6 +129,14 @@ export class OutlinerProvider implements vscode.CustomTextEditorProvider {
                         await document.save();
                         break;
 
+                    case 'openInTextEditor':
+                        await vscode.commands.executeCommand('vscode.openWith', document.uri, 'default');
+                        break;
+
+                    case 'copyFilePath':
+                        await vscode.env.clipboard.writeText(document.uri.fsPath);
+                        break;
+
                     case 'makePage':
                         await this.handleMakePage(document, webviewPanel, message);
                         break;
@@ -195,6 +203,13 @@ export class OutlinerProvider implements vscode.CustomTextEditorProvider {
 
                     case 'sidePanelOpenLink':
                         await sidePanel.handleOpenLink(message.href, message.sidePanelFilePath);
+                        break;
+
+                    case 'sidePanelOpenInTextEditor':
+                        if (message.sidePanelFilePath) {
+                            const spTextUri = vscode.Uri.file(message.sidePanelFilePath);
+                            await vscode.commands.executeCommand('vscode.openWith', spTextUri, 'default');
+                        }
                         break;
 
                     case 'sendToChat': {

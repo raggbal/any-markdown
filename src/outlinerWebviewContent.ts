@@ -32,6 +32,8 @@ export function getOutlinerWebviewContent(
         .replace('__FONT_SIZE__', String(config.fontSize));
 
     // Load HostBridge
+    const sidePanelBridgeScript = fs.readFileSync(
+        path.join(__dirname, 'shared', 'sidepanel-bridge-methods.js'), 'utf8');
     const hostBridgePath = path.join(__dirname, 'shared', 'outliner-host-bridge.js');
     const hostBridgeScript = fs.readFileSync(hostBridgePath, 'utf8');
 
@@ -131,6 +133,9 @@ export function getOutlinerWebviewContent(
     </script>
     <script nonce="${nonce}">
         ${editorScript}
+    </script>
+    <script nonce="${nonce}">
+        ${sidePanelBridgeScript}
     </script>
     <script nonce="${nonce}">
         ${hostBridgeScript}

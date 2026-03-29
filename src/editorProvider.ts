@@ -868,6 +868,13 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
                     await sidePanel.handleOpenLink(message.href, message.sidePanelFilePath);
                     break;
 
+                case 'sidePanelOpenInTextEditor':
+                    if (message.sidePanelFilePath) {
+                        const spTextUri = vscode.Uri.file(message.sidePanelFilePath);
+                        await vscode.commands.executeCommand('vscode.openWith', spTextUri, 'default');
+                    }
+                    break;
+
                 case 'sendToChat':
                     // Open text editor with selection based on line numbers from webview
                     try {

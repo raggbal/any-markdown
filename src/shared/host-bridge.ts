@@ -30,6 +30,7 @@ export interface HostBridge {
     saveSidePanelFile(filePath: string, content: string): void;
     sidePanelOpenLink(href: string, sidePanelFilePath: string): void;
     notifySidePanelClosed(): void;
+    sidePanelOpenInTextEditor(sidePanelFilePath: string): void;
     getSidePanelImageDir(sidePanelFilePath: string): void;
 
     // ページ追加 (Action Panel)

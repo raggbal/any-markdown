@@ -579,7 +579,7 @@ body {
 [data-theme="perplexity"] .editor table th { background: #EAEEEF; }
 [data-theme="perplexity"] .editor table td, [data-theme="perplexity"] .editor table th { border-color: #D8D8D0; }
 [data-theme="perplexity"] .editor code { border-radius: 6px; font-size: 0.8125em; color: #1a1a1a; }
-[data-theme="perplexity"] .editor pre code { color: #1a1a1a; }
+/* pre code color is inherited from --code-text (#1a1a1a) via CSS variables */
 [data-theme="perplexity"] .editor a { text-decoration: underline; text-decoration-color: rgba(31, 184, 205, 0.4); text-underline-offset: 2px; }
 [data-theme="perplexity"] .editor a:hover { text-decoration-color: #1FB8CD; }
 [data-theme="perplexity"] .editor hr { border-top-color: #D8D8D0; border-top-width: 1px; margin: 0.5em 0; }
@@ -858,7 +858,19 @@ body {
 [data-theme="dark"] .hljs-name { color: #7ee787; }
 [data-theme="dark"] .hljs-selector { color: #d2a8ff; }
 [data-theme="dark"] .hljs-property { color: #79c0ff; }
-
+[data-theme="perplexity"] .hljs-keyword { color: #1A6872; }
+[data-theme="perplexity"] .hljs-string { color: #707C36; }
+[data-theme="perplexity"] .hljs-number { color: #A84B2F; }
+[data-theme="perplexity"] .hljs-comment { color: #92DCE2; font-style: italic; }
+[data-theme="perplexity"] .hljs-function { color: #1FB8CD; }
+[data-theme="perplexity"] .hljs-built_in { color: #2CA0AB; }
+[data-theme="perplexity"] .hljs-literal { color: #A84B2F; }
+[data-theme="perplexity"] .hljs-type { color: #1A6872; }
+[data-theme="perplexity"] .hljs-attr { color: #2E565E; }
+[data-theme="perplexity"] .hljs-tag { color: #1A6872; }
+[data-theme="perplexity"] .hljs-name { color: #1FB8CD; }
+[data-theme="perplexity"] .hljs-selector { color: #1A6872; }
+[data-theme="perplexity"] .hljs-property { color: #2CA0AB; }
 
 .editor blockquote {
     margin: 0.5em 0;

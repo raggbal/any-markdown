@@ -12,6 +12,7 @@ const path = require('path');
 
 const editorJsPath = path.join(__dirname, '../src/webview/editor.js');
 const editorUtilsJsPath = path.join(__dirname, '../src/webview/editor-utils.js');
+const sidePanelBridgePath = path.join(__dirname, '../src/shared/sidepanel-bridge-methods.js');
 const testHostBridgePath = path.join(__dirname, '../src/shared/test-host-bridge.js');
 const outputPath = path.join(__dirname, 'html/standalone-editor.html');
 
@@ -35,11 +36,19 @@ if (fs.existsSync(vendorSrc)) {
     }
 }
 
+// styles.css を読み込み（テーマCSS変数・hljsカラー等を含む）
+const stylesPath = path.join(__dirname, '../src/webview/styles.css');
+const stylesContent = fs.readFileSync(stylesPath, 'utf-8')
+    .replace('__FONT_SIZE__', '16px');
+
 // editor-utils.js を読み込み（editor.jsより前にロードされる）
 const editorUtilsScript = fs.readFileSync(editorUtilsJsPath, 'utf-8');
 
 // editor.jsを読み込み
 let editorScript = fs.readFileSync(editorJsPath, 'utf-8');
+
+// 共通ブリッジメソッドを読み込み
+const sidePanelBridgeScript = fs.readFileSync(sidePanelBridgePath, 'utf-8');
 
 // テスト用HostBridgeを読み込み
 const testHostBridgeScript = fs.readFileSync(testHostBridgePath, 'utf-8');
@@ -169,6 +178,10 @@ const html = `<!DOCTYPE html>
             background: var(--selection-bg);
         }
     </style>
+    <style>
+        /* Full styles.css for theme support and syntax highlighting */
+        ${stylesContent}
+    </style>
 </head>
 <body>
     <div class="sidebar" id="sidebar" style="display:none;"><div class="outline" id="outline"></div></div>
@@ -203,6 +216,9 @@ const html = `<!DOCTYPE html>
     <script src="vendor/turndown-plugin-gfm.js"></script>
     <script src="vendor/mermaid.min.js"></script>
     <script>
+    __SIDEPANEL_BRIDGE__
+    </script>
+    <script>
     __TEST_HOST_BRIDGE__
     </script>
     <script>
@@ -215,6 +231,7 @@ const html = `<!DOCTYPE html>
 </html>`;
 
 fs.writeFileSync(outputPath, html
+    .replace('__SIDEPANEL_BRIDGE__', sidePanelBridgeScript)
     .replace('__TEST_HOST_BRIDGE__', testHostBridgeScript)
     .replace('__EDITOR_UTILS_SCRIPT__', editorUtilsScript)
     .replace('__EDITOR_SCRIPT__', editorScript));

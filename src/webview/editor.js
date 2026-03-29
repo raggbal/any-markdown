@@ -53,6 +53,7 @@ class EditorInstance {
     static instances = [];
     static activeInstance = null;
     static _lastKnownActive = null;
+    static _globalListenersRegistered = false;
 
     static getActiveInstance() {
         // Find the most specific (deepest nested) container that contains activeElement.
@@ -98,6 +99,7 @@ class EditorInstance {
 
     // ===== Destroy instance =====
     destroy() {
+        console.log('[DEBUG] EditorInstance.destroy() called. instances before=' + EditorInstance.instances.length);
         const idx = EditorInstance.instances.indexOf(this);
         if (idx !== -1) EditorInstance.instances.splice(idx, 1);
         if (EditorInstance.activeInstance === this) {
@@ -106,6 +108,16 @@ class EditorInstance {
         if (EditorInstance._lastKnownActive === this) {
             EditorInstance._lastKnownActive = EditorInstance.instances[0] || null;
         }
+        // Cleanup: remove command palette and action panel DOM elements appended to document.body
+        if (this._commandPaletteEl) {
+            this._commandPaletteEl.remove();
+            this._commandPaletteEl = null;
+        }
+        if (this._actionPanelEl) {
+            this._actionPanelEl.remove();
+            this._actionPanelEl = null;
+        }
+        console.log('[DEBUG] EditorInstance.destroy() done. instances after=' + EditorInstance.instances.length);
     }
 
     // ===== Create minimal DOM for side panel editor =====
@@ -174,6 +186,7 @@ class EditorInstance {
 
     // ===== Legacy IIFE code (will be refactored in later phases) =====
     _legacyInit() {
+    var self = this;
     // Debug logging configuration
     const DEBUG_MODE = __DEBUG_MODE__;
     const IS_OUTLINER_PAGE = __IS_OUTLINER_PAGE__;
@@ -185,7 +198,8 @@ class EditorInstance {
 
     const host = this.host;
     const container = this.container;
-    const isMainInstance = EditorInstance.instances.length === 1;
+    const isMainInstance = !EditorInstance._globalListenersRegistered;
+    if (isMainInstance) EditorInstance._globalListenersRegistered = true;
     const i18n = __I18N__;
 
     // Import shared pure functions/constants from editor-utils.js (loaded before this script)
@@ -4320,6 +4334,19 @@ class EditorInstance {
             return true;
         }
 
+        // Horizontal rule: --- + space or enter (must be checked BEFORE UL pattern,
+        // because UL regex /^[-*+]\s?(.*)$/ also matches "---")
+        if (/^-{3,}$/.test(text.trim()) && node.tagName && node.tagName.toUpperCase() === 'P') {
+            const hr = document.createElement('hr');
+            const p = document.createElement('p');
+            p.innerHTML = '<br>';
+            node.replaceWith(hr);
+            hr.after(p);
+            setCursorToEnd(p);
+            syncMarkdown();
+            return true;
+        }
+
         // Unordered list: - + space or * + space (with optional existing text)
         // Space is preventDefault'd, so text is "-" or "- existing text"
         const ulMatch = text.match(/^[-*+]\s?(.*)$/);
@@ -4411,18 +4438,6 @@ class EditorInstance {
             }
             node.replaceWith(blockquote);
             setCursorToEnd(blockquote);
-            syncMarkdown();
-            return true;
-        }
-
-        // Horizontal rule: --- + space or enter
-        if (/^-{3,}$/.test(text.trim()) && node.tagName && node.tagName.toUpperCase() === 'P') {
-            const hr = document.createElement('hr');
-            const p = document.createElement('p');
-            p.innerHTML = '<br>';
-            node.replaceWith(hr);
-            hr.after(p);
-            setCursorToEnd(p);
             syncMarkdown();
             return true;
         }
@@ -11343,6 +11358,7 @@ class EditorInstance {
         });
 
         document.body.appendChild(commandPalette);
+        self._commandPaletteEl = commandPalette;
     }
 
     function renderCommandPaletteItems(filter) {
@@ -11597,6 +11613,7 @@ class EditorInstance {
         actionPanel.className = 'action-panel';
         actionPanel.style.display = 'none';
         document.body.appendChild(actionPanel);
+        self._actionPanelEl = actionPanel;
     }
 
     function renderActionPanelMenu() {
@@ -12248,6 +12265,9 @@ class EditorInstance {
     // Instance-aware global shortcut handler (captures closure variables)
     this._handleGlobalShortcut = async function(e) {
         const isMod = e.ctrlKey || e.metaKey;
+        if (isMod && (e.key === '/' || e.key === 'n')) {
+            console.log('[DEBUG] _handleGlobalShortcut key=' + e.key + ' isMainInstance=' + isMainInstance + ' isSourceMode=' + isSourceMode + ' commandPaletteVisible=' + commandPaletteVisible + ' actionPanelVisible=' + actionPanelVisible);
+        }
 
         // Handle paste shortcut for Kiro only
         const isKiro = navigator.userAgent.includes('Kiro');
@@ -12659,6 +12679,13 @@ class EditorInstance {
     // Register document-level shortcut delegation (once, by main instance)
     if (isMainInstance) document.addEventListener('keydown', function(e) {
         var inst = EditorInstance.getActiveInstance();
+        if ((e.ctrlKey || e.metaKey) && (e.key === '/' || e.key === 'n')) {
+            console.log('[DEBUG] Global keydown delegation: key=' + e.key
+                + ' instances=' + EditorInstance.instances.length
+                + ' activeInstance=' + (inst ? (inst === EditorInstance.instances[0] ? 'main' : 'sidePanel(idx=' + EditorInstance.instances.indexOf(inst) + ')') : 'null')
+                + ' activeElement=' + document.activeElement.tagName + '.' + document.activeElement.className
+                + ' _lastKnownActive=' + (EditorInstance._lastKnownActive ? EditorInstance.instances.indexOf(EditorInstance._lastKnownActive) : 'null'));
+        }
         if (inst && inst._handleGlobalShortcut) inst._handleGlobalShortcut(e);
     });
 
@@ -13453,6 +13480,7 @@ class EditorInstance {
 
         var undoBtn = header.querySelector('[data-action="undo"]');
         var redoBtn = header.querySelector('[data-action="redo"]');
+        var openTextEditorBtn = header.querySelector('[data-action="openInTextEditor"]');
         var sourceBtn = header.querySelector('[data-action="source"]');
 
         if (undoBtn) undoBtn.addEventListener('click', function() {
@@ -13460,6 +13488,11 @@ class EditorInstance {
         });
         if (redoBtn) redoBtn.addEventListener('click', function() {
             if (sidePanelInstance) sidePanelInstance._redo();
+        });
+        if (openTextEditorBtn) openTextEditorBtn.addEventListener('click', function() {
+            if (sidePanelFilePath) {
+                host.sidePanelOpenInTextEditor(sidePanelFilePath);
+            }
         });
         if (sourceBtn) sourceBtn.addEventListener('click', function() {
             if (sidePanelInstance) sidePanelInstance._toggleSourceMode();
@@ -15168,7 +15201,6 @@ class EditorInstance {
     });
 
     // Focus/blur notifications for sync policy
-    var self = this;
     editor.addEventListener('focus', function() {
         EditorInstance._lastKnownActive = self;
         host.reportFocus();

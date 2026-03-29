@@ -153,6 +153,18 @@ export class NotesEditorProvider {
                 const uri = vscode.Uri.file(filePath);
                 await vscode.commands.executeCommand('vscode.open', uri);
             },
+            openInTextEditor: () => {
+                const fp = this.fileManager?.getCurrentFilePath();
+                if (fp) {
+                    vscode.commands.executeCommand('vscode.openWith', vscode.Uri.file(fp), 'default');
+                }
+            },
+            copyFilePath: () => {
+                const fp = this.fileManager?.getCurrentFilePath();
+                if (fp) {
+                    vscode.env.clipboard.writeText(fp);
+                }
+            },
             requestInsertImage: async (sidePanelFilePath: string) => {
                 if (!this.fileManager) return;
                 const pagesDir = this.fileManager.getPagesDirPath();
@@ -272,6 +284,12 @@ export class NotesEditorProvider {
             },
             handleSidePanelOpenLink: (href: string, sidePanelFilePath: string) => {
                 sidePanel.handleOpenLink(href, sidePanelFilePath);
+            },
+            handleSidePanelOpenInTextEditor: (sidePanelFilePath: string) => {
+                if (sidePanelFilePath) {
+                    const spTextUri = vscode.Uri.file(sidePanelFilePath);
+                    vscode.commands.executeCommand('vscode.openWith', spTextUri, 'default');
+                }
             },
             handleSidePanelClosed: () => {
                 sidePanel.handleClose();

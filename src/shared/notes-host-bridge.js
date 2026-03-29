@@ -4,9 +4,11 @@
  * notes-file-panel.js が使う window.notesHostBridge の両方を提供する。
  *
  * notesWebviewContent.ts により outliner.js の前に注入される。
+ * 共通メソッドは sidepanel-bridge-methods.js の __createSidePanelBridgeMethods() から取得。
  */
 (function() {
     var api = acquireVsCodeApi();
+    var postFn = function(msg) { api.postMessage(msg); };
 
     // ファイル切替カウンター: stale syncData を防止
     var currentFileChangeId = window.__initialFileChangeId || 0;
@@ -16,16 +18,14 @@
         }
     });
 
+    // 共通メソッド（サイドパネル・画像・リンク・フォーカス等）
+    var shared = window.__createSidePanelBridgeMethods(postFn);
+
     // ── outliner.js 用ブリッジ (既存 outliner-host-bridge.js と同一インターフェース) ──
-    window.outlinerHostBridge = {
+    window.outlinerHostBridge = Object.assign(shared, {
         // データ同期
         syncData: function(jsonString) {
             api.postMessage({ type: 'syncData', content: jsonString, fileChangeId: currentFileChangeId });
-        },
-
-        // 保存
-        save: function() {
-            api.postMessage({ type: 'save' });
         },
 
         // ページ操作
@@ -46,41 +46,6 @@
         openPageInSidePanel: function(nodeId, pageId) {
             api.postMessage({ type: 'openPageInSidePanel', nodeId: nodeId, pageId: pageId });
         },
-        saveSidePanelFile: function(filePath, content) {
-            api.postMessage({ type: 'saveSidePanelFile', filePath: filePath, content: content });
-        },
-        notifySidePanelClosed: function() {
-            api.postMessage({ type: 'sidePanelClosed' });
-        },
-        sidePanelOpenLink: function(href, sidePanelFilePath) {
-            api.postMessage({ type: 'sidePanelOpenLink', href: href, sidePanelFilePath: sidePanelFilePath });
-        },
-        openLinkInTab: function(href) {
-            api.postMessage({ type: 'openLinkInTab', href: href });
-        },
-        getSidePanelImageDir: function(sidePanelFilePath) {
-            api.postMessage({ type: 'getSidePanelImageDir', sidePanelFilePath: sidePanelFilePath });
-        },
-        requestInsertImage: function(sidePanelFilePath) {
-            api.postMessage({ type: 'insertImage', position: 0, sidePanelFilePath: sidePanelFilePath });
-        },
-        requestSetImageDir: function(sidePanelFilePath) {
-            api.postMessage({ type: 'setImageDir', sidePanelFilePath: sidePanelFilePath });
-        },
-        saveImageAndInsert: function(dataUrl, fileName, sidePanelFilePath) {
-            api.postMessage({ type: 'saveImageAndInsert', dataUrl: dataUrl, fileName: fileName, sidePanelFilePath: sidePanelFilePath });
-        },
-        readAndInsertImage: function(filePath, sidePanelFilePath) {
-            api.postMessage({ type: 'readAndInsertImage', filePath: filePath, sidePanelFilePath: sidePanelFilePath });
-        },
-        searchFiles: function(query) {
-            api.postMessage({ type: 'searchFiles', query: query });
-        },
-
-        // sendToChat (サイドパネルからの呼び出し)
-        sendToChat: function(startLine, endLine, selectedMarkdown, sidePanelFilePath) {
-            api.postMessage({ type: 'sendToChat', startLine: startLine, endLine: endLine, selectedMarkdown: selectedMarkdown, sidePanelFilePath: sidePanelFilePath });
-        },
 
         // ページ管理 (サイドパネル内EditorInstanceから呼ばれる — outlinerでは未使用)
         createPageAtPath: function() { /* no-op in outliner */ },
@@ -88,6 +53,14 @@
         updatePageH1: function() { /* no-op in outliner */ },
 
         // Daily Notes ナビゲーション（outliner.jsから呼び出し）
+        // .outファイル操作
+        openInTextEditor: function() {
+            api.postMessage({ type: 'openInTextEditor' });
+        },
+        copyFilePath: function() {
+            api.postMessage({ type: 'copyFilePath' });
+        },
+
         postDailyNotes: function(type, dayOffset, currentDate) {
             if (window.Outliner && window.Outliner.flushSync) {
                 window.Outliner.flushSync();
@@ -97,28 +70,8 @@
             } else {
                 api.postMessage({ type: type, dayOffset: dayOffset || 0, currentDate: currentDate || null });
             }
-        },
-
-        // リンク
-        openLink: function(href) {
-            api.postMessage({ type: 'openLink', href: href });
-        },
-
-        // フォーカス
-        reportFocus: function() {
-            api.postMessage({ type: 'webviewFocus' });
-        },
-        reportBlur: function() {
-            api.postMessage({ type: 'webviewBlur' });
-        },
-
-        // ホストからのメッセージ受信
-        onMessage: function(handler) {
-            window.addEventListener('message', function(e) {
-                handler(e.data);
-            });
         }
-    };
+    });
 
     // ── Outliner即時同期ヘルパー ──
     // ファイル切替前に未保存のoutlinerデータを即座にsyncする

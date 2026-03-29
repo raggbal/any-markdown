@@ -2,7 +2,8 @@
   "version": 1,
   "rootIds": [
     "nmn2906pz5lddat",
-    "nmn29085o6be3n9"
+    "nmn29085o6be3n9",
+    "nmnbg8mbben6hvj"
   ],
   "nodes": {
     "nmn2906pz5lddat": {
@@ -25,9 +26,22 @@
       "collapsed": false,
       "checked": null,
       "subtext": ""
+    },
+    "nmnbg8mbben6hvj": {
+      "id": "nmnbg8mbben6hvj",
+      "parentId": null,
+      "children": [],
+      "text": "ｄｓｄｓ",
+      "tags": [],
+      "isPage": true,
+      "pageId": "30a31fbd-0f22-4c9e-8b30-454fb2341d63",
+      "collapsed": false,
+      "checked": null,
+      "subtext": ""
     }
   },
   "title": "test",
   "searchFocusMode": false,
-  "pageDir": "./mn2906pzdx0r"
+  "pageDir": "./mn2906pzdx0r",
+  "sidePanelWidth": 649
 }

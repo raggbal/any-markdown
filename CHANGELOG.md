@@ -5,6 +5,20 @@ All notable changes to the "Any Markdown Editor" extension will be documented in
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.195.541] - 2026-03-29
+
+### Added
+
+- **Perplexityテーマ: シンタックスハイライト** — コードブロックに13色のカラーパレットを追加
+
+### Fixed
+
+- **水平線(---)の入力** — `---` がリスト項目として処理される場合があったバグを修正
+
+### Changed
+
+- **HostBridge共通メソッド抽出** — 4つのブリッジファイルの重複コードを `sidepanel-bridge-methods.js` に一元化
+
 ## [0.195.539] - 2026-03-26
 
 ### Added

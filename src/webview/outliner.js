@@ -131,6 +131,10 @@ var Outliner = (function() {
         if (data && data.pinnedTags) {
             pinnedTags = data.pinnedTags;
         }
+        // JSONからサイドパネル幅を復元
+        if (data && data.sidePanelWidth) {
+            sidePanelWidthSetting = data.sidePanelWidth;
+        }
 
         treeEl = document.querySelector('.outliner-tree');
         searchInput = document.querySelector('.outliner-search-input');
@@ -2061,6 +2065,27 @@ var Outliner = (function() {
         var dropdown = document.createElement('div');
         dropdown.className = 'outliner-menu-dropdown';
 
+        // Open in Text Editor
+        var openTextEditorItem = document.createElement('button');
+        openTextEditorItem.className = 'menu-item';
+        openTextEditorItem.textContent = i18n.openInTextEditor || 'Open in Text Editor';
+        openTextEditorItem.title = i18n.openInTextEditor || 'Open in Text Editor';
+        openTextEditorItem.addEventListener('click', function() {
+            dropdown.remove();
+            host.openInTextEditor();
+        });
+        dropdown.appendChild(openTextEditorItem);
+
+        // Copy File Path
+        var copyPathItem = document.createElement('button');
+        copyPathItem.className = 'menu-item';
+        copyPathItem.textContent = i18n.copyPath || 'Copy File Path';
+        copyPathItem.addEventListener('click', function() {
+            dropdown.remove();
+            host.copyFilePath();
+        });
+        dropdown.appendChild(copyPathItem);
+
         // Notes mode ではpageDirが自動管理のため Set page directory を非表示
         if (!document.querySelector('.notes-layout')) {
             var setPageDirItem = document.createElement('button');
@@ -2939,10 +2964,12 @@ var Outliner = (function() {
                 });
                 var undoBtn = header.querySelector('[data-action="undo"]');
                 var redoBtn = header.querySelector('[data-action="redo"]');
+                var openTextEditorBtn = header.querySelector('[data-action="openInTextEditor"]');
                 var sourceBtn = header.querySelector('[data-action="source"]');
 
                 if (undoBtn) { undoBtn.addEventListener('click', function() { if (sidePanelInstance) sidePanelInstance._undo(); }); }
                 if (redoBtn) { redoBtn.addEventListener('click', function() { if (sidePanelInstance) sidePanelInstance._redo(); }); }
+                if (openTextEditorBtn) { openTextEditorBtn.addEventListener('click', function() { if (sidePanelFilePath) host.sidePanelOpenInTextEditor(sidePanelFilePath); }); }
                 if (sourceBtn) { sourceBtn.addEventListener('click', function() { if (sidePanelInstance) sidePanelInstance._toggleSourceMode(); }); }
 
                 sidePanelInstance._setUndoUpdateCallback(function(undoDisabled, redoDisabled) {

@@ -37,10 +37,16 @@ export interface NotesPlatformActions {
     saveSidePanelFile(filePath: string, content: string): Promise<void>;
     /** サイドパネルのリンクを処理 */
     handleSidePanelOpenLink(href: string, sidePanelFilePath: string): void;
+    /** サイドパネルファイルをテキストエディタで開く */
+    handleSidePanelOpenInTextEditor?(sidePanelFilePath: string): void;
     /** サイドパネルが閉じられた */
     handleSidePanelClosed(): void;
     /** サイドパネルの sendToChat を処理（テキストエディタで開いて行選択） */
     sendToChatFromSidePanel?(sidePanelFilePath: string, startLine: number, endLine: number, selectedMarkdown: string): Promise<void>;
+    /** .outファイルをテキストエディタで開く */
+    openInTextEditor?(): void;
+    /** .outファイルパスをクリップボードにコピー */
+    copyFilePath?(): void;
     /** 外部エディタでファイルを開く */
     openFileExternal?(filePath: string): void;
     /** 最後に開いたファイルを記録 */
@@ -100,6 +106,14 @@ export function handleNotesMessage(
             fileManager.flushSave();
             break;
 
+        case 'openInTextEditor':
+            platform.openInTextEditor?.();
+            break;
+
+        case 'copyFilePath':
+            platform.copyFilePath?.();
+            break;
+
         // ── Page Operations ──
 
         case 'makePage': {
@@ -155,6 +169,10 @@ export function handleNotesMessage(
 
         case 'sidePanelOpenLink':
             platform.handleSidePanelOpenLink(message.href, message.sidePanelFilePath);
+            break;
+
+        case 'sidePanelOpenInTextEditor':
+            platform.handleSidePanelOpenInTextEditor?.(message.sidePanelFilePath);
             break;
 
         case 'sendToChat':

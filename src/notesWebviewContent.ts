@@ -48,7 +48,9 @@ export function getNotesWebviewContent(
     const notesFilePanelScript = fs.readFileSync(
         path.join(__dirname, 'shared', 'notes-file-panel.js'), 'utf8');
 
-    // Load Notes HostBridge
+    // Load HostBridge (shared + notes)
+    const sidePanelBridgeScript = fs.readFileSync(
+        path.join(__dirname, 'shared', 'sidepanel-bridge-methods.js'), 'utf8');
     const notesHostBridgeScript = fs.readFileSync(
         path.join(__dirname, 'shared', 'notes-host-bridge.js'), 'utf8');
 
@@ -161,6 +163,7 @@ export function getNotesWebviewContent(
         window.__outlinerMessages = ${JSON.stringify(config.webviewMessages || {})};
         window.__initialFileChangeId = ${initData.fileChangeId || 0};
     </script>
+    <script nonce="${nonce}">${sidePanelBridgeScript}</script>
     <script nonce="${nonce}">${notesHostBridgeScript}</script>
     <script nonce="${nonce}">${editorUtilsScript}</script>
     <script nonce="${nonce}">${editorScript}</script>
