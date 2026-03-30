@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to the "Any Markdown Editor" extension will be documented in this file.
+All notable changes to the "Fractal" extension extension will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -177,7 +177,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Outliner: Tag click search** — Click a #tag or @tag on a non-focused node to auto-search
 - **Outliner: 7 theme support** — github, sepia, night, dark, minimal, things, perplexity themes now applied to outliner
 - **Outliner: i18n support** — 7 languages (en, ja, ko, es, fr, zh-cn, zh-tw) for all outliner UI strings
-- **Outliner: Page directory setting** — `any-markdown.outlinerPageDir` setting + per-file override via mmd JSON `pageDir` field
+- **Outliner: Page directory setting** — `fractal.outlinerPageDir` setting + per-file override via mmd JSON `pageDir` field
 - **Outliner: Page display constraints** — Pages opened from outliner have forced image directory and hidden addPage feature
 
 ### Fixed
@@ -291,7 +291,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Notion-style side panel** — Clicking a `.md` link opens a fully functional side panel with complete WYSIWYG editing (undo/redo, code blocks, Mermaid, Math, all keyboard shortcuts). Powered by iframe-based architecture for full editor isolation.
-- **Link open mode setting** — `any-markdown.linkOpenMode`: `"sidePanel"` (default) for Notion-style peek, `"tab"` for new editor tab.
+- **Link open mode setting** — `fractal.linkOpenMode`: `"sidePanel"` (default) for Notion-style peek, `"tab"` for new editor tab.
 - **Cmd+Click always opens in new tab** — Hold Cmd (Mac) or Ctrl (Windows/Linux) while clicking a link to always open in a new tab, regardless of settings.
 - **Side panel link navigation** — Links clicked inside the side panel navigate within the same panel.
 
@@ -354,14 +354,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.195.374] - 2026-03-04
 
 ### Changed
-- **Toolbar default mode is now **`simple` — With the Action Palette (`Cmd+/`) available, the toolbar defaults to simple mode. Set `"any-markdown.toolbarMode": "full"` to restore the full toolbar.
+- **Toolbar default mode is now **`simple` — With the Action Palette (`Cmd+/`) available, the toolbar defaults to simple mode. Set `"fractal.toolbarMode": "full"` to restore the full toolbar.
 - **Open in Text Editor shortcut changed** — `Cmd+,` / `Ctrl+,` → `Cmd+Shift+.` / `Ctrl+Shift+.` to avoid conflict with VS Code's Settings shortcut. Now paired with `Cmd+.` (Source Mode toggle).
 - **README redesigned** — Added Important Changes section, fixed incorrect shortcut documentation, added emoji to section headings, updated screenshots.
 
 ## [0.195.368] - 2026-03-03
 
 ### Added
-- **Simple Toolbar Mode** — New `any-markdown.toolbarMode` setting with `"full"` (default) and `"simple"` options. Simple mode shows only undo/redo and utility buttons (open text editor, source mode toggle) with a transparent background and no dividers. Use Cmd+/ (command palette) for other operations.
+- **Simple Toolbar Mode** — New `fractal.toolbarMode` setting with `"full"` (default) and `"simple"` options. Simple mode shows only undo/redo and utility buttons (open text editor, source mode toggle) with a transparent background and no dividers. Use Cmd+/ (command palette) for other operations.
 
 ## [0.195.367] - 2026-03-03
 

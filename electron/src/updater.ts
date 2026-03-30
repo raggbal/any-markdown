@@ -7,7 +7,7 @@ import { BrowserWindow, dialog, shell, net, app } from 'electron';
  */
 
 const GITHUB_OWNER = 'raggbal';
-const GITHUB_REPO = 'any-markdown';
+const GITHUB_REPO = 'fractal';
 const TAG_PREFIX = 'electron-v';
 const API_URL = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases`;
 

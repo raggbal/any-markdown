@@ -87,7 +87,7 @@ class SettingsManager {
             resizable: false,
             minimizable: false,
             maximizable: false,
-            title: 'Any Markdown — Preferences',
+            title: 'Fractal — Preferences',
             webPreferences: {
                 nodeIntegration: false,
                 contextIsolation: true,

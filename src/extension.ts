@@ -7,17 +7,17 @@ import { initLocale, t } from './i18n/messages';
 
 export function activate(context: vscode.ExtensionContext) {
     // Initialize localization
-    const config = vscode.workspace.getConfiguration('any-markdown');
+    const config = vscode.workspace.getConfiguration('fractal');
     initLocale(config.get<string>('language', 'default'), vscode.env.language);
     
-    console.log('Any Markdown Editor is now active!');
+    console.log('Fractal is now active!');
 
     // Register the custom editor provider
     const provider = new AnyMarkdownEditorProvider(context);
     
     context.subscriptions.push(
         vscode.window.registerCustomEditorProvider(
-            'any-markdown.editor',
+            'fractal.editor',
             provider,
             {
                 webviewOptions: {
@@ -35,7 +35,7 @@ export function activate(context: vscode.ExtensionContext) {
     const outlinerProvider = new OutlinerProvider(context);
     context.subscriptions.push(
         vscode.window.registerCustomEditorProvider(
-            'any-markdown.outliner',
+            'fractal.outliner',
             outlinerProvider,
             {
                 webviewOptions: {
@@ -48,13 +48,13 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Register commands
     context.subscriptions.push(
-        vscode.commands.registerCommand('any-markdown.openEditor', async () => {
+        vscode.commands.registerCommand('fractal.openEditor', async () => {
             const activeEditor = vscode.window.activeTextEditor;
             if (activeEditor && activeEditor.document.languageId === 'markdown') {
                 await vscode.commands.executeCommand(
                     'vscode.openWith',
                     activeEditor.document.uri,
-                    'any-markdown.editor'
+                    'fractal.editor'
                 );
             } else {
                 vscode.window.showInformationMessage(t('openMarkdownFirst'));
@@ -63,7 +63,7 @@ export function activate(context: vscode.ExtensionContext) {
     );
 
     context.subscriptions.push(
-        vscode.commands.registerCommand('any-markdown.insertTable', async () => {
+        vscode.commands.registerCommand('fractal.insertTable', async () => {
             const rows = await vscode.window.showInputBox({
                 prompt: t('numberOfRows'),
                 value: '3',
@@ -95,7 +95,7 @@ export function activate(context: vscode.ExtensionContext) {
     );
 
     context.subscriptions.push(
-        vscode.commands.registerCommand('any-markdown.insertToc', () => {
+        vscode.commands.registerCommand('fractal.insertToc', () => {
             const editor = vscode.window.activeTextEditor;
             if (editor) {
                 editor.edit(editBuilder => {
@@ -106,19 +106,19 @@ export function activate(context: vscode.ExtensionContext) {
     );
 
     context.subscriptions.push(
-        vscode.commands.registerCommand('any-markdown.exportToPdf', () => {
+        vscode.commands.registerCommand('fractal.exportToPdf', () => {
             vscode.window.showInformationMessage(t('pdfExportComingSoon'));
         })
     );
 
     // Undo/Redo commands - forwarded to webview to bypass VSCode's native undo
     context.subscriptions.push(
-        vscode.commands.registerCommand('any-markdown.undo', () => {
+        vscode.commands.registerCommand('fractal.undo', () => {
             provider.sendUndo();
         })
     );
     context.subscriptions.push(
-        vscode.commands.registerCommand('any-markdown.redo', () => {
+        vscode.commands.registerCommand('fractal.redo', () => {
             if (!provider.sendRedo()) {
                 // Fallback to built-in redo when our custom editor is not active
                 vscode.commands.executeCommand('redo');
@@ -128,7 +128,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Toggle source mode - forwarded to webview
     context.subscriptions.push(
-        vscode.commands.registerCommand('any-markdown.toggleSourceMode', () => {
+        vscode.commands.registerCommand('fractal.toggleSourceMode', () => {
             provider.sendToggleSourceMode();
         })
     );
@@ -142,38 +142,38 @@ export function activate(context: vscode.ExtensionContext) {
     );
 
     context.subscriptions.push(
-        vscode.commands.registerCommand('any-markdown.addNotesFolder', () => {
+        vscode.commands.registerCommand('fractal.addNotesFolder', () => {
             notesFolderProvider.addFolder();
         })
     );
 
     context.subscriptions.push(
-        vscode.commands.registerCommand('any-markdown.removeNotesFolder', (item) => {
+        vscode.commands.registerCommand('fractal.removeNotesFolder', (item) => {
             notesFolderProvider.removeFolder(item);
         })
     );
 
     context.subscriptions.push(
-        vscode.commands.registerCommand('any-markdown.openNotesFolder', (folderPath: string) => {
+        vscode.commands.registerCommand('fractal.openNotesFolder', (folderPath: string) => {
             notesEditorProvider.openNotesFolder(folderPath);
         })
     );
 
     // Outliner scope commands - forwarded to webview
     context.subscriptions.push(
-        vscode.commands.registerCommand('any-markdown.scopeIn', () => {
+        vscode.commands.registerCommand('fractal.scopeIn', () => {
             outlinerProvider.sendScopeIn();
         })
     );
     context.subscriptions.push(
-        vscode.commands.registerCommand('any-markdown.scopeOut', () => {
+        vscode.commands.registerCommand('fractal.scopeOut', () => {
             outlinerProvider.sendScopeOut();
         })
     );
 
     // New outliner file
     context.subscriptions.push(
-        vscode.commands.registerCommand('any-markdown.newOutliner', async () => {
+        vscode.commands.registerCommand('fractal.newOutliner', async () => {
             const name = await vscode.window.showInputBox({
                 prompt: 'Enter outliner file name (without .out extension)',
                 placeHolder: 'my-notes',
@@ -213,13 +213,13 @@ export function activate(context: vscode.ExtensionContext) {
 
             const emptyData = JSON.stringify({ rootIds: [], nodes: {} }, null, 2);
             await vscode.workspace.fs.writeFile(fileUri, Buffer.from(emptyData, 'utf8'));
-            await vscode.commands.executeCommand('vscode.openWith', fileUri, 'any-markdown.outliner');
+            await vscode.commands.executeCommand('vscode.openWith', fileUri, 'fractal.outliner');
         })
     );
 
     // Open markdown file in standard text editor
     context.subscriptions.push(
-        vscode.commands.registerCommand('any-markdown.openAsText', async (uri?: vscode.Uri) => {
+        vscode.commands.registerCommand('fractal.openAsText', async (uri?: vscode.Uri) => {
             // Get URI from argument (context menu) or active editor
             let targetUri = uri;
             if (!targetUri) {
@@ -240,7 +240,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Compare markdown files as text
     context.subscriptions.push(
-        vscode.commands.registerCommand('any-markdown.compareAsText', async (uri?: vscode.Uri, uris?: vscode.Uri[]) => {
+        vscode.commands.registerCommand('fractal.compareAsText', async (uri?: vscode.Uri, uris?: vscode.Uri[]) => {
             const fs = require('fs');
             const path = require('path');
             const os = require('os');

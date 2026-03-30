@@ -1,7 +1,7 @@
 /**
  * SettingsProvider — エディタ設定の読み書きを抽象化するインターフェース
  *
- * VSCode: vscode.workspace.getConfiguration('any-markdown') をラップ
+ * VSCode: vscode.workspace.getConfiguration('fractal') をラップ
  * Electron: electron-store ベースの実装 (フェーズ3)
  */
 

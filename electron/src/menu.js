@@ -119,7 +119,7 @@ function buildMenu(handlers) {
             submenu: [
                 {
                     label: 'GitHub Repository',
-                    click: () => electron_1.shell.openExternal('https://github.com/raggbal/any-markdown'),
+                    click: () => electron_1.shell.openExternal('https://github.com/raggbal/fractal'),
                 },
             ],
         },

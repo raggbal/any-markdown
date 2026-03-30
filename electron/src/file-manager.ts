@@ -231,7 +231,7 @@ export class FileManager {
     private updateTitle(): void {
         const name = this.filePath ? path.basename(this.filePath) : 'Untitled';
         const dirty = this.isDirty ? ' - Edited' : '';
-        this.win.setTitle(`${name}${dirty} — Any Markdown`);
+        this.win.setTitle(`${name}${dirty} — Fractal`);
     }
 
     dispose(): void {

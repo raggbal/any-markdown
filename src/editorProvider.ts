@@ -225,7 +225,7 @@ class ImageDirectoryManager {
         }
         
         // 3. VS Code設定のimageDefaultDirをチェック
-        const config = vscode.workspace.getConfiguration('any-markdown');
+        const config = vscode.workspace.getConfiguration('fractal');
         const defaultDir = config.get<string>('imageDefaultDir', '');
         if (defaultDir) {
             const normalized = normalizeTrailingSlash(defaultDir);
@@ -258,7 +258,7 @@ class ImageDirectoryManager {
         }
         
         // 2. VS Code設定をチェック
-        const config = vscode.workspace.getConfiguration('any-markdown');
+        const config = vscode.workspace.getConfiguration('fractal');
         return config.get<boolean>('forceRelativeImagePath', false);
     }
     
@@ -324,7 +324,7 @@ class ImageDirectoryManager {
 const imageDirectoryManager = new ImageDirectoryManager();
 
 export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvider {
-    private static readonly viewType = 'any-markdown.editor';
+    private static readonly viewType = 'fractal.editor';
 
     // Track the currently active webview panel for undo/redo command forwarding
     private activeWebviewPanel: vscode.WebviewPanel | undefined;
@@ -445,7 +445,7 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
 
         const updateWebview = () => {
             try {
-                const config = vscode.workspace.getConfiguration('any-markdown');
+                const config = vscode.workspace.getConfiguration('fractal');
                 const content = convertImagePaths(document.getText());
                 webviewPanel.webview.html = getWebviewContent(
                     webviewPanel.webview,
@@ -491,7 +491,7 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
             // Determine source
             const fileImageDir = imageDirectoryManager.getFileImageDir(uriKey);
             const docImageDir = extractImageDir(docContent);
-            const cfg = vscode.workspace.getConfiguration('any-markdown');
+            const cfg = vscode.workspace.getConfiguration('fractal');
             const settingsDir = cfg.get<string>('imageDefaultDir', '');
 
             let source: 'file' | 'settings' | 'default';
@@ -540,7 +540,7 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
             const spUriKey = spUri.toString();
             const fileImageDir = imageDirectoryManager.getFileImageDir(spUriKey);
             const docImageDir = extractImageDir(spContent);
-            const cfg = vscode.workspace.getConfiguration('any-markdown');
+            const cfg = vscode.workspace.getConfiguration('fractal');
             const settingsDir = cfg.get<string>('imageDefaultDir', '');
 
             let source: 'file' | 'settings' | 'default';
@@ -676,10 +676,10 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
 
         // Listen for configuration changes
         const changeConfigSubscription = vscode.workspace.onDidChangeConfiguration(e => {
-            if (e.affectsConfiguration('any-markdown')) {
+            if (e.affectsConfiguration('fractal')) {
                 // Re-initialize locale if language setting changed
-                if (e.affectsConfiguration('any-markdown.language')) {
-                    const langConfig = vscode.workspace.getConfiguration('any-markdown');
+                if (e.affectsConfiguration('fractal.language')) {
+                    const langConfig = vscode.workspace.getConfiguration('fractal');
                     initLocale(langConfig.get<string>('language', 'default'), vscode.env.language);
                 }
                 updateWebview();
@@ -814,9 +814,9 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
                         const resolvedPath = resolvedUri.fsPath.toLowerCase();
                         if (resolvedPath.endsWith('.md') || resolvedPath.endsWith('.markdown')) {
                             const linkOpenMode = forceTab ? 'tab'
-                                : vscode.workspace.getConfiguration('any-markdown').get<string>('linkOpenMode', 'sidePanel');
+                                : vscode.workspace.getConfiguration('fractal').get<string>('linkOpenMode', 'sidePanel');
                             if (linkOpenMode === 'tab') {
-                                vscode.commands.executeCommand('vscode.openWith', resolvedUri, 'any-markdown.editor');
+                                vscode.commands.executeCommand('vscode.openWith', resolvedUri, 'fractal.editor');
                             } else {
                                 await sidePanel.openFile(resolvedUri.fsPath);
                             }
@@ -844,7 +844,7 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
                     break;
 
                 case 'error':
-                    vscode.window.showErrorMessage(`Any MD: ${message.message}`);
+                    vscode.window.showErrorMessage(`Fractal: ${message.message}`);
                     break;
 
                 case 'openInTextEditor':
@@ -987,7 +987,7 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
                 case 'getImageDir':
                     // Return current IMAGE_DIR to webview
                     const currentImageDir = extractImageDir(document.getText()) || '';
-                    const config = vscode.workspace.getConfiguration('any-markdown');
+                    const config = vscode.workspace.getConfiguration('fractal');
                     const defaultImageDir = config.get<string>('imageDefaultDir', '');
                     webviewPanel.webview.postMessage({
                         type: 'imageDirInfo',

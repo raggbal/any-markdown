@@ -72,7 +72,7 @@ export class NotesEditorProvider {
 
         // WebviewPanel 作成
         this.panel = vscode.window.createWebviewPanel(
-            'any-markdown.notes',
+            'fractal.notes',
             `Notes: ${path.basename(folderPath)}`,
             vscode.ViewColumn.One,
             {
@@ -87,7 +87,7 @@ export class NotesEditorProvider {
         );
 
         // HTML 生成
-        const config = vscode.workspace.getConfiguration('any-markdown');
+        const config = vscode.workspace.getConfiguration('fractal');
         this.panel.webview.html = getNotesWebviewContent(
             this.panel.webview,
             this.context.extensionUri,
@@ -132,7 +132,7 @@ export class NotesEditorProvider {
             },
             openFileInEditor: (filePath: string) => {
                 const uri = vscode.Uri.file(filePath);
-                vscode.commands.executeCommand('vscode.openWith', uri, 'any-markdown.editor');
+                vscode.commands.executeCommand('vscode.openWith', uri, 'fractal.editor');
             },
             openPageInSidePanel: async (filePath: string, lineNumber?: number) => {
                 if (!fs.existsSync(filePath)) {
@@ -319,7 +319,7 @@ export class NotesEditorProvider {
             },
             s3GetStatus: () => {
                 if (!this.fileManager) return;
-                const config = vscode.workspace.getConfiguration('any-markdown');
+                const config = vscode.workspace.getConfiguration('fractal');
                 const bucketPath = this.fileManager.getS3BucketPath();
                 const hasCredentials = !!(config.get<string>('s3AccessKeyId') && config.get<string>('s3SecretAccessKey'));
                 sender.postMessage({
@@ -342,14 +342,14 @@ export class NotesEditorProvider {
         // テーマ変更対応 (N-50b)
         this.disposables.push(
             vscode.workspace.onDidChangeConfiguration((e) => {
-                if (e.affectsConfiguration('any-markdown.language')) {
-                    const langConfig = vscode.workspace.getConfiguration('any-markdown');
+                if (e.affectsConfiguration('fractal.language')) {
+                    const langConfig = vscode.workspace.getConfiguration('fractal');
                     initLocale(langConfig.get<string>('language', 'default'), vscode.env.language);
                 }
-                if (e.affectsConfiguration('any-markdown.theme') ||
-                    e.affectsConfiguration('any-markdown.fontSize') ||
-                    e.affectsConfiguration('any-markdown.outlinerPageTitle') ||
-                    e.affectsConfiguration('any-markdown.language')) {
+                if (e.affectsConfiguration('fractal.theme') ||
+                    e.affectsConfiguration('fractal.fontSize') ||
+                    e.affectsConfiguration('fractal.outlinerPageTitle') ||
+                    e.affectsConfiguration('fractal.language')) {
                     this.refreshPanel();
                 }
             })
@@ -366,7 +366,7 @@ export class NotesEditorProvider {
 
     private refreshPanel(): void {
         if (!this.panel || !this.fileManager || !this.currentFolderPath) return;
-        const config = vscode.workspace.getConfiguration('any-markdown');
+        const config = vscode.workspace.getConfiguration('fractal');
         const fileList = this.fileManager.listFiles();
         const currentFilePath = this.fileManager.getCurrentFilePath();
         let jsonContent = '{"version":1,"rootIds":[],"nodes":{}}';
@@ -418,12 +418,12 @@ export class NotesEditorProvider {
     }
 
     private getS3Config(bucketPath: string): S3SyncConfig | null {
-        const config = vscode.workspace.getConfiguration('any-markdown');
+        const config = vscode.workspace.getConfiguration('fractal');
         const accessKeyId = config.get<string>('s3AccessKeyId', '');
         const secretAccessKey = config.get<string>('s3SecretAccessKey', '');
         const region = config.get<string>('s3Region', 'us-east-1');
         if (!accessKeyId || !secretAccessKey) {
-            vscode.window.showErrorMessage('AWS credentials not configured. Set any-markdown.s3AccessKeyId and s3SecretAccessKey in settings.');
+            vscode.window.showErrorMessage('AWS credentials not configured. Set fractal.s3AccessKeyId and s3SecretAccessKey in settings.');
             return null;
         }
         if (!this.currentFolderPath) return null;

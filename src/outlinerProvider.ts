@@ -56,7 +56,7 @@ export class OutlinerProvider implements vscode.CustomTextEditorProvider {
         // --- updateWebview ---
         const updateWebview = () => {
             try {
-                const config = vscode.workspace.getConfiguration('any-markdown');
+                const config = vscode.workspace.getConfiguration('fractal');
                 const content = document.getText();
                 webviewPanel.webview.html = getOutlinerWebviewContent(
                     webviewPanel.webview,
@@ -228,7 +228,7 @@ export class OutlinerProvider implements vscode.CustomTextEditorProvider {
 
                     case 'openLinkInTab': {
                         const uri = vscode.Uri.file(message.href);
-                        vscode.commands.executeCommand('vscode.openWith', uri, 'any-markdown.editor');
+                        vscode.commands.executeCommand('vscode.openWith', uri, 'fractal.editor');
                         break;
                     }
 
@@ -361,14 +361,14 @@ export class OutlinerProvider implements vscode.CustomTextEditorProvider {
         // --- 設定変更 ---
         disposables.push(
             vscode.workspace.onDidChangeConfiguration((e) => {
-                if (e.affectsConfiguration('any-markdown.language')) {
-                    const langConfig = vscode.workspace.getConfiguration('any-markdown');
+                if (e.affectsConfiguration('fractal.language')) {
+                    const langConfig = vscode.workspace.getConfiguration('fractal');
                     initLocale(langConfig.get<string>('language', 'default'), vscode.env.language);
                 }
-                if (e.affectsConfiguration('any-markdown.theme') ||
-                    e.affectsConfiguration('any-markdown.fontSize') ||
-                    e.affectsConfiguration('any-markdown.outlinerPageTitle') ||
-                    e.affectsConfiguration('any-markdown.language')) {
+                if (e.affectsConfiguration('fractal.theme') ||
+                    e.affectsConfiguration('fractal.fontSize') ||
+                    e.affectsConfiguration('fractal.outlinerPageTitle') ||
+                    e.affectsConfiguration('fractal.language')) {
                     updateWebview();
                 }
             })
@@ -418,7 +418,7 @@ export class OutlinerProvider implements vscode.CustomTextEditorProvider {
         } catch { /* ignore parse errors */ }
 
         // 2. VSCode設定
-        const config = vscode.workspace.getConfiguration('any-markdown');
+        const config = vscode.workspace.getConfiguration('fractal');
         const configDir = config.get<string>('outlinerPageDir', './pages');
         if (path.isAbsolute(configDir)) {
             return configDir;
@@ -497,12 +497,12 @@ export class OutlinerProvider implements vscode.CustomTextEditorProvider {
         const pagesDir = this.getPagesDirPath(document);
         OutlinerProvider.outlinerPagePaths.set(filePath, pagesDir);
 
-        // any-markdown エディタでサイドに開く
+        // fractal エディタでサイドに開く
         const fileUri = vscode.Uri.file(filePath);
         await vscode.commands.executeCommand(
             'vscode.openWith',
             fileUri,
-            'any-markdown.editor',
+            'fractal.editor',
             vscode.ViewColumn.Beside
         );
     }

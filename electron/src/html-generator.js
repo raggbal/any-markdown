@@ -39,7 +39,7 @@ const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const os = __importStar(require("os"));
 function getResourcePath(relativePath) {
-    // 開発時: プロジェクトルートから相対パス (electron/ の親 = any-markdown/)
+    // 開発時: プロジェクトルートから相対パス (electron/ の親 = fractal/)
     const devPath = path.join(__dirname, '..', '..', relativePath);
     if (fs.existsSync(devPath)) {
         console.log(`[html-generator] Found (dev): ${relativePath} → ${devPath}`);
@@ -89,7 +89,7 @@ function generateEditorHtml(content, config) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline' file:; script-src 'unsafe-inline' file:; img-src file: data: https: http:; font-src file: data:;">
-    <title>Any Markdown</title>
+    <title>Fractal</title>
     <style>
         ${styles}
     </style>
@@ -194,7 +194,7 @@ function generateEditorHtml(content, config) {
 }
 let tempCounter = 0;
 function writeHtmlToTempFile(html) {
-    const tempDir = path.join(os.tmpdir(), 'any-markdown');
+    const tempDir = path.join(os.tmpdir(), 'fractal');
     fs.mkdirSync(tempDir, { recursive: true });
     const tempFile = path.join(tempDir, `editor-${process.pid}-${tempCounter++}.html`);
     fs.writeFileSync(tempFile, html, 'utf8');

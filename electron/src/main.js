@@ -41,7 +41,7 @@ const settings_manager_1 = require("./settings-manager");
 const html_generator_1 = require("./html-generator");
 const menu_1 = require("./menu");
 /**
- * Any Markdown — Electron Main Process
+ * Fractal — Electron Main Process
  */
 const settingsManager = new settings_manager_1.SettingsManager();
 const windows = new Map();
@@ -86,7 +86,7 @@ function createWindow(filePath) {
         height: bounds?.height || 700,
         x: bounds?.x,
         y: bounds?.y,
-        title: 'Any Markdown',
+        title: 'Fractal',
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             contextIsolation: true,

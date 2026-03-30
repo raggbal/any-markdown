@@ -1,5 +1,5 @@
 {
-  "name": "any-markdown-desktop",
+  "name": "fractal-desktop",
   "version": "0.195.535",
   "description": "Any Markdown — WYSIWYG Markdown editor for desktop",
   "main": "out/main.js",
@@ -7,7 +7,7 @@
     "name": "imaken",
     "email": "imaken@users.noreply.github.com"
   },
-  "homepage": "https://github.com/raggbal/any-markdown",
+  "homepage": "https://github.com/raggbal/fractal",
   "license": "MIT",
   "scripts": {
     "compile": "cd .. && npm run compile && cd electron && tsc -p . && node ../scripts/copy-vendor.js",
@@ -25,7 +25,7 @@
     "typescript": "^5.3.0"
   },
   "build": {
-    "appId": "com.imaken.any-markdown",
+    "appId": "com.imaken.fractal",
     "productName": "Any Markdown",
     "directories": {
       "output": "dist"

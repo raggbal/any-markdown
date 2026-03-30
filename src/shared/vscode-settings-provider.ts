@@ -6,7 +6,7 @@ import { EditorSettings, SettingsProvider, DEFAULT_SETTINGS } from './settings-p
 
 export class VSCodeSettingsProvider implements SettingsProvider {
     private get config() {
-        return vscode.workspace.getConfiguration('any-markdown');
+        return vscode.workspace.getConfiguration('fractal');
     }
 
     get<K extends keyof EditorSettings>(key: K): EditorSettings[K] {
@@ -27,7 +27,7 @@ export class VSCodeSettingsProvider implements SettingsProvider {
 
     onChange(callback: () => void): { dispose(): void } {
         const disposable = vscode.workspace.onDidChangeConfiguration(e => {
-            if (e.affectsConfiguration('any-markdown')) {
+            if (e.affectsConfiguration('fractal')) {
                 callback();
             }
         });

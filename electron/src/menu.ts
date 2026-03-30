@@ -147,7 +147,7 @@ export function buildMenu(handlers: {
                 { type: 'separator' },
                 {
                     label: 'GitHub Repository',
-                    click: () => shell.openExternal('https://github.com/raggbal/any-markdown'),
+                    click: () => shell.openExternal('https://github.com/raggbal/fractal'),
                 },
             ],
         },

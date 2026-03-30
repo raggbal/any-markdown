@@ -368,8 +368,8 @@ Images can be saved to custom directories when pasting or drag-and-dropping.
 
 ```json
 {
-  "any-markdown.imageDefaultDir": "./images",
-  "any-markdown.forceRelativeImagePath": true
+  "fractal.imageDefaultDir": "./images",
+  "fractal.forceRelativeImagePath": true
 }
 ```
 
@@ -406,15 +406,15 @@ FORCE_RELATIVE_PATH: true
 
 | Setting | Description | Default |
 | --- | --- | --- |
-| `any-markdown.theme` | Editor theme (`github`, `sepia`, `night`, `dark`, `minimal`, `perplexity`, `things`) | `things` |
-| `any-markdown.fontSize` | Base font size (px) | `16` |
-| `any-markdown.imageDefaultDir` | Default directory for saved images | `""` (same as markdown file) |
-| `any-markdown.forceRelativeImagePath` | Force relative paths for images | `false` |
-| `any-markdown.language` | UI language (`default`, `en`, `ja`, `zh-cn`, `zh-tw`, `ko`, `es`, `fr`) | `default` |
-| `any-markdown.toolbarMode` | Toolbar display mode (`full`, `simple`) | `simple` |
-| `any-markdown.outlinerPageDir` | Default page directory for outliner | `./pages` |
-| `any-markdown.outlinerPageTitle` | Show page title input in outliner | `false` |
-| `any-markdown.enableDebugLogging` | Enable debug logging in browser console | `false` |
+| `fractal.theme` | Editor theme (`github`, `sepia`, `night`, `dark`, `minimal`, `perplexity`, `things`) | `things` |
+| `fractal.fontSize` | Base font size (px) | `16` |
+| `fractal.imageDefaultDir` | Default directory for saved images | `""` (same as markdown file) |
+| `fractal.forceRelativeImagePath` | Force relative paths for images | `false` |
+| `fractal.language` | UI language (`default`, `en`, `ja`, `zh-cn`, `zh-tw`, `ko`, `es`, `fr`) | `default` |
+| `fractal.toolbarMode` | Toolbar display mode (`full`, `simple`) | `simple` |
+| `fractal.outlinerPageDir` | Default page directory for outliner | `./pages` |
+| `fractal.outlinerPageTitle` | Show page title input in outliner | `false` |
+| `fractal.enableDebugLogging` | Enable debug logging in browser console | `false` |
 
 ### Themes
 
@@ -446,7 +446,7 @@ The editor UI supports the following languages:
 | Spanish | `es` |
 | French | `fr` |
 
-Set via `any-markdown.language` or use `default` to follow VS Code's display language.
+Set via `fractal.language` or use `default` to follow VS Code's display language.
 
 ---
 

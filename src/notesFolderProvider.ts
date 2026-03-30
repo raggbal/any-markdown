@@ -60,7 +60,7 @@ export class NotesFolderItem extends vscode.TreeItem {
         this.tooltip = folderPath;
         this.contextValue = 'notesFolder';
         this.command = {
-            command: 'any-markdown.openNotesFolder',
+            command: 'fractal.openNotesFolder',
             title: 'Open Notes',
             arguments: [folderPath],
         };

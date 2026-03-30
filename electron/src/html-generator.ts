@@ -17,7 +17,7 @@ interface ElectronEditorConfig {
 }
 
 function getResourcePath(relativePath: string): string {
-    // 開発時: プロジェクトルートから相対パス (electron/ の親 = any-markdown/)
+    // 開発時: プロジェクトルートから相対パス (electron/ の親 = fractal/)
     const devPath = path.join(__dirname, '..', '..', relativePath);
     if (fs.existsSync(devPath)) {
         console.log(`[html-generator] Found (dev): ${relativePath} → ${devPath}`);
@@ -87,7 +87,7 @@ export function generateEditorHtml(
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; frame-src blob:; style-src 'unsafe-inline' file:; script-src 'unsafe-inline' file: blob:; img-src file: data: https: http:; font-src file: data:;">
-    <title>Any Markdown</title>
+    <title>Fractal</title>
     <style>
         ${styles}
     </style>
@@ -148,7 +148,7 @@ export function generateWelcomeHtml(theme: string): string {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Any Markdown</title>
+    <title>Fractal</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -221,7 +221,7 @@ export function generateWelcomeHtml(theme: string): string {
 </head>
 <body>
     <div class="welcome">
-        <h1>Any Markdown</h1>
+        <h1>Fractal</h1>
         <p>WYSIWYG Markdown Editor</p>
         <div class="buttons">
             <button class="btn btn-primary" id="open-notes">Open Notes</button>
@@ -353,7 +353,7 @@ export function generateOutlinerHtml(
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap">
-    <title>Any Markdown Outliner</title>
+    <title>Fractal Outliner</title>
     <style>${editorStyles}</style>
     <style>${outlinerCss}</style>
     <link rel="stylesheet" href="${vendorFileUriStr('katex.min.css')}">
@@ -592,7 +592,7 @@ export function generateOutlinerHtml(
 let tempCounter = 0;
 
 export function writeHtmlToTempFile(html: string): string {
-    const tempDir = path.join(os.tmpdir(), 'any-markdown');
+    const tempDir = path.join(os.tmpdir(), 'fractal');
     fs.mkdirSync(tempDir, { recursive: true });
     const tempFile = path.join(tempDir, `editor-${process.pid}-${tempCounter++}.html`);
     fs.writeFileSync(tempFile, html, 'utf8');

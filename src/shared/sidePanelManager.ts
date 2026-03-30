@@ -17,7 +17,7 @@ export interface SidePanelHost {
 }
 
 export interface SidePanelManagerConfig {
-    /** ログ出力のプレフィックス (例: '[Any MD]', '[Outliner]') */
+    /** ログ出力のプレフィックス (例: '[Fractal]', '[Outliner]') */
     logPrefix: string;
 }
 

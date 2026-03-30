@@ -9,7 +9,7 @@ import { setupUpdateChecker, checkForUpdates } from './updater';
 import * as chokidar from 'chokidar';
 
 /**
- * Any Markdown — Electron Main Process
+ * Fractal — Electron Main Process
  */
 
 const settingsManager = new SettingsManager();
@@ -556,7 +556,7 @@ function createWindow(filePath?: string): BrowserWindow {
         height: bounds?.height || 700,
         x: bounds?.x,
         y: bounds?.y,
-        title: 'Any Markdown',
+        title: 'Fractal',
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             contextIsolation: true,

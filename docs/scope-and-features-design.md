@@ -133,12 +133,12 @@
 **現状**: ページ保存先は `path.join(path.dirname(document.uri.fsPath), 'pages')` にハードコード（outlinerProvider.ts:174-176）。
 
 **修正箇所**:
-- `package.json`: `any-markdown.outlinerPageDir` 設定追加（デフォルト `"./pages"`）
+- `package.json`: `fractal.outlinerPageDir` 設定追加（デフォルト `"./pages"`）
 - `outlinerProvider.ts`: `getPagesDirPath()` で設定を読み込み
 - `outlinerWebviewContent.ts` or `outliner.js`: 設定ボタンUI
 
 **仕様**:
-- `any-markdown.outlinerPageDir`: グローバルデフォルト（相対パス → mmdファイルからの相対）
+- `fractal.outlinerPageDir`: グローバルデフォルト（相対パス → mmdファイルからの相対）
 - 絶対パスも設定可能
 - mmd個別設定: どこかにボタン表示 → 入力ダイアログでパスを設定
 - mmd個別設定はJSONデータ内 or ファイルレベルの IMAGE_DIR と同様の方式
@@ -176,9 +176,9 @@ C. outlinerProvider.ts から `openSidePanel` メッセージをoutliner webview
 - editorProvider.ts の `openSidePanel` = webview内部のiframe（Notion風）
 - `ViewColumn.Beside` = VSCodeの別パネル
 
-ユーザーの添付画像を見ると、パンくずリストのような表示がある。おそらくVSCode内の別パネル（`ViewColumn.Beside`）で`any-markdown.editor`として開くのが正解で、現状の実装と同じ可能性がある。
+ユーザーの添付画像を見ると、パンくずリストのような表示がある。おそらくVSCode内の別パネル（`ViewColumn.Beside`）で`fractal.editor`として開くのが正解で、現状の実装と同じ可能性がある。
 
-**結論**: 現状の `handleOpenPage` は既に `ViewColumn.Beside` で `any-markdown.editor` として開いている。ユーザーの「sidepanel editor」がeditor.js内のiframeサイドパネルを指すなら大きな変更が必要。mdモードの editor.js の openSidePanel をoutlinerでも使うには:
+**結論**: 現状の `handleOpenPage` は既に `ViewColumn.Beside` で `fractal.editor` として開いている。ユーザーの「sidepanel editor」がeditor.js内のiframeサイドパネルを指すなら大きな変更が必要。mdモードの editor.js の openSidePanel をoutlinerでも使うには:
 1. outlinerWebviewContent にeditor.js系のスクリプトを全て読み込む（非現実的）
 2. または、別のwebviewPanelを作ってeditorとして開く（現状と同等）
 
@@ -347,7 +347,7 @@ C. outlinerProvider.ts から `openSidePanel` メッセージをoutliner webview
 ### Phase 4: ページディレクトリ設定（要件8）
 
 #### Step 4.1: package.json 設定追加
-- `any-markdown.outlinerPageDir` 追加（デフォルト `"./pages"`）
+- `fractal.outlinerPageDir` 追加（デフォルト `"./pages"`）
 
 #### Step 4.2: outlinerProvider.ts 修正
 - `getPagesDirPath()` で設定値を読み込み
@@ -517,7 +517,7 @@ C. outlinerProvider.ts から `openSidePanel` メッセージをoutliner webview
 
 ### I. 要件9 サイドパネルの重大な設計課題
 
-**現状**: outlinerProvider.tsの `handleOpenPage()` は `vscode.openWith('any-markdown.editor', ViewColumn.Beside)` でVSCodeの別タブとして開く。
+**現状**: outlinerProvider.tsの `handleOpenPage()` は `vscode.openWith('fractal.editor', ViewColumn.Beside)` でVSCodeの別タブとして開く。
 
 **ユーザー要望**: 「sidepanel editorで開かれる仕様にしてください。sidepanelは markdownモードですでに実装済み」
 

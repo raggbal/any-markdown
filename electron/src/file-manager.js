@@ -190,7 +190,7 @@ class FileManager {
     updateTitle() {
         const name = this.filePath ? path.basename(this.filePath) : 'Untitled';
         const dirty = this.isDirty ? ' - Edited' : '';
-        this.win.setTitle(`${name}${dirty} — Any Markdown`);
+        this.win.setTitle(`${name}${dirty} — Fractal`);
     }
     dispose() {
         this.stopWatching();

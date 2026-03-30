@@ -1,19 +1,20 @@
 {
-  "name": "any-markdown",
-  "displayName": "Any Markdown Editor",
-  "description": "A WYSIWYG markdown editor for VS Code with seamless live preview",
+  "name": "fractal",
+  "displayName": "Fractal - Outline & Markdown Editor",
+  "description": "Combines a Dynalist-like outliner and a Typora-like WYSIWYG markdown editor",
   "version": "0.195.545",
   "publisher": "imaken",
+  "author": "imaken",
   "icon": "media/icon.png",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/raggbal/any-markdown"
+    "url": "https://github.com/raggbal/fractal"
   },
   "bugs": {
-    "url": "https://github.com/raggbal/any-markdown/issues"
+    "url": "https://github.com/raggbal/fractal/issues"
   },
-  "homepage": "https://github.com/raggbal/any-markdown#readme",
+  "homepage": "https://github.com/raggbal/fractal#readme",
   "sponsor": {
     "url": "https://github.com/sponsors/raggbal"
   },
@@ -21,18 +22,23 @@
     "vscode": "^1.85.0"
   },
   "categories": [
-    "Programming Languages",
-    "Formatters",
-    "Visualization"
+    "Notebooks",
+    "Visualization",
+    "Other"
   ],
   "keywords": [
     "markdown",
     "wysiwyg",
     "editor",
+    "outliner",
+    "notebook",
+    "note",
     "live preview",
     "mermaid",
     "table",
-    "rich text"
+    "rich text",
+    "dynalist",
+    "typora"
   ],
   "activationEvents": [],
   "main": "./out/extension.js",
@@ -40,14 +46,14 @@
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "any-markdown-notes",
-          "title": "Any Markdown Notes",
+          "id": "fractal-notes",
+          "title": "Fractal Notes",
           "icon": "media/notes-icon.svg"
         }
       ]
     },
     "views": {
-      "any-markdown-notes": [
+      "fractal-notes": [
         {
           "id": "notesExplorer",
           "name": "Notes Folders"
@@ -56,87 +62,87 @@
     },
     "commands": [
       {
-        "command": "any-markdown.openEditor",
-        "title": "Open with Any Markdown Editor",
-        "category": "Any MD"
+        "command": "fractal.openEditor",
+        "title": "Open with Fractal Editor",
+        "category": "Fractal"
       },
       {
-        "command": "any-markdown.addNotesFolder",
+        "command": "fractal.addNotesFolder",
         "title": "Add Notes Folder",
-        "category": "Any MD",
+        "category": "Fractal",
         "icon": "$(add)"
       },
       {
-        "command": "any-markdown.removeNotesFolder",
+        "command": "fractal.removeNotesFolder",
         "title": "Remove Notes Folder",
-        "category": "Any MD",
+        "category": "Fractal",
         "icon": "$(remove)"
       },
       {
-        "command": "any-markdown.openNotesFolder",
+        "command": "fractal.openNotesFolder",
         "title": "Open Notes Folder",
-        "category": "Any MD"
+        "category": "Fractal"
       },
       {
-        "command": "any-markdown.exportToPdf",
+        "command": "fractal.exportToPdf",
         "title": "Export to PDF",
-        "category": "Any MD"
+        "category": "Fractal"
       },
       {
-        "command": "any-markdown.insertTable",
+        "command": "fractal.insertTable",
         "title": "Insert Table",
-        "category": "Any MD"
+        "category": "Fractal"
       },
       {
-        "command": "any-markdown.insertToc",
+        "command": "fractal.insertToc",
         "title": "Insert Table of Contents",
-        "category": "Any MD"
+        "category": "Fractal"
       },
       {
-        "command": "any-markdown.openAsText",
+        "command": "fractal.openAsText",
         "title": "Open as Text Editor",
-        "category": "Any MD"
+        "category": "Fractal"
       },
       {
-        "command": "any-markdown.toggleSourceMode",
+        "command": "fractal.toggleSourceMode",
         "title": "Toggle Source Mode",
-        "category": "Any MD"
+        "category": "Fractal"
       },
       {
-        "command": "any-markdown.compareAsText",
+        "command": "fractal.compareAsText",
         "title": "Compare as Text",
-        "category": "Any MD"
+        "category": "Fractal"
       },
       {
-        "command": "any-markdown.undo",
+        "command": "fractal.undo",
         "title": "Undo",
-        "category": "Any MD"
+        "category": "Fractal"
       },
       {
-        "command": "any-markdown.redo",
+        "command": "fractal.redo",
         "title": "Redo",
-        "category": "Any MD"
+        "category": "Fractal"
       },
       {
-        "command": "any-markdown.scopeIn",
+        "command": "fractal.scopeIn",
         "title": "Scope Into Node",
-        "category": "Any MD"
+        "category": "Fractal"
       },
       {
-        "command": "any-markdown.scopeOut",
+        "command": "fractal.scopeOut",
         "title": "Clear Scope",
-        "category": "Any MD"
+        "category": "Fractal"
       },
       {
-        "command": "any-markdown.newOutliner",
+        "command": "fractal.newOutliner",
         "title": "New Outliner File",
-        "category": "Any MD"
+        "category": "Fractal"
       }
     ],
     "customEditors": [
       {
-        "viewType": "any-markdown.editor",
-        "displayName": "Any Markdown",
+        "viewType": "fractal.editor",
+        "displayName": "Fractal",
         "selector": [
           {
             "filenamePattern": "*.md"
@@ -148,8 +154,8 @@
         "priority": "option"
       },
       {
-        "viewType": "any-markdown.outliner",
-        "displayName": "Any Markdown Outliner",
+        "viewType": "fractal.outliner",
+        "displayName": "Fractal Outliner",
         "selector": [
           {
             "filenamePattern": "*.out"
@@ -159,9 +165,9 @@
       }
     ],
     "configuration": {
-      "title": "Any Markdown",
+      "title": "Fractal",
       "properties": {
-        "any-markdown.theme": {
+        "fractal.theme": {
           "type": "string",
           "enum": [
             "github",
@@ -175,22 +181,22 @@
           "default": "things",
           "description": "Editor theme"
         },
-        "any-markdown.fontSize": {
+        "fractal.fontSize": {
           "type": "number",
           "default": 16,
           "description": "Base font size in pixels"
         },
-        "any-markdown.imageDefaultDir": {
+        "fractal.imageDefaultDir": {
           "type": "string",
           "default": "",
-          "description": "画像保存のデフォルトディレクトリ。空の場合はMarkdownファイルと同じディレクトリを使用。絶対パス（/path/to/dir）または相対パス（./images、images/）を指定可能。"
+          "description": "Default directory for saving images. Uses the same directory as the Markdown file when empty. Accepts absolute (/path/to/dir) or relative (./images, images/) paths."
         },
-        "any-markdown.forceRelativeImagePath": {
+        "fractal.forceRelativeImagePath": {
           "type": "boolean",
           "default": false,
-          "description": "画像パスを常に相対パスで挿入します。絶対パスでimageDefaultDirを指定した場合でも、Markdownには相対パスが挿入されます。"
+          "description": "Always insert image paths as relative paths, even when imageDefaultDir is an absolute path."
         },
-        "any-markdown.language": {
+        "fractal.language": {
           "type": "string",
           "enum": [
             "default",
@@ -203,100 +209,100 @@
             "fr"
           ],
           "default": "default",
-          "description": "UI language. 'default' uses VS Code's display language. / UI言語。'default'はVS Codeの表示言語を使用します。"
+          "description": "UI language. 'default' uses VS Code's display language."
         },
-        "any-markdown.outlinerPageDir": {
+        "fractal.outlinerPageDir": {
           "type": "string",
           "default": "./pages",
-          "description": "Outliner page files directory. Relative to .out file or absolute path. / アウトライナのページファイルディレクトリ。.outファイルからの相対パスまたは絶対パス。"
+          "description": "Outliner page files directory. Relative to .out file or absolute path."
         },
-        "any-markdown.outlinerPageTitle": {
+        "fractal.outlinerPageTitle": {
           "type": "boolean",
           "default": true,
-          "description": "Show page title input above the search bar in Outliner. / アウトライナの検索バー上部にタイトル入力欄を表示します。"
+          "description": "Show page title input above the search bar in Outliner."
         },
-        "any-markdown.toolbarMode": {
+        "fractal.toolbarMode": {
           "type": "string",
           "enum": [
             "full",
             "simple"
           ],
           "default": "simple",
-          "description": "Toolbar display mode. 'full' shows all buttons. 'simple' shows only undo/redo and utility buttons (use Cmd+/ for other operations). / ツールバー表示モード。'full'は全ボタン表示。'simple'はundo/redoとユーティリティのみ（他はCmd+/で操作）。"
+          "description": "Toolbar display mode. 'full' shows all buttons. 'simple' shows only undo/redo and utility buttons (use Cmd+/ for other operations)."
         },
-        "any-markdown.linkOpenMode": {
+        "fractal.linkOpenMode": {
           "type": "string",
           "enum": [
             "sidePanel",
             "tab"
           ],
           "default": "sidePanel",
-          "description": "How to open linked Markdown files. 'sidePanel' opens in a Notion-style side peek panel. 'tab' opens in a new editor tab. / リンク先Markdownの開き方。'sidePanel'はNotion風サイドパネル。'tab'は新タブで開く。"
+          "description": "How to open linked Markdown files. 'sidePanel' opens in a Notion-style side peek panel. 'tab' opens in a new editor tab."
         },
-        "any-markdown.enableDebugLogging": {
+        "fractal.enableDebugLogging": {
           "type": "boolean",
           "default": false,
-          "description": "Enable debug logging in the editor. Useful for troubleshooting. / エディタのデバッグログを有効にします。トラブルシューティングに便利です。"
+          "description": "Enable debug logging in the editor. Useful for troubleshooting."
         },
-        "any-markdown.s3AccessKeyId": {
+        "fractal.s3AccessKeyId": {
           "type": "string",
           "default": "",
-          "description": "AWS Access Key ID for S3 sync / S3同期用のAWSアクセスキーID"
+          "description": "AWS Access Key ID for S3 sync"
         },
-        "any-markdown.s3SecretAccessKey": {
+        "fractal.s3SecretAccessKey": {
           "type": "string",
           "default": "",
-          "description": "AWS Secret Access Key for S3 sync / S3同期用のAWSシークレットアクセスキー"
+          "description": "AWS Secret Access Key for S3 sync"
         },
-        "any-markdown.s3Region": {
+        "fractal.s3Region": {
           "type": "string",
           "default": "us-east-1",
-          "description": "AWS Region for S3 sync (e.g., ap-northeast-1) / S3同期用のAWSリージョン"
+          "description": "AWS Region for S3 sync (e.g., ap-northeast-1)"
         }
       }
     },
     "menus": {
       "editor/context": [
         {
-          "command": "any-markdown.insertTable",
+          "command": "fractal.insertTable",
           "when": "resourceLangId == markdown",
-          "group": "anymd"
+          "group": "fractal"
         },
         {
-          "command": "any-markdown.insertToc",
+          "command": "fractal.insertToc",
           "when": "resourceLangId == markdown",
-          "group": "anymd"
+          "group": "fractal"
         }
       ],
       "explorer/context": [
         {
-          "command": "any-markdown.openAsText",
+          "command": "fractal.openAsText",
           "when": "resourceLangId == markdown",
           "group": "navigation@99"
         },
         {
-          "command": "any-markdown.compareAsText",
+          "command": "fractal.compareAsText",
           "when": "resourceLangId == markdown",
           "group": "3_compare"
         }
       ],
       "editor/title/context": [
         {
-          "command": "any-markdown.openAsText",
+          "command": "fractal.openAsText",
           "when": "resourceLangId == markdown",
           "group": "navigation"
         }
       ],
       "view/title": [
         {
-          "command": "any-markdown.addNotesFolder",
+          "command": "fractal.addNotesFolder",
           "when": "view == notesExplorer",
           "group": "navigation"
         }
       ],
       "view/item/context": [
         {
-          "command": "any-markdown.removeNotesFolder",
+          "command": "fractal.removeNotesFolder",
           "when": "view == notesExplorer",
           "group": "inline"
         }
@@ -304,46 +310,46 @@
     },
     "keybindings": [
       {
-        "command": "any-markdown.undo",
+        "command": "fractal.undo",
         "key": "ctrl+z",
         "mac": "cmd+z",
-        "when": "activeCustomEditorId == 'any-markdown.editor'"
+        "when": "activeCustomEditorId == 'fractal.editor'"
       },
       {
-        "command": "any-markdown.redo",
+        "command": "fractal.redo",
         "key": "ctrl+shift+z",
         "mac": "cmd+shift+z",
         "when": "!editorTextFocus"
       },
       {
-        "command": "any-markdown.redo",
+        "command": "fractal.redo",
         "key": "ctrl+y",
         "mac": "cmd+y",
         "when": "!editorTextFocus"
       },
       {
-        "command": "any-markdown.toggleSourceMode",
+        "command": "fractal.toggleSourceMode",
         "key": "ctrl+.",
         "mac": "cmd+.",
-        "when": "activeCustomEditorId == 'any-markdown.editor'"
+        "when": "activeCustomEditorId == 'fractal.editor'"
       },
       {
-        "command": "any-markdown.openAsText",
+        "command": "fractal.openAsText",
         "key": "ctrl+shift+.",
         "mac": "cmd+shift+.",
-        "when": "activeCustomEditorId == 'any-markdown.editor'"
+        "when": "activeCustomEditorId == 'fractal.editor'"
       },
       {
-        "command": "any-markdown.scopeOut",
+        "command": "fractal.scopeOut",
         "key": "ctrl+shift+]",
         "mac": "cmd+shift+]",
-        "when": "activeCustomEditorId == 'any-markdown.outliner'"
+        "when": "activeCustomEditorId == 'fractal.outliner'"
       },
       {
-        "command": "any-markdown.scopeIn",
+        "command": "fractal.scopeIn",
         "key": "ctrl+]",
         "mac": "cmd+]",
-        "when": "activeCustomEditorId == 'any-markdown.outliner'"
+        "when": "activeCustomEditorId == 'fractal.outliner'"
       }
     ]
   },

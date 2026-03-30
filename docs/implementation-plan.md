@@ -215,7 +215,7 @@ case '[':
 
 ### Step 6.1: package.json に設定追加
 ```json
-"any-markdown.outlinerPageDir": {
+"fractal.outlinerPageDir": {
     "type": "string",
     "default": "./pages",
     "description": "Outliner page files directory. Relative to .mmd file or absolute path."

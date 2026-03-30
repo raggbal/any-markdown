@@ -3,7 +3,7 @@
  *
  * DOM レンダリング、キーハンドラ、折りたたみ制御を担当。
  * ページノードクリック時はホストに openPage を送信し、
- * VSCode が any-markdown.editor を ViewColumn.Beside で開く。
+ * VSCode が fractal.editor を ViewColumn.Beside で開く。
  * window.outlinerHostBridge 経由でホスト通信。
  */
 
