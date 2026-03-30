@@ -85,34 +85,14 @@ var OutlinerModel = (function() {
     }
 
     Model.prototype._ensureChildren = function() {
-        // 全ノードの children を初期化 + subtext デフォルト設定
+        // subtext デフォルト設定 + 旧形式データ検出
         for (var id in this.nodes) {
             if (!this.nodes[id].children) {
+                console.error('[OutlinerModel] 旧形式データ検出: ノード ' + id + ' に children プロパティがありません。データ形式が古いためサポートされません。');
                 this.nodes[id].children = [];
             }
             if (this.nodes[id].subtext === undefined) {
                 this.nodes[id].subtext = '';
-            }
-        }
-        // parentId ベースで children を構築 (children が空のノードのみ)
-        var needsRebuild = false;
-        for (var nid in this.nodes) {
-            var node = this.nodes[nid];
-            if (node.parentId && node.children.length === 0) {
-                needsRebuild = true;
-                break;
-            }
-        }
-        if (needsRebuild) {
-            // children をクリアして再構築
-            for (var cid in this.nodes) {
-                this.nodes[cid].children = [];
-            }
-            for (var pid in this.nodes) {
-                var parent = this.nodes[pid];
-                if (parent.parentId && this.nodes[parent.parentId]) {
-                    this.nodes[parent.parentId].children.push(pid);
-                }
             }
         }
     };
