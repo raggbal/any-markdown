@@ -71,16 +71,7 @@ var OutlinerModel = (function() {
             }
         }
 
-        // rootIds が空で nodes がある場合、parentId === null のノードを root に
-        if (this.rootIds.length === 0 && Object.keys(this.nodes).length > 0) {
-            for (var nid in this.nodes) {
-                if (this.nodes[nid].parentId === null || this.nodes[nid].parentId === undefined) {
-                    this.rootIds.push(nid);
-                }
-            }
-        }
-
-        // 各ノードの children が未設定の場合、parentId から再構築
+        // 各ノードの children が未設定の場合のフォールバック
         this._ensureChildren();
     }
 
