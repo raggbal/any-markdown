@@ -13774,25 +13774,47 @@ class EditorInstance {
 
     // External change toast notification
     // --- scrollToLine: 行番号指定でスクロール ---
+    // lineNumberは生Markdownファイルの行番号(0-based)
     function scrollToLine(lineNumber) {
-        var blocks = editor.querySelectorAll(':scope > *');
-        var currentLine = 0;
-        for (var i = 0; i < blocks.length; i++) {
-            var block = blocks[i];
-            var text = block.textContent || '';
-            var blockLines = text.split('\n').length;
-            if (currentLine + blockLines > lineNumber) {
-                block.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                var origBg = block.style.backgroundColor;
-                block.style.transition = 'background-color 0.3s';
-                block.style.backgroundColor = 'rgba(255, 200, 0, 0.25)';
-                setTimeout(function() {
-                    block.style.backgroundColor = origBg;
-                }, 2000);
-                return;
+        // 生Markdownから対象行のテキストを取得
+        var md = htmlToMarkdown();
+        var mdLines = md.split('\n');
+        if (lineNumber < 0 || lineNumber >= mdLines.length) { return; }
+        var targetLineText = mdLines[lineNumber].replace(/^#+\s*/, '').replace(/^[-*+]\s*(\[[ xX]\]\s*)?/, '').replace(/^\d+\.\s*/, '').replace(/^>\s*/, '').trim();
+        if (!targetLineText) {
+            // 空行の場合、前後の非空行を探す
+            for (var s = 1; s < 5; s++) {
+                if (lineNumber + s < mdLines.length && mdLines[lineNumber + s].trim()) {
+                    targetLineText = mdLines[lineNumber + s].replace(/^#+\s*/, '').replace(/^[-*+]\s*(\[[ xX]\]\s*)?/, '').replace(/^\d+\.\s*/, '').replace(/^>\s*/, '').trim();
+                    break;
+                }
+                if (lineNumber - s >= 0 && mdLines[lineNumber - s].trim()) {
+                    targetLineText = mdLines[lineNumber - s].replace(/^#+\s*/, '').replace(/^[-*+]\s*(\[[ xX]\]\s*)?/, '').replace(/^\d+\.\s*/, '').replace(/^>\s*/, '').trim();
+                    break;
+                }
             }
-            currentLine += blockLines;
         }
+        if (!targetLineText) { return; }
+
+        // DOMブロックからテキストマッチで対象を探す
+        var blocks = editor.querySelectorAll(':scope > *');
+        var targetBlock = null;
+        for (var i = 0; i < blocks.length; i++) {
+            var blockText = (blocks[i].textContent || '').trim();
+            if (blockText.indexOf(targetLineText) >= 0) {
+                targetBlock = blocks[i];
+                break;
+            }
+        }
+        if (!targetBlock) { return; }
+
+        targetBlock.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        var origBg = targetBlock.style.backgroundColor;
+        targetBlock.style.transition = 'background-color 0.3s';
+        targetBlock.style.backgroundColor = 'rgba(255, 200, 0, 0.25)';
+        setTimeout(function() {
+            targetBlock.style.backgroundColor = origBg;
+        }, 2000);
     }
 
     let externalChangeToast = null;
