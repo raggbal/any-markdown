@@ -76,6 +76,8 @@ export class NotesFileManager {
     private fileChangeId = 0;
     private isWriting = false;
     private isWritingTimer: ReturnType<typeof setTimeout> | null = null;
+    private isWritingStructure = false;
+    private isWritingStructureTimer: ReturnType<typeof setTimeout> | null = null;
 
     private static SAVE_DEBOUNCE_MS = 1000;
 
@@ -88,6 +90,7 @@ export class NotesFileManager {
     isDirtyState(): boolean { return this.isDirty; }
     getFileChangeId(): number { return this.fileChangeId; }
     getIsWriting(): boolean { return this.isWriting; }
+    getIsWritingStructure(): boolean { return this.isWritingStructure; }
     getLastKnownContent(): string | null { return this.lastJsonString; }
 
     /**
@@ -100,6 +103,32 @@ export class NotesFileManager {
         if (this.saveTimer) {
             clearTimeout(this.saveTimer);
             this.saveTimer = null;
+        }
+    }
+
+    /**
+     * 構造キャッシュを無効化する。外部変更検知時に呼び出す。
+     */
+    invalidateStructureCache(): void {
+        this.structure = null;
+    }
+
+    /**
+     * outline.note の最後の既知内容を取得する（内容比較用）。
+     */
+    getLastKnownStructureContent(): string | null {
+        if (!this.structure) return null;
+        return JSON.stringify(this.structure, null, 2);
+    }
+
+    /**
+     * 外部変更検知後に outline.note の最後の既知内容を更新する。
+     */
+    updateLastKnownStructureContent(content: string): void {
+        try {
+            this.structure = JSON.parse(content);
+        } catch {
+            // パースエラーは無視
         }
     }
 
@@ -273,8 +302,15 @@ export class NotesFileManager {
     saveStructure(): void {
         if (!this.structure) return;
         try {
+            this.isWritingStructure = true;
             fs.writeFileSync(this.getNoteFilePath(), JSON.stringify(this.structure, null, 2), 'utf8');
+            if (this.isWritingStructureTimer) clearTimeout(this.isWritingStructureTimer);
+            this.isWritingStructureTimer = setTimeout(() => {
+                this.isWritingStructure = false;
+                this.isWritingStructureTimer = null;
+            }, 300);
         } catch (e) {
+            this.isWritingStructure = false;
             console.error('[NotesFileManager] saveStructure error:', e);
         }
     }
@@ -1008,6 +1044,11 @@ export class NotesFileManager {
             this.isWritingTimer = null;
         }
         this.isWriting = false;
+        if (this.isWritingStructureTimer) {
+            clearTimeout(this.isWritingStructureTimer);
+            this.isWritingStructureTimer = null;
+        }
+        this.isWritingStructure = false;
         if (this.isDirty && this.lastJsonString && this.currentFilePath) {
             try {
                 fs.writeFileSync(this.currentFilePath, this.lastJsonString, 'utf8');

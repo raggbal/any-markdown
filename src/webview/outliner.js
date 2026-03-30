@@ -3160,8 +3160,11 @@ var Outliner = (function() {
 
         renderTree();
 
+        // フォーカス復元: focusNode() は textEl.focus() を呼ぶためVSCodeが
+        // このパネルをアクティブにしてしまう。外部変更時はCSSクラスのみ設定し
+        // DOMフォーカスは奪わない。
         if (savedFocus && model.getNode(savedFocus)) {
-            focusNode(savedFocus);
+            setFocusedNode(savedFocus);
         }
     }
 

@@ -365,16 +365,20 @@ export class NotesEditorProvider {
         const folderWatcher = vscode.workspace.createFileSystemWatcher(watcherPattern);
 
         const refreshFileListFromWatcher = () => {
-            (fileManager as any).structure = null;
-            const structure = fileManager.loadStructure();
-            const wFileList = fileManager.listFiles();
-            const currentFile = fileManager.getCurrentFilePath();
-            panel.webview.postMessage({
-                type: 'notesFileListChanged',
-                fileList: wFileList,
-                structure,
-                currentFile,
-            });
+            try {
+                fileManager.invalidateStructureCache();
+                const structure = fileManager.loadStructure();
+                const wFileList = fileManager.listFiles();
+                const currentFile = fileManager.getCurrentFilePath();
+                panel.webview.postMessage({
+                    type: 'notesFileListChanged',
+                    fileList: wFileList,
+                    structure,
+                    currentFile,
+                });
+            } catch {
+                // ファイル読み込みエラーは無視
+            }
         };
 
         disposables.push(folderWatcher.onDidCreate(refreshFileListFromWatcher));
@@ -403,11 +407,49 @@ export class NotesEditorProvider {
 
         disposables.push(folderWatcher);
 
+        // --- outline.note の外部変更検知 ---
+        const noteFileWatcher = vscode.workspace.createFileSystemWatcher(
+            new vscode.RelativePattern(vscode.Uri.file(folderPath), 'outline.note')
+        );
+
+        disposables.push(noteFileWatcher.onDidChange(() => {
+            if (fileManager.getIsWritingStructure()) return;
+
+            setTimeout(() => {
+                try {
+                    if (fileManager.getIsWritingStructure()) return;
+
+                    // 内容比較: 同じなら何もしない（isWritingStructureタイミングずれの安全弁）
+                    const noteFilePath = path.join(folderPath, 'outline.note');
+                    const noteContent = fs.readFileSync(noteFilePath, 'utf8');
+                    if (noteContent === fileManager.getLastKnownStructureContent()) return;
+
+                    // 構造を再読み込みしてwebviewに送信
+                    fileManager.invalidateStructureCache();
+                    const structure = fileManager.loadStructure();
+                    const noteFileList = fileManager.listFiles();
+                    const currentFile = fileManager.getCurrentFilePath();
+                    panel.webview.postMessage({
+                        type: 'notesFileListChanged',
+                        fileList: noteFileList,
+                        structure,
+                        currentFile,
+                    });
+                    fileManager.updateLastKnownStructureContent(noteContent);
+                } catch {
+                    // 読み込みエラーは無視
+                }
+            }, 200);
+        }));
+
+        disposables.push(noteFileWatcher);
+
         // パネル破棄時のクリーンアップ
         panel.onDidDispose(() => {
             fileManager.dispose();
             sidePanel.disposeFileWatcher();
-            folderWatcher.dispose();
+            // folderWatcher, noteFileWatcher は disposables に含まれているため
+            // disposables.forEach で一括dispose（二重disposeを避ける）
             disposables.forEach(d => d.dispose());
         });
     }
