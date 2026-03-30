@@ -10,55 +10,44 @@ import { s3Sync, s3RemoteDeleteAndUpload, s3LocalDeleteAndDownload, S3SyncConfig
 
 /**
  * NotesEditorProvider — WebviewPanel で Notes エディタを開く
- * 同時に開けるパネルは1つのみ (N-50a)
+ * 複数パネル対応: 各パネルが独立したfileManager/watcher/disposablesをクロージャで保持
  */
 export class NotesEditorProvider {
-    private panel: vscode.WebviewPanel | undefined;
-    private fileManager: NotesFileManager | undefined;
-    private currentFolderPath: string | undefined;
-    private disposables: vscode.Disposable[] = [];
-    private folderWatcher: vscode.FileSystemWatcher | undefined;
-
     constructor(private context: vscode.ExtensionContext) {}
 
     async openNotesFolder(folderPath: string): Promise<void> {
-        // 既にパネルがある場合は閉じる (N-50a)
-        if (this.panel) {
-            this.disposePanel();
-        }
-
         // フォルダ存在確認 (N-45)
         if (!fs.existsSync(folderPath) || !fs.statSync(folderPath).isDirectory()) {
             vscode.window.showErrorMessage(`Notes folder not found: ${folderPath}`);
             return;
         }
 
-        this.currentFolderPath = folderPath;
-        this.fileManager = new NotesFileManager(folderPath);
+        // --- パネル固有の状態（全てローカル変数） ---
+        const fileManager = new NotesFileManager(folderPath);
 
         // .note構造をロード（自動マイグレーション含む）
-        const noteStructure = this.fileManager.loadStructure();
+        const noteStructure = fileManager.loadStructure();
 
         // ファイル一覧取得（空フォルダなら default outliner を自動作成）
-        let fileList = this.fileManager.listFiles();
+        let fileList = fileManager.listFiles();
         if (fileList.length === 0) {
-            this.fileManager.createFile('default');
-            fileList = this.fileManager.listFiles();
+            fileManager.createFile('default');
+            fileList = fileManager.listFiles();
         }
         let currentFilePath: string | null = null;
         let jsonContent = '{"version":1,"rootIds":[],"nodes":{}}';
 
         // 構造のツリー順で最初のファイルを開く
-        const firstFileId = this.fileManager.findFirstFileId();
+        const firstFileId = fileManager.findFirstFileId();
         if (firstFileId) {
-            const fp = this.fileManager.getFilePathById(firstFileId);
-            const content = this.fileManager.openFile(fp);
+            const fp = fileManager.getFilePathById(firstFileId);
+            const content = fileManager.openFile(fp);
             if (content !== null) {
                 currentFilePath = fp;
                 jsonContent = content;
             }
         } else if (fileList.length > 0) {
-            const content = this.fileManager.openFile(fileList[0].filePath);
+            const content = fileManager.openFile(fileList[0].filePath);
             if (content !== null) {
                 currentFilePath = fileList[0].filePath;
                 jsonContent = content;
@@ -71,7 +60,7 @@ export class NotesEditorProvider {
         );
 
         // WebviewPanel 作成
-        this.panel = vscode.window.createWebviewPanel(
+        const panel = vscode.window.createWebviewPanel(
             'fractal.notes',
             `Notes: ${path.basename(folderPath)}`,
             vscode.ViewColumn.One,
@@ -88,8 +77,8 @@ export class NotesEditorProvider {
 
         // HTML 生成
         const config = vscode.workspace.getConfiguration('fractal');
-        this.panel.webview.html = getNotesWebviewContent(
-            this.panel.webview,
+        panel.webview.html = getNotesWebviewContent(
+            panel.webview,
             this.context.extensionUri,
             {
                 theme: config.get<string>('theme', 'github'),
@@ -103,17 +92,17 @@ export class NotesEditorProvider {
                 fileList,
                 currentFilePath,
                 panelCollapsed,
-                structure: this.fileManager.getStructure(),
-                panelWidth: this.fileManager.getPanelWidth(),
-                fileChangeId: this.fileManager.getFileChangeId(),
+                structure: fileManager.getStructure(),
+                panelWidth: fileManager.getPanelWidth(),
+                fileChangeId: fileManager.getFileChangeId(),
             }
         );
 
         // サイドパネル管理
         const sidePanel = new SidePanelManager(
             {
-                postMessage: (msg: any) => this.panel ? this.panel.webview.postMessage(msg) : Promise.resolve(false),
-                asWebviewUri: (uri: vscode.Uri) => this.panel!.webview.asWebviewUri(uri),
+                postMessage: (msg: any) => panel.webview.postMessage(msg),
+                asWebviewUri: (uri: vscode.Uri) => panel.webview.asWebviewUri(uri),
             },
             { logPrefix: '[Notes]' }
         );
@@ -121,11 +110,11 @@ export class NotesEditorProvider {
         // Sender
         const sender: NotesSender = {
             postMessage: (msg: unknown) => {
-                this.panel?.webview.postMessage(msg);
+                panel.webview.postMessage(msg);
             },
         };
 
-        // Platform Actions
+        // Platform Actions (全てローカル変数 panel / fileManager / folderPath をキャプチャ)
         const platform: NotesPlatformActions = {
             openExternalLink: (href: string) => {
                 vscode.env.openExternal(vscode.Uri.parse(href));
@@ -142,7 +131,7 @@ export class NotesEditorProvider {
                 await sidePanel.openFile(filePath);
                 if (lineNumber !== undefined) {
                     setTimeout(() => {
-                        this.panel?.webview.postMessage({
+                        panel.webview.postMessage({
                             type: 'scrollToLine',
                             lineNumber: lineNumber,
                         });
@@ -154,20 +143,19 @@ export class NotesEditorProvider {
                 await vscode.commands.executeCommand('vscode.open', uri);
             },
             openInTextEditor: () => {
-                const fp = this.fileManager?.getCurrentFilePath();
+                const fp = fileManager.getCurrentFilePath();
                 if (fp) {
                     vscode.commands.executeCommand('vscode.openWith', vscode.Uri.file(fp), 'default');
                 }
             },
             copyFilePath: () => {
-                const fp = this.fileManager?.getCurrentFilePath();
+                const fp = fileManager.getCurrentFilePath();
                 if (fp) {
                     vscode.env.clipboard.writeText(fp);
                 }
             },
             requestInsertImage: async (sidePanelFilePath: string) => {
-                if (!this.fileManager) return;
-                const pagesDir = this.fileManager.getPagesDirPath();
+                const pagesDir = fileManager.getPagesDirPath();
                 const imagesDir = path.join(pagesDir, 'images');
                 if (!fs.existsSync(imagesDir)) fs.mkdirSync(imagesDir, { recursive: true });
                 const options: vscode.OpenDialogOptions = {
@@ -182,8 +170,8 @@ export class NotesEditorProvider {
                     fs.copyFileSync(srcPath, destPath);
                     const spDir = path.dirname(sidePanelFilePath);
                     const relPath = path.relative(spDir, destPath).replace(/\\/g, '/');
-                    const displayUri = this.panel!.webview.asWebviewUri(vscode.Uri.file(destPath)).toString();
-                    this.panel?.webview.postMessage({
+                    const displayUri = panel.webview.asWebviewUri(vscode.Uri.file(destPath)).toString();
+                    panel.webview.postMessage({
                         type: 'insertImageHtml',
                         markdownPath: relPath,
                         displayUri,
@@ -191,16 +179,14 @@ export class NotesEditorProvider {
                 }
             },
             savePanelCollapsed: (collapsed: boolean) => {
-                if (this.currentFolderPath) {
-                    this.context.globalState.update(
-                        `notesPanelCollapsed:${this.currentFolderPath}`, collapsed
-                    );
-                }
+                this.context.globalState.update(
+                    `notesPanelCollapsed:${folderPath}`, collapsed
+                );
             },
             requestSetPageDir: async () => {
-                if (!this.fileManager || !this.fileManager.getCurrentFilePath()) return;
-                const currentDir = this.fileManager.getPagesDirPath();
-                const outDir = path.dirname(this.fileManager.getCurrentFilePath()!);
+                if (!fileManager.getCurrentFilePath()) return;
+                const currentDir = fileManager.getPagesDirPath();
+                const outDir = path.dirname(fileManager.getCurrentFilePath()!);
                 const relCurrent = path.relative(outDir, currentDir);
                 const input = await vscode.window.showInputBox({
                     prompt: 'Enter page directory (relative to .out file or absolute)',
@@ -208,12 +194,12 @@ export class NotesEditorProvider {
                 });
                 if (input !== undefined) {
                     try {
-                        const content = fs.readFileSync(this.fileManager.getCurrentFilePath()!, 'utf8');
+                        const content = fs.readFileSync(fileManager.getCurrentFilePath()!, 'utf8');
                         const data = JSON.parse(content);
                         data.pageDir = input || undefined;
                         const jsonStr = JSON.stringify(data, null, 2);
-                        fs.writeFileSync(this.fileManager.getCurrentFilePath()!, jsonStr, 'utf8');
-                        this.panel?.webview.postMessage({
+                        fs.writeFileSync(fileManager.getCurrentFilePath()!, jsonStr, 'utf8');
+                        panel.webview.postMessage({
                             type: 'pageDirChanged',
                             pageDir: input,
                         });
@@ -223,8 +209,7 @@ export class NotesEditorProvider {
                 }
             },
             saveImageToDir: (dataUrl: string, fileName: string, sidePanelFilePath: string) => {
-                if (!this.fileManager) return;
-                const pagesDir = this.fileManager.getPagesDirPath();
+                const pagesDir = fileManager.getPagesDirPath();
                 const imagesDir = path.join(pagesDir, 'images');
                 if (!fs.existsSync(imagesDir)) fs.mkdirSync(imagesDir, { recursive: true });
                 let imgFileName = fileName;
@@ -238,8 +223,8 @@ export class NotesEditorProvider {
                 fs.writeFileSync(destPath, Buffer.from(base64Data, 'base64'));
                 const spDir = path.dirname(sidePanelFilePath);
                 const relPath = path.relative(spDir, destPath).replace(/\\/g, '/');
-                const displayUri = this.panel!.webview.asWebviewUri(vscode.Uri.file(destPath)).toString();
-                this.panel?.webview.postMessage({
+                const displayUri = panel.webview.asWebviewUri(vscode.Uri.file(destPath)).toString();
+                panel.webview.postMessage({
                     type: 'insertImageHtml',
                     markdownPath: relPath,
                     displayUri,
@@ -247,8 +232,7 @@ export class NotesEditorProvider {
                 });
             },
             readAndInsertImage: (filePath: string, sidePanelFilePath: string) => {
-                if (!this.fileManager) return;
-                const pagesDir = this.fileManager.getPagesDirPath();
+                const pagesDir = fileManager.getPagesDirPath();
                 const imagesDir = path.join(pagesDir, 'images');
                 if (!fs.existsSync(imagesDir)) fs.mkdirSync(imagesDir, { recursive: true });
                 const imgFileName = path.basename(filePath);
@@ -257,8 +241,8 @@ export class NotesEditorProvider {
                     fs.copyFileSync(filePath, destPath);
                     const spDir = path.dirname(sidePanelFilePath);
                     const relPath = path.relative(spDir, destPath).replace(/\\/g, '/');
-                    const displayUri = this.panel!.webview.asWebviewUri(vscode.Uri.file(destPath)).toString();
-                    this.panel?.webview.postMessage({
+                    const displayUri = panel.webview.asWebviewUri(vscode.Uri.file(destPath)).toString();
+                    panel.webview.postMessage({
                         type: 'insertImageHtml',
                         markdownPath: relPath,
                         displayUri,
@@ -268,12 +252,11 @@ export class NotesEditorProvider {
                 }
             },
             sendSidePanelImageDir: (sidePanelFilePath: string) => {
-                if (!this.fileManager) return;
-                const pagesDir = this.fileManager.getPagesDirPath();
+                const pagesDir = fileManager.getPagesDirPath();
                 const imagesDir = path.join(pagesDir, 'images');
                 const spDir = path.dirname(sidePanelFilePath);
                 const displayPath = path.relative(spDir, imagesDir).replace(/\\/g, '/') || '.';
-                this.panel?.webview.postMessage({
+                panel.webview.postMessage({
                     type: 'sidePanelImageDirStatus',
                     displayPath,
                     source: 'default',
@@ -302,45 +285,44 @@ export class NotesEditorProvider {
                 }
             },
             saveLastOpenedFile: (filePath: string) => {
-                if (this.currentFolderPath) {
-                    this.context.globalState.update(
-                        `notesLastFile:${this.currentFolderPath}`, filePath
-                    );
-                }
+                this.context.globalState.update(
+                    `notesLastFile:${folderPath}`, filePath
+                );
             },
             s3Sync: (bucketPath: string) => {
-                this.runS3Operation('s3Sync', bucketPath, sender);
+                this.runS3Operation('s3Sync', bucketPath, sender, fileManager, folderPath);
             },
             s3RemoteDeleteAndUpload: (bucketPath: string) => {
-                this.runS3Operation('s3RemoteDeleteAndUpload', bucketPath, sender);
+                this.runS3Operation('s3RemoteDeleteAndUpload', bucketPath, sender, fileManager, folderPath);
             },
             s3LocalDeleteAndDownload: (bucketPath: string) => {
-                this.runS3Operation('s3LocalDeleteAndDownload', bucketPath, sender);
+                this.runS3Operation('s3LocalDeleteAndDownload', bucketPath, sender, fileManager, folderPath);
             },
             s3GetStatus: () => {
-                if (!this.fileManager) return;
-                const config = vscode.workspace.getConfiguration('fractal');
-                const bucketPath = this.fileManager.getS3BucketPath();
-                const hasCredentials = !!(config.get<string>('s3AccessKeyId') && config.get<string>('s3SecretAccessKey'));
+                const fractalConfig = vscode.workspace.getConfiguration('fractal');
+                const bucketPath = fileManager.getS3BucketPath();
+                const hasCredentials = !!(fractalConfig.get<string>('s3AccessKeyId') && fractalConfig.get<string>('s3SecretAccessKey'));
                 sender.postMessage({
                     type: 'notesS3Status',
                     bucketPath: bucketPath || '',
                     hasCredentials,
-                    region: config.get<string>('s3Region', 'us-east-1'),
+                    region: fractalConfig.get<string>('s3Region', 'us-east-1'),
                 });
             },
         };
 
+        // --- パネル固有の disposables ---
+        const disposables: vscode.Disposable[] = [];
+
         // メッセージハンドラ登録
-        this.disposables.push(
-            this.panel.webview.onDidReceiveMessage((message) => {
-                if (!this.fileManager) return;
-                handleNotesMessage(message, this.fileManager, sender, platform);
+        disposables.push(
+            panel.webview.onDidReceiveMessage((message) => {
+                handleNotesMessage(message, fileManager, sender, platform);
             })
         );
 
         // テーマ変更対応 (N-50b)
-        this.disposables.push(
+        disposables.push(
             vscode.workspace.onDidChangeConfiguration((e) => {
                 if (e.affectsConfiguration('fractal.language')) {
                     const langConfig = vscode.workspace.getConfiguration('fractal');
@@ -350,74 +332,87 @@ export class NotesEditorProvider {
                     e.affectsConfiguration('fractal.fontSize') ||
                     e.affectsConfiguration('fractal.outlinerPageTitle') ||
                     e.affectsConfiguration('fractal.language')) {
-                    this.refreshPanel();
+                    // refreshPanel inline (ローカル変数を使用)
+                    const refreshConfig = vscode.workspace.getConfiguration('fractal');
+                    const refreshFileList = fileManager.listFiles();
+                    const refreshCurrentFile = fileManager.getCurrentFilePath();
+                    let refreshJsonContent = '{"version":1,"rootIds":[],"nodes":{}}';
+                    if (refreshCurrentFile) {
+                        const refreshContent = fileManager.openFile(refreshCurrentFile);
+                        if (refreshContent !== null) refreshJsonContent = refreshContent;
+                    }
+                    const refreshPanelCollapsed = this.context.globalState.get<boolean>(
+                        `notesPanelCollapsed:${folderPath}`, false
+                    );
+                    panel.webview.html = getNotesWebviewContent(
+                        panel.webview,
+                        this.context.extensionUri,
+                        {
+                            theme: refreshConfig.get<string>('theme', 'github'),
+                            fontSize: refreshConfig.get<number>('fontSize', 16),
+                            webviewMessages: getWebviewMessages() as unknown as Record<string, string>,
+                            enableDebugLogging: refreshConfig.get<boolean>('enableDebugLogging', false),
+                            outlinerPageTitle: refreshConfig.get<boolean>('outlinerPageTitle', true),
+                        },
+                        { jsonContent: refreshJsonContent, fileList: refreshFileList, currentFilePath: refreshCurrentFile, panelCollapsed: refreshPanelCollapsed, structure: fileManager.getStructure(), panelWidth: fileManager.getPanelWidth(), fileChangeId: fileManager.getFileChangeId() }
+                    );
                 }
             })
         );
 
-        // フォルダ監視 (N-44)
-        this.setupFolderWatcher(folderPath);
+        // --- パネル固有のフォルダ監視 ---
+        const watcherPattern = new vscode.RelativePattern(vscode.Uri.file(folderPath), '*.out');
+        const folderWatcher = vscode.workspace.createFileSystemWatcher(watcherPattern);
 
-        // パネル破棄時のクリーンアップ
-        this.panel.onDidDispose(() => {
-            this.disposePanel();
-        });
-    }
-
-    private refreshPanel(): void {
-        if (!this.panel || !this.fileManager || !this.currentFolderPath) return;
-        const config = vscode.workspace.getConfiguration('fractal');
-        const fileList = this.fileManager.listFiles();
-        const currentFilePath = this.fileManager.getCurrentFilePath();
-        let jsonContent = '{"version":1,"rootIds":[],"nodes":{}}';
-        if (currentFilePath) {
-            const content = this.fileManager.openFile(currentFilePath);
-            if (content !== null) jsonContent = content;
-        }
-        const panelCollapsed = this.context.globalState.get<boolean>(
-            `notesPanelCollapsed:${this.currentFolderPath}`, false
-        );
-
-        this.panel.webview.html = getNotesWebviewContent(
-            this.panel.webview,
-            this.context.extensionUri,
-            {
-                theme: config.get<string>('theme', 'github'),
-                fontSize: config.get<number>('fontSize', 16),
-                webviewMessages: getWebviewMessages() as unknown as Record<string, string>,
-                enableDebugLogging: config.get<boolean>('enableDebugLogging', false),
-                outlinerPageTitle: config.get<boolean>('outlinerPageTitle', true),
-            },
-            { jsonContent, fileList, currentFilePath, panelCollapsed, structure: this.fileManager.getStructure(), panelWidth: this.fileManager.getPanelWidth(), fileChangeId: this.fileManager.getFileChangeId() }
-        );
-    }
-
-    private setupFolderWatcher(folderPath: string): void {
-        this.folderWatcher?.dispose();
-        const pattern = new vscode.RelativePattern(vscode.Uri.file(folderPath), '*.out');
-        this.folderWatcher = vscode.workspace.createFileSystemWatcher(pattern);
-
-        const refreshFileList = () => {
-            if (!this.fileManager || !this.panel) return;
-            // ディスク変更を検知したら構造を再同期
-            (this.fileManager as any).structure = null; // キャッシュ無効化
-            const structure = this.fileManager.loadStructure();
-            const fileList = this.fileManager.listFiles();
-            const currentFile = this.fileManager.getCurrentFilePath();
-            this.panel.webview.postMessage({
+        const refreshFileListFromWatcher = () => {
+            (fileManager as any).structure = null;
+            const structure = fileManager.loadStructure();
+            const wFileList = fileManager.listFiles();
+            const currentFile = fileManager.getCurrentFilePath();
+            panel.webview.postMessage({
                 type: 'notesFileListChanged',
-                fileList,
+                fileList: wFileList,
                 structure,
                 currentFile,
             });
         };
 
-        this.disposables.push(this.folderWatcher.onDidCreate(refreshFileList));
-        this.disposables.push(this.folderWatcher.onDidDelete(refreshFileList));
-        this.disposables.push(this.folderWatcher);
+        disposables.push(folderWatcher.onDidCreate(refreshFileListFromWatcher));
+        disposables.push(folderWatcher.onDidDelete(refreshFileListFromWatcher));
+
+        // 現在開いている.outファイルの外部変更検知
+        disposables.push(folderWatcher.onDidChange((uri) => {
+            const currentFile = fileManager.getCurrentFilePath();
+            if (!currentFile) return;
+            if (uri.fsPath !== currentFile) return;
+            if (fileManager.getIsWriting()) return;
+
+            setTimeout(() => {
+                try {
+                    if (fileManager.getIsWriting()) return;
+                    const content = fs.readFileSync(currentFile, 'utf8');
+                    if (content === fileManager.getLastKnownContent()) return;
+                    const data = JSON.parse(content);
+                    panel.webview.postMessage({ type: 'updateData', data });
+                    fileManager.updateLastKnownContent(content);
+                } catch {
+                    // JSONパースエラー or ファイル読み込みエラーは無視
+                }
+            }, 200);
+        }));
+
+        disposables.push(folderWatcher);
+
+        // パネル破棄時のクリーンアップ
+        panel.onDidDispose(() => {
+            fileManager.dispose();
+            sidePanel.disposeFileWatcher();
+            folderWatcher.dispose();
+            disposables.forEach(d => d.dispose());
+        });
     }
 
-    private getS3Config(bucketPath: string): S3SyncConfig | null {
+    private getS3Config(bucketPath: string, folderPath: string): S3SyncConfig | null {
         const config = vscode.workspace.getConfiguration('fractal');
         const accessKeyId = config.get<string>('s3AccessKeyId', '');
         const secretAccessKey = config.get<string>('s3SecretAccessKey', '');
@@ -426,19 +421,19 @@ export class NotesEditorProvider {
             vscode.window.showErrorMessage('AWS credentials not configured. Set fractal.s3AccessKeyId and s3SecretAccessKey in settings.');
             return null;
         }
-        if (!this.currentFolderPath) return null;
-        return { accessKeyId, secretAccessKey, region, bucketPath, localPath: this.currentFolderPath };
+        return { accessKeyId, secretAccessKey, region, bucketPath, localPath: folderPath };
     }
 
     private async runS3Operation(
         op: 's3Sync' | 's3RemoteDeleteAndUpload' | 's3LocalDeleteAndDownload',
         bucketPath: string,
         sender: NotesSender,
+        fileManager: NotesFileManager,
+        folderPath: string,
     ): Promise<void> {
-        if (!this.fileManager || !this.currentFolderPath) return;
-        this.fileManager.flushSave();
+        fileManager.flushSave();
 
-        const config = this.getS3Config(bucketPath);
+        const config = this.getS3Config(bucketPath, folderPath);
         if (!config) {
             sender.postMessage({ type: 'notesS3Progress', phase: 'error', message: 'AWS credentials not configured.' });
             return;
@@ -455,27 +450,13 @@ export class NotesEditorProvider {
                 await s3RemoteDeleteAndUpload(config, onProgress);
             } else {
                 await s3LocalDeleteAndDownload(config, onProgress);
-                // ローカルファイルが完全に入れ替わったので、パネルを開き直して完全初期化
                 sender.postMessage({ type: 'notesS3Progress', phase: 'complete', message: 'Local delete & download complete. Reopening...' });
-                if (this.currentFolderPath) {
-                    await this.openNotesFolder(this.currentFolderPath);
-                }
-                return; // openNotesFolder が全てを再構築するので、後続の complete 送信は不要
+                await this.openNotesFolder(folderPath);
+                return;
             }
         } catch (e: unknown) {
             const message = e instanceof Error ? e.message : String(e);
             sender.postMessage({ type: 'notesS3Progress', phase: 'error', message });
         }
-    }
-
-    private disposePanel(): void {
-        this.fileManager?.dispose();
-        this.fileManager = undefined;
-        this.folderWatcher?.dispose();
-        this.folderWatcher = undefined;
-        this.disposables.forEach(d => d.dispose());
-        this.disposables = [];
-        this.panel = undefined;
-        this.currentFolderPath = undefined;
     }
 }

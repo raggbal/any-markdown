@@ -5,6 +5,14 @@ All notable changes to the "Fractal" extension extension will be documented in t
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.195.550] - 2026-03-30
+
+### Added
+
+- **複数パネル間同期** — 同じファイルを複数タブで開いて編集した場合、変更がリアルタイムに反映される（Markdown/Outliner/Notes全エディタ対応）
+- **外部変更検知** — 外部プロセス（テキストエディタ、Claude等）からの変更をOutliner/Notesエディタに反映
+- **編集中ガード** — 編集中の外部変更をキューし、1.5秒アイドル後にフォーカス保持で適用
+
 ## [0.195.541] - 2026-03-29
 
 ### Added

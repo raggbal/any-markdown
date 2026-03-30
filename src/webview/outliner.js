@@ -36,6 +36,12 @@ var Outliner = (function() {
     var syncDebounceTimer = null;
     var SYNC_DEBOUNCE_MS = 1000;
 
+    // --- 外部変更検知用 ---
+    var isActivelyEditing = false;
+    var editingIdleTimer = null;
+    var queuedExternalUpdate = null;
+    var EDITING_IDLE_TIMEOUT = 1500;
+
     // --- Navigation history (Back/Forward) ---
     var navBackStack = [];
     var navForwardStack = [];
@@ -3121,9 +3127,55 @@ var Outliner = (function() {
         if (sidePanelOpenOutlineBtn) { sidePanelOpenOutlineBtn.classList.remove('hidden'); }
     }
 
+    // --- 外部変更の編集中ガード ---
+
+    function markActivelyEditing() {
+        isActivelyEditing = true;
+        clearTimeout(editingIdleTimer);
+        editingIdleTimer = setTimeout(function() {
+            isActivelyEditing = false;
+            applyQueuedExternalUpdate();
+        }, EDITING_IDLE_TIMEOUT);
+    }
+
+    function applyExternalUpdate(data) {
+        var savedFocus = focusedNodeId;
+
+        model = new OutlinerModel(data);
+        searchEngine = new OutlinerSearch.SearchEngine(model);
+        pageDir = data.pageDir || null;
+        sidePanelWidthSetting = data.sidePanelWidth || null;
+        pinnedTags = data.pinnedTags || [];
+        // isDailyNotes は変更しない（外部変更はファイル切替ではない）
+        // currentScope も変更しない（スコープ保持）
+
+        undoStack.length = 0;
+        redoStack.length = 0;
+        updateUndoRedoButtons();
+        updatePinnedTagBar();
+
+        if (pageTitleInput && document.activeElement !== pageTitleInput) {
+            pageTitleInput.value = model.title || '';
+        }
+
+        renderTree();
+
+        if (savedFocus && model.getNode(savedFocus)) {
+            focusNode(savedFocus);
+        }
+    }
+
+    function applyQueuedExternalUpdate() {
+        if (queuedExternalUpdate === null) return;
+        var data = queuedExternalUpdate.data;
+        queuedExternalUpdate = null;
+        applyExternalUpdate(data);
+    }
+
     // --- ホスト通信 ---
 
     function scheduleSyncToHost() {
+        markActivelyEditing();
         clearTimeout(syncDebounceTimer);
         syncDebounceTimer = setTimeout(function() {
             syncToHostImmediate();
@@ -3341,24 +3393,25 @@ var Outliner = (function() {
         host.onMessage(function(msg) {
             switch (msg.type) {
                 case 'updateData':
-                    var savedFocus = focusedNodeId;
-                    model = new OutlinerModel(msg.data);
-                    searchEngine = new OutlinerSearch.SearchEngine(model);
-                    pageDir = msg.data.pageDir || null;
-                    sidePanelWidthSetting = msg.data.sidePanelWidth || null;
-                    pinnedTags = msg.data.pinnedTags || [];
-                    // モデルが入れ替わったのでundo/redoスタックをクリア
-                    // (別ファイルのスナップショットでundo→データ上書きを防止)
-                    undoStack.length = 0;
-                    redoStack.length = 0;
-                    updateUndoRedoButtons();
-                    // Daily Notes 表示切替
-                    isDailyNotes = !!msg.isDailyNotes;
-                    updatePinnedTagBar();
-                    // Notes モードのファイル切替時: 検索・スコープをリセット
-                    // fileChangeId はNotes用のupdateDataにのみ存在する
-                    // 単体.outの外部変更検知（outlinerProvider.ts）ではfileChangeIdがないためリセットしない
+                    // --- Notes ファイル切替（fileChangeIdあり）は従来通り即時適用 ---
                     if (msg.fileChangeId !== undefined) {
+                        // 編集中ガード状態をリセット（ファイル切替は最優先）
+                        isActivelyEditing = false;
+                        clearTimeout(editingIdleTimer);
+                        queuedExternalUpdate = null;
+
+                        var savedFocus = focusedNodeId;
+                        model = new OutlinerModel(msg.data);
+                        searchEngine = new OutlinerSearch.SearchEngine(model);
+                        pageDir = msg.data.pageDir || null;
+                        sidePanelWidthSetting = msg.data.sidePanelWidth || null;
+                        pinnedTags = msg.data.pinnedTags || [];
+                        undoStack.length = 0;
+                        redoStack.length = 0;
+                        updateUndoRedoButtons();
+                        isDailyNotes = !!msg.isDailyNotes;
+                        updatePinnedTagBar();
+                        // Notes ファイル切替: 検索・スコープを全リセット
                         navBackStack.length = 0;
                         navForwardStack.length = 0;
                         updateNavButtons();
@@ -3367,8 +3420,6 @@ var Outliner = (function() {
                         }
                         currentSearchResult = null;
                         currentScope = { type: 'document' };
-                        // scopeToNodeId がある場合は renderTree() 前にスコープを設定
-                        // （scope out → scope in のチラつきを防止）
                         if (msg.scopeToNodeId) {
                             var preScopeTarget = model.getNode(msg.scopeToNodeId);
                             if (preScopeTarget) {
@@ -3376,45 +3427,51 @@ var Outliner = (function() {
                             }
                         }
                         updateBreadcrumb();
-                        updatePinnedTagBar(); // タグのis-activeをリセット
-                    }
-                    if (pageTitleInput && document.activeElement !== pageTitleInput) {
-                        pageTitleInput.value = model.title || '';
-                    }
-                    // 空の場合、初期ノードを追加（init()と同じ処理）
-                    if (model.rootIds.length === 0) {
-                        var firstNode = model.addNode(null, null, '');
-                        renderTree();
-                        focusNode(firstNode.id);
-                        syncData();
-                    } else {
-                        renderTree();
-                        // scopeToNodeId適用済みならそのノードにフォーカス、そうでなければ元のフォーカスを復元
-                        if (msg.scopeToNodeId && currentScope.type === 'subtree') {
-                            focusNode(msg.scopeToNodeId);
-                        } else if (savedFocus && model.getNode(savedFocus)) {
-                            focusNode(savedFocus);
+                        updatePinnedTagBar();
+                        if (pageTitleInput && document.activeElement !== pageTitleInput) {
+                            pageTitleInput.value = model.title || '';
                         }
-                    }
-                    // dailyCurrentDate を scopeToNodeId のノード階層から復元
-                    if (msg.scopeToNodeId && isDailyNotes) {
-                        var dayNode = model.getNode(msg.scopeToNodeId);
-                        if (dayNode) {
-                            var monthNode = model.getParent(msg.scopeToNodeId);
-                            var yearNode = monthNode ? model.getParent(monthNode.id) : null;
-                            if (yearNode && monthNode) {
-                                dailyCurrentDate = yearNode.text + '-' +
-                                    String(monthNode.text).padStart(2, '0') + '-' +
-                                    String(dayNode.text).padStart(2, '0');
+                        if (model.rootIds.length === 0) {
+                            var firstNode = model.addNode(null, null, '');
+                            renderTree();
+                            focusNode(firstNode.id);
+                            syncData();
+                        } else {
+                            renderTree();
+                            if (msg.scopeToNodeId && currentScope.type === 'subtree') {
+                                focusNode(msg.scopeToNodeId);
+                            } else if (savedFocus && model.getNode(savedFocus)) {
+                                focusNode(savedFocus);
                             }
                         }
+                        if (msg.scopeToNodeId && isDailyNotes) {
+                            var dayNode = model.getNode(msg.scopeToNodeId);
+                            if (dayNode) {
+                                var monthNode = model.getParent(msg.scopeToNodeId);
+                                var yearNode = monthNode ? model.getParent(monthNode.id) : null;
+                                if (yearNode && monthNode) {
+                                    dailyCurrentDate = yearNode.text + '-' +
+                                        String(monthNode.text).padStart(2, '0') + '-' +
+                                        String(dayNode.text).padStart(2, '0');
+                                }
+                            }
+                        }
+                        if (msg.jumpToNodeId) {
+                            setTimeout(function() {
+                                jumpToAndHighlightNode(msg.jumpToNodeId);
+                            }, 100);
+                        }
+                        break;
                     }
-                    // 検索結果ジャンプ: 特定ノードにスクロール+ハイライト
-                    if (msg.jumpToNodeId) {
-                        setTimeout(function() {
-                            jumpToAndHighlightNode(msg.jumpToNodeId);
-                        }, 100);
+
+                    // --- 外部変更（fileChangeIdなし）→ 編集中ガード ---
+                    if (isActivelyEditing) {
+                        queuedExternalUpdate = { data: msg.data };
+                        break;
                     }
+
+                    // アイドル状態 → 即時適用（フォーカス・スコープ・isDailyNotes保持）
+                    applyExternalUpdate(msg.data);
                     break;
 
                 case 'pageCreated':

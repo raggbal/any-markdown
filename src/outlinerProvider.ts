@@ -358,6 +358,52 @@ export class OutlinerProvider implements vscode.CustomTextEditorProvider {
             })
         );
 
+        // --- FileSystemWatcher（外部プロセスからの変更検知） ---
+        const fileWatcher = vscode.workspace.createFileSystemWatcher(
+            new vscode.RelativePattern(
+                vscode.Uri.joinPath(document.uri, '..'),
+                path.basename(document.uri.fsPath)
+            )
+        );
+        const fileChangeSubscription = fileWatcher.onDidChange(async (uri) => {
+            if (uri.toString() === document.uri.toString()) {
+                setTimeout(async () => {
+                    try {
+                        const fileContent = await vscode.workspace.fs.readFile(uri);
+                        const newContent = new TextDecoder().decode(fileContent);
+                        const currentContent = document.getText();
+
+                        if (newContent !== currentContent) {
+                            isApplyingOwnEdit = true;
+                            const fullRange = new vscode.Range(
+                                document.positionAt(0),
+                                document.positionAt(currentContent.length)
+                            );
+                            const edit = new vscode.WorkspaceEdit();
+                            edit.replace(document.uri, fullRange, newContent);
+                            await vscode.workspace.applyEdit(edit);
+                            isApplyingOwnEdit = false;
+
+                            await document.save();
+
+                            try {
+                                const data = JSON.parse(newContent);
+                                webviewPanel.webview.postMessage({
+                                    type: 'updateData',
+                                    data: data
+                                });
+                            } catch { /* JSON parse error ignored */ }
+                        }
+                    } catch (error) {
+                        isApplyingOwnEdit = false;
+                        console.error('[Outliner] Error reading file after external change:', error);
+                    }
+                }, 100);
+            }
+        });
+        disposables.push(fileWatcher);
+        disposables.push(fileChangeSubscription);
+
         // --- 設定変更 ---
         disposables.push(
             vscode.workspace.onDidChangeConfiguration((e) => {

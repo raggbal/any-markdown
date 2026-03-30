@@ -74,6 +74,8 @@ export class NotesFileManager {
     private lastJsonString: string | null = null;
     private structure: NoteStructure | null = null;
     private fileChangeId = 0;
+    private isWriting = false;
+    private isWritingTimer: ReturnType<typeof setTimeout> | null = null;
 
     private static SAVE_DEBOUNCE_MS = 1000;
 
@@ -85,6 +87,21 @@ export class NotesFileManager {
     getCurrentFilePath(): string | null { return this.currentFilePath; }
     isDirtyState(): boolean { return this.isDirty; }
     getFileChangeId(): number { return this.fileChangeId; }
+    getIsWriting(): boolean { return this.isWriting; }
+    getLastKnownContent(): string | null { return this.lastJsonString; }
+
+    /**
+     * 外部変更検知時に呼び出す。lastJsonStringを更新し、
+     * 残っているデバウンスタイマーを停止する（古いデータの書き戻しを防止）。
+     */
+    updateLastKnownContent(jsonString: string): void {
+        this.lastJsonString = jsonString;
+        this.isDirty = false;
+        if (this.saveTimer) {
+            clearTimeout(this.saveTimer);
+            this.saveTimer = null;
+        }
+    }
 
     // ── outline.note 構造管理 ──
 
@@ -514,9 +531,17 @@ export class NotesFileManager {
     private _writeFile(jsonString: string): void {
         if (!this.currentFilePath) return;
         try {
+            this.isWriting = true;
             fs.writeFileSync(this.currentFilePath, jsonString, 'utf8');
             this.isDirty = false;
+            // FileSystemWatcherの発火タイミングを考慮し、遅延でフラグをリセット
+            if (this.isWritingTimer) clearTimeout(this.isWritingTimer);
+            this.isWritingTimer = setTimeout(() => {
+                this.isWriting = false;
+                this.isWritingTimer = null;
+            }, 300);
         } catch (e) {
+            this.isWriting = false;
             console.error('[NotesFileManager] write error:', e);
         }
     }
@@ -978,6 +1003,11 @@ export class NotesFileManager {
             clearTimeout(this.saveTimer);
             this.saveTimer = null;
         }
+        if (this.isWritingTimer) {
+            clearTimeout(this.isWritingTimer);
+            this.isWritingTimer = null;
+        }
+        this.isWriting = false;
         if (this.isDirty && this.lastJsonString && this.currentFilePath) {
             try {
                 fs.writeFileSync(this.currentFilePath, this.lastJsonString, 'utf8');
