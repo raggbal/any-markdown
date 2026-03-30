@@ -26,7 +26,7 @@ export function activate(context: vscode.ExtensionContext) {
                     // We handle this by always clearing webview.html first in resolveCustomTextEditor.
                     retainContextWhenHidden: true,
                 },
-                supportsMultipleEditorsPerDocument: true,
+                supportsMultipleEditorsPerDocument: false,
             }
         )
     );
@@ -41,7 +41,7 @@ export function activate(context: vscode.ExtensionContext) {
                 webviewOptions: {
                     retainContextWhenHidden: true,
                 },
-                supportsMultipleEditorsPerDocument: true,
+                supportsMultipleEditorsPerDocument: false,
             }
         )
     );

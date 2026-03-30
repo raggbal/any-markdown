@@ -13,9 +13,19 @@ import { s3Sync, s3RemoteDeleteAndUpload, s3LocalDeleteAndDownload, S3SyncConfig
  * 複数パネル対応: 各パネルが独立したfileManager/watcher/disposablesをクロージャで保持
  */
 export class NotesEditorProvider {
+    // 開いているパネルを追跡（folderPath → WebviewPanel）
+    private openPanels = new Map<string, vscode.WebviewPanel>();
+
     constructor(private context: vscode.ExtensionContext) {}
 
     async openNotesFolder(folderPath: string): Promise<void> {
+        // 同じフォルダのパネルが既に存在する場合はrevealして再利用
+        const existingPanel = this.openPanels.get(folderPath);
+        if (existingPanel) {
+            existingPanel.reveal(vscode.ViewColumn.One);
+            return;
+        }
+
         // フォルダ存在確認 (N-45)
         if (!fs.existsSync(folderPath) || !fs.statSync(folderPath).isDirectory()) {
             vscode.window.showErrorMessage(`Notes folder not found: ${folderPath}`);
@@ -74,6 +84,12 @@ export class NotesEditorProvider {
                 ],
             }
         );
+
+        // パネルをMapに登録、dispose時に除去
+        this.openPanels.set(folderPath, panel);
+        panel.onDidDispose(() => {
+            this.openPanels.delete(folderPath);
+        });
 
         // HTML 生成
         const config = vscode.workspace.getConfiguration('fractal');
