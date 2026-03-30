@@ -55,11 +55,12 @@ body {
     font-size: var(--outliner-font-size);
     line-height: var(--outliner-line-height);
     overflow: hidden;
+    --outliner-gutter: 32px;
 }
 
 /* --- Page Title --- */
 .outliner-page-title {
-    padding: 16px 16px 4px;
+    padding: 16px var(--outliner-gutter) 4px;
     flex-shrink: 0;
 }
 
@@ -85,25 +86,21 @@ body {
 .outliner-search-bar {
     display: flex;
     align-items: center;
-    padding: 8px 16px;
-    border-bottom: 1px solid var(--outliner-border);
+    padding: 8px var(--outliner-gutter);
     flex-shrink: 0;
     box-sizing: border-box;
-}
-.outliner-search-bar:has(+ .outliner-breadcrumb.is-visible) {
-    border-bottom-color: transparent;
 }
 
 .outliner-search-mode-toggle {
     background: transparent;
-    border: 1px solid var(--outliner-search-border);
+    border: none;
     border-radius: 4px;
     color: var(--outliner-search-fg);
     cursor: pointer;
     padding: 4px 6px;
-    margin-right: 6px;
+    margin-right: 4px;
     line-height: 1;
-    opacity: 0.7;
+    opacity: 0.5;
     flex-shrink: 0;
     display: flex;
     align-items: center;
@@ -111,20 +108,26 @@ body {
 }
 .outliner-search-mode-toggle:hover {
     opacity: 1;
-    border-color: var(--vscode-focusBorder, #007acc);
+    background: var(--outliner-hover-bg);
 }
 
 .outliner-search-input-wrapper {
-    flex: 1;
+    width: 250px;
+    flex-shrink: 0;
     position: relative;
     display: flex;
     align-items: center;
+    transition: width 0.2s ease;
+}
+.outliner-search-input-wrapper:focus-within {
+    flex: 1;
+    width: auto;
 }
 .outliner-search-input {
     flex: 1;
     background: var(--outliner-search-bg);
-    border: 1px solid var(--outliner-search-border);
-    border-radius: 4px;
+    border: 1px solid transparent;
+    border-radius: 6px;
     color: var(--outliner-search-fg);
     padding: 6px 26px 6px 10px;
     font-size: 13px;
@@ -162,14 +165,14 @@ body {
 .outliner-redo-btn,
 .outliner-menu-btn {
     background: transparent;
-    border: 1px solid var(--outliner-search-border);
+    border: none;
     border-radius: 4px;
     color: var(--outliner-search-fg);
     cursor: pointer;
     padding: 4px 6px;
-    margin-left: 6px;
+    margin-left: 4px;
     line-height: 1;
-    opacity: 0.7;
+    opacity: 0.5;
     flex-shrink: 0;
     display: flex;
     align-items: center;
@@ -181,7 +184,7 @@ body {
 .outliner-redo-btn:hover:not(:disabled),
 .outliner-menu-btn:hover {
     opacity: 1;
-    border-color: var(--vscode-focusBorder, #007acc);
+    background: var(--outliner-hover-bg);
 }
 .outliner-nav-back-btn:disabled,
 .outliner-nav-forward-btn:disabled,
@@ -194,7 +197,7 @@ body {
 /* --- Menu Dropdown --- */
 .outliner-menu-dropdown {
     position: absolute;
-    right: 16px;
+    right: 0;
     top: 100%;
     background: var(--outliner-bg, var(--vscode-editor-background, #1e1e1e));
     border: 1px solid var(--outliner-border);
@@ -224,8 +227,7 @@ body {
 .outliner-breadcrumb {
     display: none;
     flex-shrink: 0;
-    padding: 6px 16px;
-    border-bottom: 1px solid var(--outliner-border);
+    padding: 6px var(--outliner-gutter);
     font-size: 12px;
     color: var(--outliner-fg);
     overflow-x: auto;
@@ -258,13 +260,15 @@ body {
     overflow-y: auto;
     overflow-x: hidden;
     padding: 8px 0;
+    margin: 0 var(--outliner-gutter);
+    border-top: 1px solid var(--outliner-border);
 }
 
 /* --- Node --- */
 .outliner-node {
     display: flex;
     align-items: flex-start;
-    padding: 1px 16px 1px 0;
+    padding: 1px 0 1px 0;
     position: relative;
     min-height: 28px;
 }
@@ -934,8 +938,7 @@ body {
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 4px 16px;
-    border-bottom: 1px solid var(--outliner-border);
+    padding: 4px var(--outliner-gutter);
     flex-shrink: 0;
     position: relative;
     flex-wrap: wrap;
@@ -1130,7 +1133,7 @@ body {
 .outliner-daily-picker {
     position: absolute;
     top: 100%;
-    left: 16px;
+    left: var(--outliner-gutter);
     z-index: 100;
     background: var(--outliner-bg);
     border: 1px solid var(--outliner-border);
@@ -1194,7 +1197,7 @@ body {
 .outliner-focus-ancestry {
     font-size: 11px;
     color: var(--outliner-subtext-color, #888);
-    padding: 2px 16px 0 44px;
+    padding: 2px 0 0 44px;
     line-height: 16px;
     white-space: nowrap;
     overflow: hidden;
