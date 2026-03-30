@@ -38,6 +38,9 @@
         removePage: function(nodeId, pageId) {
             api.postMessage({ type: 'removePage', nodeId: nodeId, pageId: pageId });
         },
+        copyPageFile: function(sourcePageId, newPageId) {
+            api.postMessage({ type: 'copyPageFile', sourcePageId: sourcePageId, newPageId: newPageId });
+        },
         setPageDir: function() {
             api.postMessage({ type: 'setPageDir' });
         },

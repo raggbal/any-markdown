@@ -311,6 +311,11 @@ var OutlinerModel = (function() {
 
     // --- ページ操作 ---
 
+    /** pageId生成のプロキシ（outliner.jsからアクセス用） */
+    Model.prototype.generatePageId = function() {
+        return generatePageId();
+    };
+
     Model.prototype.makePage = function(nodeId) {
         var node = this.nodes[nodeId];
         if (!node || node.isPage) { return null; }

@@ -59,6 +59,9 @@ var Outliner = (function() {
     var selectedNodeIds = new Set();    // 選択中のノードIDセット
     var selectionAnchorId = null;       // Shift選択の起点ノードID
 
+    // --- 内部クリップボード（ページメタデータ保持用） ---
+    var internalClipboard = null;  // { plainText, isCut, nodes: [{text, level, isPage, pageId}] }
+
     // --- Undo/Redo ---
     var undoStack = [];
     var redoStack = [];
@@ -975,6 +978,40 @@ var Outliner = (function() {
         return lines.join('\n');
     }
 
+    /** 選択中ノードのテキスト+ページメタデータを取得 (表示順) */
+    function getSelectedNodesData() {
+        var flat = model.getFlattenedIds(true);
+        var minDepth = Infinity;
+        var selectedFlat = [];
+        for (var i = 0; i < flat.length; i++) {
+            if (selectedNodeIds.has(flat[i])) {
+                var depth = model.getDepth(flat[i]);
+                if (depth < minDepth) { minDepth = depth; }
+                selectedFlat.push(flat[i]);
+            }
+        }
+        var nodes = [];
+        for (var j = 0; j < selectedFlat.length; j++) {
+            var nd = model.getNode(selectedFlat[j]);
+            if (!nd) { continue; }
+            var relDepth = model.getDepth(selectedFlat[j]) - minDepth;
+            nodes.push({
+                text: nd.text,
+                level: relDepth,
+                isPage: nd.isPage || false,
+                pageId: nd.pageId || null
+            });
+        }
+        return nodes;
+    }
+
+    /** 内部クリップボードの照合（テキスト一致チェック） */
+    function getValidInternalClipboard(clipText) {
+        if (!internalClipboard) { return null; }
+        if (internalClipboard.plainText !== clipText) { return null; }
+        return internalClipboard;
+    }
+
     /** 選択中ノードを削除 */
     function deleteSelectedNodes() {
         if (selectedNodeIds.size === 0) { return; }
@@ -1016,6 +1053,16 @@ var Outliner = (function() {
         var node = model.getNode(nodeId);
         if (!node) { return; }
 
+        // 内部クリップボードの照合
+        var intClip = getValidInternalClipboard(clipText);
+        var clipNodes = intClip ? intClip.nodes : null;
+        var isCutPaste = intClip ? intClip.isCut : false;
+
+        // カット時は1回消費
+        if (intClip && intClip.isCut) {
+            internalClipboard = null;
+        }
+
         // 複数選択時: 選択ノードを置換
         if (selectedNodeIds.size > 0) {
             saveSnapshot();
@@ -1033,12 +1080,15 @@ var Outliner = (function() {
                 if (selectedNodeIds.has(flat[di])) { model.removeNode(flat[di]); }
             }
             clearSelection();
-            pasteNodesFromText(clipText, insertParentId, insertAfter);
+            pasteNodesFromText(clipText, insertParentId, insertAfter, clipNodes, isCutPaste);
             return;
         }
 
-        // 単一行: 現在ノードのカーソル位置に挿入
-        if (!clipText.includes('\n')) {
+        // 内部クリップボードにページノードが含まれるか判定
+        var hasPageInClipboard = clipNodes && clipNodes.some(function(cn) { return cn.isPage; });
+
+        // 単一行かつページノードなし: 現在ノードのカーソル位置に挿入
+        if (!clipText.includes('\n') && !hasPageInClipboard) {
             saveSnapshot();
             var curOff = getCursorOffset(textEl);
             var curText = node.text || '';
@@ -1062,15 +1112,15 @@ var Outliner = (function() {
             var sibIdx = siblings.indexOf(nodeId);
             var insertAfterForEmpty = sibIdx > 0 ? siblings[sibIdx - 1] : null;
             model.removeNode(nodeId);
-            pasteNodesFromText(clipText, parentId, insertAfterForEmpty);
+            pasteNodesFromText(clipText, parentId, insertAfterForEmpty, clipNodes, isCutPaste);
         } else {
             // テキストありノード: 現在ノードの後に全行を挿入
-            pasteNodesFromText(clipText, node.parentId, nodeId);
+            pasteNodesFromText(clipText, node.parentId, nodeId, clipNodes, isCutPaste);
         }
     }
 
     /** インデント付きテキストからノード階層を構築してモデルに追加 */
-    function pasteNodesFromText(text, baseParentId, afterId) {
+    function pasteNodesFromText(text, baseParentId, afterId, clipboardNodes, isCut) {
         var lines = text.split('\n');
         if (lines.length === 0) { return; }
 
@@ -1078,6 +1128,7 @@ var Outliner = (function() {
         // 内部コピー形式はタブ区切り。外部ペースト(スペースのみ)にも対応。
         // タブの後のスペースはテキストの一部として扱う。
         var parsed = [];
+        var clipNodeIndexMap = []; // parsed[n] → clipboardNodes[originalIndex] のマッピング
         for (var i = 0; i < lines.length; i++) {
             var line = lines[i];
             var tabs = 0;
@@ -1096,6 +1147,7 @@ var Outliner = (function() {
             var content = line.substring(j);
             if (content === '' && i === lines.length - 1) { continue; } // 最終空行スキップ
             parsed.push({ level: tabs, text: content });
+            clipNodeIndexMap.push(i);
         }
         if (parsed.length === 0) { return; }
 
@@ -1141,6 +1193,25 @@ var Outliner = (function() {
             }
 
             var newNode = model.addNode(parentId, after, parsed[n].text);
+
+            // ページメタデータ復元
+            if (clipboardNodes && clipboardNodes[clipNodeIndexMap[n]]) {
+                var clipNode = clipboardNodes[clipNodeIndexMap[n]];
+                if (clipNode.isPage && clipNode.pageId) {
+                    if (isCut) {
+                        // カット→ペースト: 元のpageIdをそのまま使う（移動扱い）
+                        newNode.isPage = true;
+                        newNode.pageId = clipNode.pageId;
+                    } else {
+                        // コピー→ペースト: 新pageId発行 + .mdファイル複製
+                        var newPageId = model.generatePageId();
+                        newNode.isPage = true;
+                        newNode.pageId = newPageId;
+                        host.copyPageFile(clipNode.pageId, newPageId);
+                    }
+                }
+            }
+
             levelToLastId[level] = newNode.id;
             lastId = newNode.id;
             // 深いレベルをクリア (新しい親が変わったため)
@@ -1408,12 +1479,18 @@ var Outliner = (function() {
                 } else if (e.shiftKey) {
                     // Shift+↑: 複数ノード選択を上に拡張
                     e.preventDefault();
-                    if (!selectionAnchorId) { selectionAnchorId = nodeId; }
-                    var prevEl = getDomPrevNodeEl(textEl);
-                    if (prevEl) {
-                        var prevElId = prevEl.dataset.id;
-                        if (prevElId) { selectRange(selectionAnchorId, prevElId); }
-                        focusNodeEl(prevEl);
+                    if (!selectionAnchorId) {
+                        // 初回: 自行のみ選択、フォーカス移動なし
+                        selectionAnchorId = nodeId;
+                        selectRange(selectionAnchorId, nodeId);
+                    } else {
+                        // 2回目以降: 従来通り拡張
+                        var prevEl = getDomPrevNodeEl(textEl);
+                        if (prevEl) {
+                            var prevElId = prevEl.dataset.id;
+                            if (prevElId) { selectRange(selectionAnchorId, prevElId); }
+                            focusNodeEl(prevEl);
+                        }
                     }
                 } else {
                     e.preventDefault();
@@ -1437,12 +1514,18 @@ var Outliner = (function() {
                 } else if (e.shiftKey) {
                     // Shift+↓: 複数ノード選択を下に拡張
                     e.preventDefault();
-                    if (!selectionAnchorId) { selectionAnchorId = nodeId; }
-                    var nextEl = getDomNextNodeEl(textEl);
-                    if (nextEl) {
-                        var nextElId = nextEl.dataset.id;
-                        if (nextElId) { selectRange(selectionAnchorId, nextElId); }
-                        focusNodeEl(nextEl);
+                    if (!selectionAnchorId) {
+                        // 初回: 自行のみ選択、フォーカス移動なし
+                        selectionAnchorId = nodeId;
+                        selectRange(selectionAnchorId, nodeId);
+                    } else {
+                        // 2回目以降: 従来通り拡張
+                        var nextEl = getDomNextNodeEl(textEl);
+                        if (nextEl) {
+                            var nextElId = nextEl.dataset.id;
+                            if (nextElId) { selectRange(selectionAnchorId, nextElId); }
+                            focusNodeEl(nextEl);
+                        }
                     }
                 } else {
                     e.preventDefault();
@@ -1533,9 +1616,15 @@ var Outliner = (function() {
                     break;
                 case 'c':
                     if (selectedNodeIds.size > 0) {
-                        // 複数選択時はノードテキストをコピー
+                        // 複数選択時はノードテキスト+ページメタデータをコピー
                         e.preventDefault();
-                        navigator.clipboard.writeText(getSelectedText());
+                        var copyText = getSelectedText();
+                        navigator.clipboard.writeText(copyText);
+                        internalClipboard = {
+                            plainText: copyText,
+                            isCut: false,
+                            nodes: getSelectedNodesData()
+                        };
                     } else {
                         // 単一ノード: テキスト選択があればブラウザデフォルト、
                         // なければノード全体のテキストをコピー
@@ -1543,14 +1632,21 @@ var Outliner = (function() {
                         if (!selC || selC.isCollapsed) {
                             e.preventDefault();
                             navigator.clipboard.writeText(node.text || '');
+                            internalClipboard = null;
                         }
                     }
                     break;
                 case 'x':
                     if (selectedNodeIds.size > 0) {
-                        // 複数選択時はカット
+                        // 複数選択時はカット（ページメタデータ付き）
                         e.preventDefault();
-                        navigator.clipboard.writeText(getSelectedText());
+                        var cutText = getSelectedText();
+                        navigator.clipboard.writeText(cutText);
+                        internalClipboard = {
+                            plainText: cutText,
+                            isCut: true,
+                            nodes: getSelectedNodesData()
+                        };
                         deleteSelectedNodes();
                     } else {
                         // 単一ノード: テキスト選択があればブラウザデフォルト、
@@ -1559,6 +1655,7 @@ var Outliner = (function() {
                         if (!selX || selX.isCollapsed) {
                             e.preventDefault();
                             navigator.clipboard.writeText(node.text || '');
+                            internalClipboard = null;
                             saveSnapshot();
                             model.updateText(nodeId, '');
                             textEl.innerHTML = '';
@@ -2104,10 +2201,26 @@ var Outliner = (function() {
             dropdown.appendChild(setPageDirItem);
         }
 
-        // 検索バーを基準に配置
+        // 検索バーを基準に配置（メニューボタンの直下に表示）
         var searchBar = document.querySelector('.outliner-search-bar');
         searchBar.style.position = 'relative';
         searchBar.appendChild(dropdown);
+
+        // メニューボタンの位置を基準にright値を計算
+        var barRect = searchBar.getBoundingClientRect();
+        var btnRect = menuBtn.getBoundingClientRect();
+        var rightOffset = barRect.right - btnRect.right;
+        dropdown.style.right = rightOffset + 'px';
+
+        // 画面端はみ出し防止
+        var dropRect = dropdown.getBoundingClientRect();
+        if (dropRect.right > window.innerWidth) {
+            dropdown.style.right = (barRect.right - window.innerWidth + 8) + 'px';
+        }
+        if (dropRect.left < 0) {
+            dropdown.style.right = 'auto';
+            dropdown.style.left = '0';
+        }
 
         // 外側クリックで閉じる
         setTimeout(function() {

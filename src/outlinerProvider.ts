@@ -149,6 +149,10 @@ export class OutlinerProvider implements vscode.CustomTextEditorProvider {
                         await this.handleOpenPage(document, webviewPanel, message);
                         break;
 
+                    case 'copyPageFile':
+                        await this.handleCopyPageFile(document, message);
+                        break;
+
                     case 'openLink':
                         if (message.href) {
                             vscode.env.openExternal(vscode.Uri.parse(message.href));
@@ -524,6 +528,18 @@ export class OutlinerProvider implements vscode.CustomTextEditorProvider {
             );
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to move page file to trash: ${filePath}`);
+        }
+    }
+
+    private async handleCopyPageFile(
+        document: vscode.TextDocument,
+        message: { sourcePageId: string; newPageId: string }
+    ): Promise<void> {
+        await this.ensurePagesDir(document);
+        const sourcePath = this.getPageFilePath(document, message.sourcePageId);
+        const destPath = this.getPageFilePath(document, message.newPageId);
+        if (fs.existsSync(sourcePath)) {
+            fs.copyFileSync(sourcePath, destPath);
         }
     }
 

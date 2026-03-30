@@ -5,6 +5,18 @@ All notable changes to the "Fractal" extension extension will be documented in t
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.195.555] - 2026-03-31
+
+### Fixed
+
+- **Outliner: Shift+↑/↓初回選択修正** — 初回押下で2行選択されていた問題を修正し、自行のみ選択するように変更
+- **Outliner: ページノードのクリップボード操作** — 複数行選択のcmd+c/x→cmd+vでページ属性が消失する問題を修正。カットは移動扱い、コピーは新pageId発行+mdファイル複製
+- **Outliner: メニュードロップダウン位置** — 検索バーのメニューボタンのフロートメニューがボタン直下ではなく画面右端に表示されるバグを修正
+
+### Changed
+
+- **Outliner: 選択色をオレンジ系に変更** — 行選択・テキスト範囲選択の色をオレンジ系に変更し、フォーカス行の水色と区別しやすく
+
 ## [0.195.554] - 2026-03-30
 
 ### Fixed

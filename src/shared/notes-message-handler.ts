@@ -145,6 +145,16 @@ export function handleNotesMessage(
             break;
         }
 
+        case 'copyPageFile': {
+            const pagesDir = fileManager.getPagesDirPath();
+            const sourcePath = path.join(pagesDir, `${message.sourcePageId}.md`);
+            const destPath = path.join(pagesDir, `${message.newPageId}.md`);
+            if (fs.existsSync(sourcePath)) {
+                fs.copyFileSync(sourcePath, destPath);
+            }
+            break;
+        }
+
         case 'setPageDir':
             platform.requestSetPageDir();
             break;

@@ -33,6 +33,8 @@
     --outliner-subtext-color: #888;
     --outliner-error-color: #d00;
     --outliner-accent-fg: #fff;
+    --outliner-selection-bg: rgba(255, 165, 0, 0.15);
+    --outliner-selection-text-bg: rgba(255, 165, 0, 0.25);
 }
 
 /* --- Body (side panel positioning context) --- */
@@ -197,7 +199,6 @@ body {
 /* --- Menu Dropdown --- */
 .outliner-menu-dropdown {
     position: absolute;
-    right: 0;
     top: 100%;
     background: var(--outliner-bg, var(--vscode-editor-background, #1e1e1e));
     border: 1px solid var(--outliner-border);
@@ -282,11 +283,15 @@ body {
 }
 
 .outliner-node.is-selected {
-    background: var(--vscode-editor-selectionBackground, rgba(0,120,212,0.3));
+    background: var(--outliner-selection-bg);
 }
 
 .outliner-node.is-selected .outliner-text {
     color: var(--vscode-editor-selectionForeground, inherit);
+}
+
+.outliner-container ::selection {
+    background: var(--outliner-selection-text-bg);
 }
 
 .outliner-node.is-search-match {
@@ -747,6 +752,8 @@ body {
     --outliner-text: #24292f;
     --outliner-hover: rgba(0,0,0,0.04);
     --outliner-active: rgba(9,105,218,0.15);
+    --outliner-selection-bg: rgba(255, 165, 0, 0.18);
+    --outliner-selection-text-bg: rgba(255, 165, 0, 0.3);
     --outliner-subtext: #6e7781;
     --outliner-subtext-color: #6e7781;
     --outliner-error-color: #cf222e;
@@ -776,6 +783,8 @@ body {
     --outliner-text: #5b4636;
     --outliner-hover: rgba(0,0,0,0.03);
     --outliner-active: rgba(139,105,20,0.15);
+    --outliner-selection-bg: rgba(210, 140, 20, 0.2);
+    --outliner-selection-text-bg: rgba(210, 140, 20, 0.3);
     --outliner-subtext: #8a7a66;
     --outliner-subtext-color: #8a7a66;
     --outliner-error-color: #b91c1c;
@@ -805,6 +814,8 @@ body {
     --outliner-text: #c0caf5;
     --outliner-hover: rgba(255,255,255,0.05);
     --outliner-active: rgba(122,162,247,0.2);
+    --outliner-selection-bg: rgba(255, 165, 0, 0.15);
+    --outliner-selection-text-bg: rgba(255, 165, 0, 0.25);
     --outliner-subtext: #565f89;
     --outliner-subtext-color: #565f89;
     --outliner-error-color: #f7768e;
@@ -834,6 +845,8 @@ body {
     --outliner-text: #d4d4d4;
     --outliner-hover: rgba(255,255,255,0.05);
     --outliner-active: rgba(0,120,212,0.2);
+    --outliner-selection-bg: rgba(255, 165, 0, 0.15);
+    --outliner-selection-text-bg: rgba(255, 165, 0, 0.25);
     --outliner-subtext: #888;
     --outliner-subtext-color: #888;
     --outliner-error-color: #f44747;
@@ -863,6 +876,8 @@ body {
     --outliner-text: #333333;
     --outliner-hover: rgba(0,0,0,0.03);
     --outliner-active: rgba(0,0,0,0.08);
+    --outliner-selection-bg: rgba(200, 130, 0, 0.15);
+    --outliner-selection-text-bg: rgba(200, 130, 0, 0.25);
     --outliner-subtext: #999;
     --outliner-subtext-color: #999;
     --outliner-error-color: #d32f2f;
@@ -892,6 +907,8 @@ body {
     --outliner-text: #3D3D3D;
     --outliner-hover: rgba(0,0,0,0.03);
     --outliner-active: rgba(52,120,246,0.12);
+    --outliner-selection-bg: rgba(255, 165, 0, 0.18);
+    --outliner-selection-text-bg: rgba(255, 165, 0, 0.3);
     --outliner-subtext: #8E8E93;
     --outliner-subtext-color: #8E8E93;
     --outliner-error-color: #FF3B30;
@@ -921,6 +938,8 @@ body {
     --outliner-text: #13343B;
     --outliner-hover: rgba(0,0,0,0.03);
     --outliner-active: rgba(31,184,205,0.12);
+    --outliner-selection-bg: rgba(255, 165, 0, 0.18);
+    --outliner-selection-text-bg: rgba(255, 165, 0, 0.3);
     --outliner-subtext: #6B8A8F;
     --outliner-subtext-color: #6B8A8F;
     --outliner-error-color: #dc2626;
