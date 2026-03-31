@@ -13464,6 +13464,30 @@ class EditorInstance {
             if (sidePanel) sidePanel.classList.add('open');
             if (sidePanelOverlay) sidePanelOverlay.classList.add('open');
         });
+
+        // アニメーション完了後にエディタに自動フォーカス
+        setTimeout(function() {
+            requestAnimationFrame(function() {
+                if (sidePanelInstance && sidePanelInstance.container) {
+                    var spEditor = sidePanelInstance.container.querySelector('.editor');
+                    if (spEditor) {
+                        spEditor.focus();
+                        // カーソルを先頭に設定
+                        try {
+                            var firstBlock = spEditor.querySelector(':scope > *');
+                            if (firstBlock) {
+                                var range = document.createRange();
+                                var sel = window.getSelection();
+                                range.setStart(firstBlock, 0);
+                                range.collapse(true);
+                                sel.removeAllRanges();
+                                sel.addRange(range);
+                            }
+                        } catch (e) { /* ignore */ }
+                    }
+                }
+            });
+        }, 400);
     }
 
     function setupSidePanelHeaderButtons() {

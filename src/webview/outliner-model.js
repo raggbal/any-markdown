@@ -309,6 +309,45 @@ var OutlinerModel = (function() {
         return true;
     };
 
+    /** ノードを任意の位置に移動（D&D用） */
+    Model.prototype.moveNode = function(nodeId, newParentId, afterId) {
+        var node = this.nodes[nodeId];
+        if (!node) { return false; }
+
+        // 元の場所から除去
+        var oldSiblings = node.parentId ? this.nodes[node.parentId].children : this.rootIds;
+        var oldIdx = oldSiblings.indexOf(nodeId);
+        if (oldIdx >= 0) { oldSiblings.splice(oldIdx, 1); }
+
+        // 新しい親の子リストに挿入
+        node.parentId = newParentId || null;
+        var newSiblings = newParentId ? this.nodes[newParentId].children : this.rootIds;
+        if (afterId) {
+            var afterIdx = newSiblings.indexOf(afterId);
+            if (afterIdx >= 0) {
+                newSiblings.splice(afterIdx + 1, 0, nodeId);
+            } else {
+                newSiblings.push(nodeId);
+            }
+        } else {
+            // afterId=null → 先頭に挿入
+            newSiblings.unshift(nodeId);
+        }
+
+        return true;
+    };
+
+    /** nodeIdがpotentialAncestorIdの子孫かどうか判定（循環参照防止用） */
+    Model.prototype.isDescendant = function(nodeId, potentialAncestorId) {
+        var current = nodeId;
+        while (current) {
+            if (current === potentialAncestorId) { return true; }
+            var n = this.nodes[current];
+            current = n ? n.parentId : null;
+        }
+        return false;
+    };
+
     // --- ページ操作 ---
 
     /** pageId生成のプロキシ（outliner.jsからアクセス用） */

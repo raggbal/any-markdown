@@ -62,6 +62,10 @@ var Outliner = (function() {
     // --- 内部クリップボード（ページメタデータ保持用） ---
     var internalClipboard = null;  // { plainText, isCut, nodes: [{text, level, isPage, pageId}] }
 
+    // --- ドラッグ&ドロップ ---
+    var dragState = null;       // { nodeId, nodeEl } or null
+    var dropIndicator = null;   // DOM element for drop indicator
+
     // --- Undo/Redo ---
     var undoStack = [];
     var redoStack = [];
@@ -190,6 +194,28 @@ var Outliner = (function() {
         // 初期スナップショット
         saveSnapshot();
 
+        // D&D: treeEl全体のdragover/drop（空エリアへのドロップ対応）
+        treeEl.addEventListener('dragover', function(e) {
+            if (!dragState) { return; }
+            e.preventDefault();
+        });
+        treeEl.addEventListener('drop', function(e) {
+            if (!dragState) { return; }
+            if (e.target === treeEl) {
+                e.preventDefault();
+                saveSnapshot();
+                var lastRootId = model.rootIds.length > 0 ? model.rootIds[model.rootIds.length - 1] : null;
+                var movedId = dragState.nodeId;
+                model.moveNode(movedId, null, lastRootId);
+                dragState.nodeEl.classList.remove('is-dragging');
+                dragState = null;
+                removeDropIndicator();
+                renderTree();
+                focusNode(movedId);
+                scheduleSyncToHost();
+            }
+        });
+
         // 空の場合、最初のノードを追加
         if (model.rootIds.length === 0) {
             var firstNode = model.addNode(null, null, '');
@@ -201,6 +227,46 @@ var Outliner = (function() {
             setTimeout(function() {
                 focusFirstVisibleNode();
             }, 100);
+        }
+    }
+
+    // --- ドラッグ&ドロップ ヘルパー ---
+
+    function showDropIndicator(targetEl, position) {
+        removeDropIndicator();
+        dropIndicator = document.createElement('div');
+        dropIndicator.className = 'outliner-drop-indicator';
+
+        var rect = targetEl.getBoundingClientRect();
+        var treeRect = treeEl.getBoundingClientRect();
+
+        dropIndicator.style.position = 'absolute';
+        dropIndicator.style.left = '0';
+        dropIndicator.style.right = '0';
+
+        if (position === 'before') {
+            dropIndicator.style.top = (rect.top - treeRect.top + treeEl.scrollTop) + 'px';
+            dropIndicator.style.height = '2px';
+        } else if (position === 'after') {
+            dropIndicator.style.top = (rect.bottom - treeRect.top + treeEl.scrollTop) + 'px';
+            dropIndicator.style.height = '2px';
+        } else {
+            // child: ターゲット全体をハイライト
+            dropIndicator.style.top = (rect.top - treeRect.top + treeEl.scrollTop) + 'px';
+            dropIndicator.style.height = rect.height + 'px';
+            dropIndicator.style.background = 'rgba(0, 120, 212, 0.1)';
+            dropIndicator.style.border = '1px dashed var(--vscode-focusBorder, #007acc)';
+            dropIndicator.style.borderRadius = '4px';
+        }
+
+        treeEl.style.position = 'relative';
+        treeEl.appendChild(dropIndicator);
+    }
+
+    function removeDropIndicator() {
+        if (dropIndicator) {
+            dropIndicator.remove();
+            dropIndicator = null;
         }
     }
 
@@ -459,6 +525,23 @@ var Outliner = (function() {
                 toggleCollapse(node.id);
             }
         });
+        // D&D: バレットからドラッグ開始
+        bulletEl.draggable = true;
+        bulletEl.style.cursor = 'grab';
+        bulletEl.addEventListener('dragstart', function(e) {
+            e.stopPropagation();
+            dragState = { nodeId: node.id, nodeEl: el };
+            el.classList.add('is-dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', node.id);
+        });
+        bulletEl.addEventListener('dragend', function() {
+            if (dragState) {
+                dragState.nodeEl.classList.remove('is-dragging');
+                dragState = null;
+            }
+            removeDropIndicator();
+        });
         el.appendChild(bulletEl);
 
         // チェックボックス (タスクノード)
@@ -624,6 +707,77 @@ var Outliner = (function() {
 
         contentEl.appendChild(subtextEl);
         el.appendChild(contentEl);
+
+        // D&D: ノード要素にドロップターゲットイベント
+        el.addEventListener('dragover', function(e) {
+            if (!dragState) { return; }
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+
+            var targetId = el.dataset.id;
+            if (targetId === dragState.nodeId || model.isDescendant(targetId, dragState.nodeId)) {
+                e.dataTransfer.dropEffect = 'none';
+                removeDropIndicator();
+                return;
+            }
+
+            var rect = el.getBoundingClientRect();
+            var y = e.clientY - rect.top;
+            var h = rect.height;
+            if (y < h * 0.25) {
+                showDropIndicator(el, 'before');
+            } else if (y > h * 0.75) {
+                showDropIndicator(el, 'after');
+            } else {
+                showDropIndicator(el, 'child');
+            }
+        });
+        el.addEventListener('dragleave', function(e) {
+            if (el.contains(e.relatedTarget)) { return; }
+            removeDropIndicator();
+        });
+        el.addEventListener('drop', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!dragState) { return; }
+
+            var targetId = el.dataset.id;
+            if (targetId === dragState.nodeId || model.isDescendant(targetId, dragState.nodeId)) {
+                removeDropIndicator();
+                return;
+            }
+
+            var rect = el.getBoundingClientRect();
+            var y = e.clientY - rect.top;
+            var h = rect.height;
+
+            saveSnapshot();
+            var movedNodeId = dragState.nodeId;
+            var targetNode = model.getNode(targetId);
+
+            if (y < h * 0.25) {
+                // before: targetの前に兄弟として挿入
+                var info = model._getSiblingInfo(targetId);
+                var afterId = info && info.index > 0 ? info.siblings[info.index - 1] : null;
+                model.moveNode(movedNodeId, targetNode.parentId, afterId);
+            } else if (y > h * 0.75) {
+                // after: targetの後に兄弟として挿入
+                model.moveNode(movedNodeId, targetNode.parentId, targetId);
+            } else {
+                // child: targetの子の先頭に挿入
+                model.moveNode(movedNodeId, targetId, null);
+                targetNode.collapsed = false;
+            }
+
+            dragState.nodeEl.classList.remove('is-dragging');
+            dragState = null;
+            removeDropIndicator();
+
+            renderTree();
+            focusNode(movedNodeId);
+            scheduleSyncToHost();
+        });
+
         return el;
     }
 
@@ -2699,7 +2853,7 @@ var Outliner = (function() {
             addMenuItem(contextMenuEl, i18n.outlinerMakePage || 'Make Page', function() {
                 makePage(nodeId);
                 hideContextMenu();
-            });
+            }, '@page');
         }
 
         addMenuSeparator(contextMenuEl);
@@ -3119,6 +3273,30 @@ var Outliner = (function() {
             if (sidePanelEl) { sidePanelEl.classList.add('open'); }
             if (sidePanelOverlay) { sidePanelOverlay.classList.add('open'); }
         });
+
+        // アニメーション完了後にエディタに自動フォーカス
+        setTimeout(function() {
+            requestAnimationFrame(function() {
+                if (sidePanelInstance && sidePanelInstance.container) {
+                    var spEditor = sidePanelInstance.container.querySelector('.editor');
+                    if (spEditor) {
+                        spEditor.focus();
+                        // カーソルを先頭に設定
+                        try {
+                            var firstBlock = spEditor.querySelector(':scope > *');
+                            if (firstBlock) {
+                                var range = document.createRange();
+                                var sel = window.getSelection();
+                                range.setStart(firstBlock, 0);
+                                range.collapse(true);
+                                sel.removeAllRanges();
+                                sel.addRange(range);
+                            }
+                        } catch (e) { /* ignore */ }
+                    }
+                }
+            });
+        }, 400);
     }
 
     function closeSidePanel() {
