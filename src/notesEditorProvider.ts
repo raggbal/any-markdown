@@ -99,6 +99,7 @@ export class NotesEditorProvider {
             {
                 theme: config.get<string>('theme', 'github'),
                 fontSize: config.get<number>('fontSize', 16),
+                toolbarMode: config.get<string>('toolbarMode', 'full'),
                 webviewMessages: getWebviewMessages() as unknown as Record<string, string>,
                 enableDebugLogging: config.get<boolean>('enableDebugLogging', false),
                 outlinerPageTitle: config.get<boolean>('outlinerPageTitle', true),

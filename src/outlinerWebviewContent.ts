@@ -6,6 +6,7 @@ import { getNonce } from './webviewContent';
 interface OutlinerConfig {
     theme: string;
     fontSize: number;
+    toolbarMode?: string;
     webviewMessages?: Record<string, string>;
     enableDebugLogging?: boolean;
     outlinerPageTitle?: boolean;
@@ -77,7 +78,7 @@ export function getOutlinerWebviewContent(
     const sidePanelHtml = generateSidePanelHtml(msg);
 
     return `<!DOCTYPE html>
-<html lang="en" data-theme="${config.theme}">
+<html lang="en" data-theme="${config.theme}" data-toolbar-mode="${config.toolbarMode || 'full'}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">

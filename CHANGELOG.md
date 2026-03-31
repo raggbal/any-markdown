@@ -5,6 +5,12 @@ All notable changes to the "Fractal" extension extension will be documented in t
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.195.563] - 2026-03-31
+
+### Fixed
+
+- **Side Panel: toolbarMode setting ignored in Outliner/Notes** — `fractal.toolbarMode: "simple"` setting was not applied when opening the side panel markdown editor from Outliner or Notes. The toolbar always showed in full mode.
+
 ## [0.195.555] - 2026-03-31
 
 ### Fixed

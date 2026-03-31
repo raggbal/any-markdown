@@ -1622,6 +1622,9 @@ window.__createSidePanelBridgeMethods = function(postFn) {
         notifySidePanelClosed: function() {
             postFn({ type: 'sidePanelClosed' });
         },
+        sidePanelOpenInTextEditor: function(sidePanelFilePath) {
+            postFn({ type: 'sidePanelOpenInTextEditor', sidePanelFilePath: sidePanelFilePath });
+        },
         getSidePanelImageDir: function(sidePanelFilePath) {
             postFn({ type: 'getSidePanelImageDir', sidePanelFilePath: sidePanelFilePath });
         },
@@ -2084,6 +2087,7 @@ class EditorInstance {
     static instances = [];
     static activeInstance = null;
     static _lastKnownActive = null;
+    static _globalListenersRegistered = false;
 
     static getActiveInstance() {
         // Find the most specific (deepest nested) container that contains activeElement.
@@ -2129,6 +2133,7 @@ class EditorInstance {
 
     // ===== Destroy instance =====
     destroy() {
+        console.log('[DEBUG] EditorInstance.destroy() called. instances before=' + EditorInstance.instances.length);
         const idx = EditorInstance.instances.indexOf(this);
         if (idx !== -1) EditorInstance.instances.splice(idx, 1);
         if (EditorInstance.activeInstance === this) {
@@ -2137,6 +2142,16 @@ class EditorInstance {
         if (EditorInstance._lastKnownActive === this) {
             EditorInstance._lastKnownActive = EditorInstance.instances[0] || null;
         }
+        // Cleanup: remove command palette and action panel DOM elements appended to document.body
+        if (this._commandPaletteEl) {
+            this._commandPaletteEl.remove();
+            this._commandPaletteEl = null;
+        }
+        if (this._actionPanelEl) {
+            this._actionPanelEl.remove();
+            this._actionPanelEl = null;
+        }
+        console.log('[DEBUG] EditorInstance.destroy() done. instances after=' + EditorInstance.instances.length);
     }
 
     // ===== Create minimal DOM for side panel editor =====
@@ -2205,6 +2220,7 @@ class EditorInstance {
 
     // ===== Legacy IIFE code (will be refactored in later phases) =====
     _legacyInit() {
+    var self = this;
     // Debug logging configuration
     const DEBUG_MODE = false;
     const IS_OUTLINER_PAGE = false;
@@ -2216,7 +2232,8 @@ class EditorInstance {
 
     const host = this.host;
     const container = this.container;
-    const isMainInstance = EditorInstance.instances.length === 1;
+    const isMainInstance = !EditorInstance._globalListenersRegistered;
+    if (isMainInstance) EditorInstance._globalListenersRegistered = true;
     const i18n = {};
 
     // Import shared pure functions/constants from editor-utils.js (loaded before this script)
@@ -13375,6 +13392,7 @@ class EditorInstance {
         });
 
         document.body.appendChild(commandPalette);
+        self._commandPaletteEl = commandPalette;
     }
 
     function renderCommandPaletteItems(filter) {
@@ -13629,6 +13647,7 @@ class EditorInstance {
         actionPanel.className = 'action-panel';
         actionPanel.style.display = 'none';
         document.body.appendChild(actionPanel);
+        self._actionPanelEl = actionPanel;
     }
 
     function renderActionPanelMenu() {
@@ -14280,6 +14299,9 @@ class EditorInstance {
     // Instance-aware global shortcut handler (captures closure variables)
     this._handleGlobalShortcut = async function(e) {
         const isMod = e.ctrlKey || e.metaKey;
+        if (isMod && (e.key === '/' || e.key === 'n')) {
+            console.log('[DEBUG] _handleGlobalShortcut key=' + e.key + ' isMainInstance=' + isMainInstance + ' isSourceMode=' + isSourceMode + ' commandPaletteVisible=' + commandPaletteVisible + ' actionPanelVisible=' + actionPanelVisible);
+        }
 
         // Handle paste shortcut for Kiro only
         const isKiro = navigator.userAgent.includes('Kiro');
@@ -14691,6 +14713,13 @@ class EditorInstance {
     // Register document-level shortcut delegation (once, by main instance)
     if (isMainInstance) document.addEventListener('keydown', function(e) {
         var inst = EditorInstance.getActiveInstance();
+        if ((e.ctrlKey || e.metaKey) && (e.key === '/' || e.key === 'n')) {
+            console.log('[DEBUG] Global keydown delegation: key=' + e.key
+                + ' instances=' + EditorInstance.instances.length
+                + ' activeInstance=' + (inst ? (inst === EditorInstance.instances[0] ? 'main' : 'sidePanel(idx=' + EditorInstance.instances.indexOf(inst) + ')') : 'null')
+                + ' activeElement=' + document.activeElement.tagName + '.' + document.activeElement.className
+                + ' _lastKnownActive=' + (EditorInstance._lastKnownActive ? EditorInstance.instances.indexOf(EditorInstance._lastKnownActive) : 'null'));
+        }
         if (inst && inst._handleGlobalShortcut) inst._handleGlobalShortcut(e);
     });
 
@@ -15469,6 +15498,30 @@ class EditorInstance {
             if (sidePanel) sidePanel.classList.add('open');
             if (sidePanelOverlay) sidePanelOverlay.classList.add('open');
         });
+
+        // アニメーション完了後にエディタに自動フォーカス
+        setTimeout(function() {
+            requestAnimationFrame(function() {
+                if (sidePanelInstance && sidePanelInstance.container) {
+                    var spEditor = sidePanelInstance.container.querySelector('.editor');
+                    if (spEditor) {
+                        spEditor.focus();
+                        // カーソルを先頭に設定
+                        try {
+                            var firstBlock = spEditor.querySelector(':scope > *');
+                            if (firstBlock) {
+                                var range = document.createRange();
+                                var sel = window.getSelection();
+                                range.setStart(firstBlock, 0);
+                                range.collapse(true);
+                                sel.removeAllRanges();
+                                sel.addRange(range);
+                            }
+                        } catch (e) { /* ignore */ }
+                    }
+                }
+            });
+        }, 400);
     }
 
     function setupSidePanelHeaderButtons() {
@@ -15485,6 +15538,7 @@ class EditorInstance {
 
         var undoBtn = header.querySelector('[data-action="undo"]');
         var redoBtn = header.querySelector('[data-action="redo"]');
+        var openTextEditorBtn = header.querySelector('[data-action="openInTextEditor"]');
         var sourceBtn = header.querySelector('[data-action="source"]');
 
         if (undoBtn) undoBtn.addEventListener('click', function() {
@@ -15492,6 +15546,11 @@ class EditorInstance {
         });
         if (redoBtn) redoBtn.addEventListener('click', function() {
             if (sidePanelInstance) sidePanelInstance._redo();
+        });
+        if (openTextEditorBtn) openTextEditorBtn.addEventListener('click', function() {
+            if (sidePanelFilePath) {
+                host.sidePanelOpenInTextEditor(sidePanelFilePath);
+            }
         });
         if (sourceBtn) sourceBtn.addEventListener('click', function() {
             if (sidePanelInstance) sidePanelInstance._toggleSourceMode();
@@ -15773,25 +15832,47 @@ class EditorInstance {
 
     // External change toast notification
     // --- scrollToLine: 行番号指定でスクロール ---
+    // lineNumberは生Markdownファイルの行番号(0-based)
     function scrollToLine(lineNumber) {
-        var blocks = editor.querySelectorAll(':scope > *');
-        var currentLine = 0;
-        for (var i = 0; i < blocks.length; i++) {
-            var block = blocks[i];
-            var text = block.textContent || '';
-            var blockLines = text.split('\n').length;
-            if (currentLine + blockLines > lineNumber) {
-                block.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                var origBg = block.style.backgroundColor;
-                block.style.transition = 'background-color 0.3s';
-                block.style.backgroundColor = 'rgba(255, 200, 0, 0.25)';
-                setTimeout(function() {
-                    block.style.backgroundColor = origBg;
-                }, 2000);
-                return;
+        // 生Markdownから対象行のテキストを取得
+        var md = htmlToMarkdown();
+        var mdLines = md.split('\n');
+        if (lineNumber < 0 || lineNumber >= mdLines.length) { return; }
+        var targetLineText = mdLines[lineNumber].replace(/^#+\s*/, '').replace(/^[-*+]\s*(\[[ xX]\]\s*)?/, '').replace(/^\d+\.\s*/, '').replace(/^>\s*/, '').trim();
+        if (!targetLineText) {
+            // 空行の場合、前後の非空行を探す
+            for (var s = 1; s < 5; s++) {
+                if (lineNumber + s < mdLines.length && mdLines[lineNumber + s].trim()) {
+                    targetLineText = mdLines[lineNumber + s].replace(/^#+\s*/, '').replace(/^[-*+]\s*(\[[ xX]\]\s*)?/, '').replace(/^\d+\.\s*/, '').replace(/^>\s*/, '').trim();
+                    break;
+                }
+                if (lineNumber - s >= 0 && mdLines[lineNumber - s].trim()) {
+                    targetLineText = mdLines[lineNumber - s].replace(/^#+\s*/, '').replace(/^[-*+]\s*(\[[ xX]\]\s*)?/, '').replace(/^\d+\.\s*/, '').replace(/^>\s*/, '').trim();
+                    break;
+                }
             }
-            currentLine += blockLines;
         }
+        if (!targetLineText) { return; }
+
+        // DOMブロックからテキストマッチで対象を探す
+        var blocks = editor.querySelectorAll(':scope > *');
+        var targetBlock = null;
+        for (var i = 0; i < blocks.length; i++) {
+            var blockText = (blocks[i].textContent || '').trim();
+            if (blockText.indexOf(targetLineText) >= 0) {
+                targetBlock = blocks[i];
+                break;
+            }
+        }
+        if (!targetBlock) { return; }
+
+        targetBlock.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        var origBg = targetBlock.style.backgroundColor;
+        targetBlock.style.transition = 'background-color 0.3s';
+        targetBlock.style.backgroundColor = 'rgba(255, 200, 0, 0.25)';
+        setTimeout(function() {
+            targetBlock.style.backgroundColor = origBg;
+        }, 2000);
     }
 
     let externalChangeToast = null;
@@ -17200,7 +17281,6 @@ class EditorInstance {
     });
 
     // Focus/blur notifications for sync policy
-    var self = this;
     editor.addEventListener('focus', function() {
         EditorInstance._lastKnownActive = self;
         host.reportFocus();
