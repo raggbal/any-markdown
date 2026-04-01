@@ -4,6 +4,7 @@ import * as path from 'path';
 import { getOutlinerWebviewContent } from './outlinerWebviewContent';
 import { getWebviewMessages, initLocale } from './i18n/messages';
 import { SidePanelManager } from './shared/sidePanelManager';
+import { importMdFiles } from './shared/markdown-import';
 
 /**
  * OutlinerProvider — .out ファイル用 Custom Text Editor Provider
@@ -141,6 +142,23 @@ export class OutlinerProvider implements vscode.CustomTextEditorProvider {
                     case 'copyFilePath':
                         await vscode.env.clipboard.writeText(document.uri.fsPath);
                         break;
+
+                    case 'importMdFiles': {
+                        const pageDir = this.getPagesDirPath(document);
+                        const imageDir = path.join(pageDir, 'images');
+                        const results = importMdFiles(
+                            message.filePaths || [],
+                            pageDir,
+                            imageDir
+                        );
+                        webviewPanel.webview.postMessage({
+                            type: 'importMdFilesResult',
+                            results,
+                            targetNodeId: message.targetNodeId,
+                            position: message.position
+                        });
+                        break;
+                    }
 
                     case 'makePage':
                         await this.handleMakePage(document, webviewPanel, message);

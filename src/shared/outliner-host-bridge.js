@@ -53,6 +53,11 @@
         createPageAuto: function() { /* no-op in outliner */ },
         updatePageH1: function() { /* no-op in outliner */ },
 
+        // .mdファイルインポート（D&D）
+        importMdFiles: function(filePaths, targetNodeId, position) {
+            api.postMessage({ type: 'importMdFiles', filePaths: filePaths, targetNodeId: targetNodeId, position: position });
+        },
+
         // Outlinerノード画像操作
         saveOutlinerImage: function(nodeId, dataUrl, fileName) {
             api.postMessage({ type: 'saveOutlinerImage', nodeId: nodeId, dataUrl: dataUrl, fileName: fileName });

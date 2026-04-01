@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { NotesFileManager } from './notes-file-manager';
+import { importMdFiles } from './markdown-import';
 
 /**
  * Webview へのメッセージ送信インターフェース
@@ -117,6 +118,23 @@ export function handleNotesMessage(
             break;
 
         // ── Page Operations ──
+
+        case 'importMdFiles': {
+            const pagesDir = fileManager.getPagesDirPath();
+            const imageDir = path.join(pagesDir, 'images');
+            const results = importMdFiles(
+                message.filePaths || [],
+                pagesDir,
+                imageDir
+            );
+            sender.postMessage({
+                type: 'importMdFilesResult',
+                results,
+                targetNodeId: message.targetNodeId,
+                position: message.position
+            });
+            break;
+        }
 
         case 'makePage': {
             const pagesDir = fileManager.getPagesDirPath();

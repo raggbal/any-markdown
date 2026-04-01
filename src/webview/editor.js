@@ -14739,6 +14739,8 @@ class EditorInstance {
                 pastedMd = pastedMd.replace(/^\\(>) ?/gm, '$1 ');            // blockquote: \>
                 pastedMd = pastedMd.replace(/^(\d+)\\(\. )/gm, '$1$2');      // ordered list: 1\.
                 pastedMd = pastedMd.replace(/^\\(~~~)/gm, '$1');             // code fence: \~~~
+                // Inline escapes: \* \_ \` \[ \] \\ \. (Turndown escapes these in text nodes)
+                pastedMd = pastedMd.replace(/\\([*_`\[\]\\.])/g, '$1');
 
                 // Post-process: Remove blank lines between consecutive list items
                 // Safety net for edge cases where the custom listItem rule doesn't catch all cases

@@ -5,6 +5,31 @@ All notable changes to the "Fractal" extension extension will be documented in t
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.195.576] - 2026-04-02
+
+### Added
+
+- **Outliner: リンククリック対応** — `[text](url)` 形式のMarkdownリンクをクリックで外部ブラウザで開けるように
+- **Outliner: URLペースト自動変換** — URLをペーストすると自動的に `[URL](URL)` 形式に変換（単一行・複数行対応）
+- **Outliner: 複数ノード選択インデント** — 複数ノード選択状態でTab/Shift+Tabにより一括インデント/デインデント
+
+### Fixed
+
+- **Outliner: ペースト時の空行ノード作成を抑制** — テキストペースト時に空行が不要なノードとして作成される問題を修正
+- **Outliner: 複数選択Tab後の連続操作** — Tab/Shift+Tab実行後もフォーカスと選択状態を維持し、連続操作を可能に
+
+## [0.195.575] - 2026-04-02
+
+### Added
+
+- **Outliner: .mdファイルのD&D取り込み** — Finder/Explorer/VSCode ExplorerからMarkdownファイルをOutlinerツリーにドラッグ&ドロップして、ページノードとして一括取り込み。H1テキストでノード名を自動決定、画像のコピー＆パス書き換え、複数ファイル同時対応。Standalone/Notes両対応
+
+## [0.195.574] - 2026-04-02
+
+### Fixed
+
+- **Markdown: ペースト時の不要なエスケープ文字を除去** — リッチテキストソース（Notion、ブラウザ等）からペーストした際、`## 1\. サービス概要` のように不要なバックスラッシュが挿入される問題を修正
+
 ## [0.195.573] - 2026-04-02
 
 ### Added

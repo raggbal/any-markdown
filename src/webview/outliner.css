@@ -549,6 +549,7 @@ body {
 .outliner-text a {
     color: var(--outliner-tag-color);
     text-decoration: underline;
+    cursor: pointer;
 }
 
 /* --- Children container --- */

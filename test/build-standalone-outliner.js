@@ -129,6 +129,9 @@ const testOutlinerHostBridge = `
                 });
             }
         },
+        importMdFiles: function(filePaths, targetNodeId, position) {
+            window.__testApi.messages.push({ type: 'importMdFiles', filePaths: filePaths, targetNodeId: targetNodeId, position: position });
+        },
         setOutlinerImageDir: function() {
             window.__testApi.messages.push({ type: 'setOutlinerImageDir' });
         },
