@@ -131,8 +131,8 @@ const testNotesHostBridge = `
         postDailyNotes: function(type, dayOffset, currentDate) {
             window.__testApi.messages.push({ type: 'postDailyNotes', subType: type, dayOffset: dayOffset, currentDate: currentDate });
         },
-        importMdFiles: function(filePaths, targetNodeId, position) {
-            window.__testApi.messages.push({ type: 'importMdFiles', filePaths: filePaths, targetNodeId: targetNodeId, position: position });
+        importMdFilesDialog: function(targetNodeId) {
+            window.__testApi.messages.push({ type: 'importMdFilesDialog', targetNodeId: targetNodeId });
         },
         showConfirm: function(id, message) {
             window.__testApi.messages.push({ type: 'showConfirm', id: id, message: message });

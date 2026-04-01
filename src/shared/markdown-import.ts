@@ -239,8 +239,16 @@ function processImages(
         // パスにクエリパラメータやフラグメントがある場合は除去
         const cleanPath = imgPath.split(/[?#]/)[0];
 
+        // URLエンコードをデコード（Notion等のエクスポートで %20 等が使われる）
+        let decodedPath: string;
+        try {
+            decodedPath = decodeURIComponent(cleanPath);
+        } catch {
+            decodedPath = cleanPath;
+        }
+
         // 元ファイルからの相対パスで解決
-        const absoluteImgPath = path.resolve(sourceDir, cleanPath);
+        const absoluteImgPath = path.resolve(sourceDir, decodedPath);
 
         // ファイルが存在しない場合はそのまま
         if (!fs.existsSync(absoluteImgPath)) {

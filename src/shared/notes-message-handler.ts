@@ -64,6 +64,8 @@ export interface NotesPlatformActions {
     s3GetStatus?(): void;
     /** Outlinerノード画像保存 */
     saveOutlinerImage?(nodeId: string, dataUrl: string, fileName: string): void;
+    /** .mdファイルインポートダイアログ表示 */
+    importMdFilesDialog?(targetNodeId: string | null, sender: NotesSender): void;
 }
 
 /**
@@ -119,22 +121,9 @@ export function handleNotesMessage(
 
         // ── Page Operations ──
 
-        case 'importMdFiles': {
-            const pagesDir = fileManager.getPagesDirPath();
-            const imageDir = path.join(pagesDir, 'images');
-            const results = importMdFiles(
-                message.filePaths || [],
-                pagesDir,
-                imageDir
-            );
-            sender.postMessage({
-                type: 'importMdFilesResult',
-                results,
-                targetNodeId: message.targetNodeId,
-                position: message.position
-            });
+        case 'importMdFilesDialog':
+            platform.importMdFilesDialog?.(message.targetNodeId, sender);
             break;
-        }
 
         case 'makePage': {
             const pagesDir = fileManager.getPagesDirPath();

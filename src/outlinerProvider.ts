@@ -143,19 +143,27 @@ export class OutlinerProvider implements vscode.CustomTextEditorProvider {
                         await vscode.env.clipboard.writeText(document.uri.fsPath);
                         break;
 
-                    case 'importMdFiles': {
+                    case 'importMdFilesDialog': {
+                        const options: vscode.OpenDialogOptions = {
+                            canSelectMany: true,
+                            canSelectFiles: true,
+                            canSelectFolders: false,
+                            filters: { 'Markdown': ['md'] },
+                            title: 'Import .md files'
+                        };
+                        const fileUris = await vscode.window.showOpenDialog(options);
+                        if (!fileUris || fileUris.length === 0) break;
+
+                        const filePaths = fileUris.map(u => u.fsPath).sort();
                         const pageDir = this.getPagesDirPath(document);
                         const imageDir = path.join(pageDir, 'images');
-                        const results = importMdFiles(
-                            message.filePaths || [],
-                            pageDir,
-                            imageDir
-                        );
+                        const results = importMdFiles(filePaths, pageDir, imageDir);
+
                         webviewPanel.webview.postMessage({
                             type: 'importMdFilesResult',
                             results,
                             targetNodeId: message.targetNodeId,
-                            position: message.position
+                            position: 'after'
                         });
                         break;
                     }

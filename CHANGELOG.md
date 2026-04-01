@@ -5,6 +5,16 @@ All notable changes to the "Fractal" extension extension will be documented in t
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.195.579] - 2026-04-02
+
+### Added
+
+- **Outliner: .mdファイル取り込み** — ⋮メニューの「Import .md files...」からMarkdownファイルを選択し、ページノードとして一括取り込み。H1テキストでノード名自動決定、画像のコピー＆パス書き換え、複数ファイル同時対応。Standalone/Notes両対応
+
+### Fixed
+
+- **Markdown: ペースト時の不要なエスケープ文字を除去** — リッチテキストソースからペースト時、`## 1\. サービス概要` のように不要なバックスラッシュが挿入される問題を修正
+
 ## [0.195.576] - 2026-04-02
 
 ### Added

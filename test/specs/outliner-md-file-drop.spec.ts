@@ -230,7 +230,7 @@ test.describe.serial('Outliner .md ファイル D&D 取り込み', () => {
         expect(pageIcons).toBeGreaterThanOrEqual(1);
     });
 
-    test('importMdFiles メッセージがホストに送信される（D&Dシミュレーション）', async ({ page }) => {
+    test('⋮メニューの Import .md files がホストにメッセージを送信する', async ({ page }) => {
         await page.evaluate(() => {
             (window as any).__testApi.initOutliner({
                 version: 1,
@@ -241,23 +241,24 @@ test.describe.serial('Outliner .md ファイル D&D 取り込み', () => {
             });
         });
 
-        // handleExternalFileDrop を直接呼び出してテスト
-        // (実際のD&Dはブラウザセキュリティで制限されるため)
+        // ノードにフォーカス
+        await page.locator('.outliner-text').first().click();
+        await page.waitForTimeout(500);
+
+        // HostBridge の importMdFilesDialog を直接呼び出してテスト
+        // (メニューUIはブラウザのイベントタイミングで安定しないため)
         const sent = await page.evaluate(() => {
-            // HostBridgeのimportMdFilesが呼ばれたか確認
             const bridge = (window as any).outlinerHostBridge;
-            if (!bridge || !bridge.importMdFiles) return false;
-            bridge.importMdFiles(['/test/file.md'], 'n1', 'after');
+            if (!bridge || !bridge.importMdFilesDialog) return false;
+            bridge.importMdFilesDialog('n1');
             return true;
         });
         expect(sent).toBe(true);
 
-        // メッセージが記録されている
+        // importMdFilesDialog メッセージが送信されている
         const messages = await page.evaluate(() => (window as any).__testApi.messages);
-        const importMsg = messages.find((m: any) => m.type === 'importMdFiles');
+        const importMsg = messages.find((m: any) => m.type === 'importMdFilesDialog');
         expect(importMsg).toBeTruthy();
-        expect(importMsg.filePaths).toEqual(['/test/file.md']);
         expect(importMsg.targetNodeId).toBe('n1');
-        expect(importMsg.position).toBe('after');
     });
 });

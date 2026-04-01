@@ -7,6 +7,7 @@ import { getNotesWebviewContent } from './notesWebviewContent';
 import { getWebviewMessages, initLocale } from './i18n/messages';
 import { SidePanelManager } from './shared/sidePanelManager';
 import { s3Sync, s3RemoteDeleteAndUpload, s3LocalDeleteAndDownload, S3SyncConfig } from './notes-s3-sync';
+import { importMdFiles } from './shared/markdown-import';
 
 /**
  * NotesEditorProvider — WebviewPanel で Notes エディタを開く
@@ -249,6 +250,29 @@ export class NotesEditorProvider {
                     nodeId: nodeId,
                     imagePath: relativePath,
                     displayUri: displayUri
+                });
+            },
+            importMdFilesDialog: async (targetNodeId: string | null, senderRef: NotesSender) => {
+                const options: vscode.OpenDialogOptions = {
+                    canSelectMany: true,
+                    canSelectFiles: true,
+                    canSelectFolders: false,
+                    filters: { 'Markdown': ['md'] },
+                    title: 'Import .md files'
+                };
+                const fileUris = await vscode.window.showOpenDialog(options);
+                if (!fileUris || fileUris.length === 0) return;
+
+                const filePaths = fileUris.map(u => u.fsPath).sort();
+                const pagesDir = fileManager.getPagesDirPath();
+                const imageDir = path.join(pagesDir, 'images');
+                const results = importMdFiles(filePaths, pagesDir, imageDir);
+
+                senderRef.postMessage({
+                    type: 'importMdFilesResult',
+                    results,
+                    targetNodeId,
+                    position: 'after'
                 });
             },
             saveImageToDir: (dataUrl: string, fileName: string, sidePanelFilePath: string) => {

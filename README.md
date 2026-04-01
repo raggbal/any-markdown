@@ -65,6 +65,7 @@ A Dynalist-like outliner built into VS Code.
 - **Pinned tags** — Pin frequently used tags for one-click filtering
 - **Search** — Dynalist-compatible queries: AND, OR, NOT, `"phrase"`, `#tag`, `in:title`, `has:children`, `is:page`, `is:task`. Tree mode and focus mode
 - **Page nodes** — Turn any bullet into a page with a full WYSIWYG markdown editor in a resizable side panel
+- **Import .md files** — Import Markdown files (Notion, Obsidian exports) as page nodes via ⋮ menu. Images are auto-copied and paths rewritten
 - **Task nodes** — `- [ ]` / `- [x]` checkboxes with toggle support
 - **Inline formatting** — Bold (`Cmd+B`), italic (`Cmd+I`), strikethrough (`Cmd+Shift+S`), inline code (`Cmd+E`), `[text](url)` links
 - **Clickable links** — `[text](url)` links are rendered and clickable in display mode. URLs pasted via `Cmd+V` are auto-converted to link format

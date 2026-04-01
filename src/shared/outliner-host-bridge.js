@@ -53,9 +53,9 @@
         createPageAuto: function() { /* no-op in outliner */ },
         updatePageH1: function() { /* no-op in outliner */ },
 
-        // .mdファイルインポート（D&D）
-        importMdFiles: function(filePaths, targetNodeId, position) {
-            api.postMessage({ type: 'importMdFiles', filePaths: filePaths, targetNodeId: targetNodeId, position: position });
+        // .mdファイルインポート（ファイルピッカー）
+        importMdFilesDialog: function(targetNodeId) {
+            api.postMessage({ type: 'importMdFilesDialog', targetNodeId: targetNodeId });
         },
 
         // Outlinerノード画像操作

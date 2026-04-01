@@ -19109,8 +19109,8 @@ window.__createSidePanelBridgeMethods = function(postFn) {
                 });
             }
         },
-        importMdFiles: function(filePaths, targetNodeId, position) {
-            window.__testApi.messages.push({ type: 'importMdFiles', filePaths: filePaths, targetNodeId: targetNodeId, position: position });
+        importMdFilesDialog: function(targetNodeId) {
+            window.__testApi.messages.push({ type: 'importMdFilesDialog', targetNodeId: targetNodeId });
         },
         setOutlinerImageDir: function() {
             window.__testApi.messages.push({ type: 'setOutlinerImageDir' });
@@ -20172,16 +20172,10 @@ var Outliner = (function() {
 
         // D&D: treeEl全体のdragover/drop（空エリアへのドロップ対応）
         treeEl.addEventListener('dragover', function(e) {
-            if (!dragState && !hasExternalFiles(e)) { return; }
+            if (!dragState) { return; }
             e.preventDefault();
-            e.dataTransfer.dropEffect = dragState ? 'move' : 'copy';
         });
         treeEl.addEventListener('drop', function(e) {
-            // 外部ファイルD&D
-            if (!dragState && !imageDragState && hasExternalFiles(e)) {
-                handleExternalFileDrop(e, null); // ルート末尾
-                return;
-            }
             if (!dragState) { return; }
             if (e.target === treeEl) {
                 e.preventDefault();
@@ -20250,47 +20244,6 @@ var Outliner = (function() {
             dropIndicator.remove();
             dropIndicator = null;
         }
-    }
-
-    /** 外部ファイルのドラッグ判定 */
-    function hasExternalFiles(e) {
-        return e.dataTransfer && e.dataTransfer.types && e.dataTransfer.types.indexOf('Files') >= 0;
-    }
-
-    /** 外部 .md ファイルの D&D 処理 */
-    function handleExternalFileDrop(e, targetEl) {
-        e.preventDefault();
-        e.stopPropagation();
-        removeDropIndicator();
-
-        var files = e.dataTransfer.files;
-        var filePaths = [];
-        for (var i = 0; i < files.length; i++) {
-            if (files[i].name.endsWith('.md') && files[i].path) {
-                filePaths.push(files[i].path);
-            }
-        }
-        if (filePaths.length === 0) return;
-
-        // ファイル名でソート
-        filePaths.sort();
-
-        // ドロップ位置の計算
-        var targetId = null;
-        var position = 'after';
-
-        if (targetEl) {
-            targetId = targetEl.dataset.id;
-            var rect = targetEl.getBoundingClientRect();
-            var y = e.clientY - rect.top;
-            var h = rect.height;
-            if (y < h * 0.25) position = 'before';
-            else if (y > h * 0.75) position = 'after';
-            else position = 'child';
-        }
-
-        saveSnapshot();
-        host.importMdFiles(filePaths, targetId, position);
     }
 
     // --- レンダリング ---
@@ -20765,18 +20718,15 @@ var Outliner = (function() {
 
         // D&D: ノード要素にドロップターゲットイベント
         el.addEventListener('dragover', function(e) {
-            if (!dragState && !hasExternalFiles(e)) { return; }
+            if (!dragState) { return; }
             e.preventDefault();
-            e.dataTransfer.dropEffect = dragState ? 'move' : 'copy';
+            e.dataTransfer.dropEffect = 'move';
 
-            // ノードD&D時のみ循環参照チェック
-            if (dragState) {
-                var targetId = el.dataset.id;
-                if (targetId === dragState.nodeId || model.isDescendant(targetId, dragState.nodeId)) {
-                    e.dataTransfer.dropEffect = 'none';
-                    removeDropIndicator();
-                    return;
-                }
+            var targetId = el.dataset.id;
+            if (targetId === dragState.nodeId || model.isDescendant(targetId, dragState.nodeId)) {
+                e.dataTransfer.dropEffect = 'none';
+                removeDropIndicator();
+                return;
             }
 
             var rect = el.getBoundingClientRect();
@@ -20797,11 +20747,6 @@ var Outliner = (function() {
         el.addEventListener('drop', function(e) {
             e.preventDefault();
             e.stopPropagation();
-            // 外部ファイルD&D
-            if (!dragState && !imageDragState && hasExternalFiles(e)) {
-                handleExternalFileDrop(e, el);
-                return;
-            }
             if (!dragState) { return; }
 
             var targetId = el.dataset.id;
@@ -22733,6 +22678,16 @@ var Outliner = (function() {
             });
             dropdown.appendChild(setImageDirItem);
         }
+
+        // .mdファイルインポート
+        var importMdItem = document.createElement('button');
+        importMdItem.className = 'menu-item';
+        importMdItem.textContent = 'Import .md files...';
+        importMdItem.addEventListener('click', function() {
+            dropdown.remove();
+            host.importMdFilesDialog(focusedNodeId);
+        });
+        dropdown.appendChild(importMdItem);
 
         // 検索バーを基準に配置（メニューボタンの直下に表示）
         var searchBar = document.querySelector('.outliner-search-bar');
