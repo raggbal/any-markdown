@@ -365,7 +365,7 @@ var Outliner = (function() {
             if (scopeRootNode && (!scopeRootNode.children || scopeRootNode.children.length === 0)) {
                 // スコープヘッダーは表示
                 var emptyHeaderEl = createNodeElement(scopeRootNode, 0, null);
-                emptyHeaderEl.classList.add('is-scope-header');
+                emptyHeaderEl.classList.add('outliner-scope-header');
                 treeEl.appendChild(emptyHeaderEl);
                 // 空メッセージ
                 var emptyDiv = document.createElement('div');
@@ -412,7 +412,7 @@ var Outliner = (function() {
                 var scopeNode = model.getNode(currentScope.rootId);
                 if (scopeNode) {
                     var headerEl = createNodeElement(scopeNode, 0, searchQuery);
-                    headerEl.classList.add('is-scope-header');
+                    headerEl.classList.add('outliner-scope-header');
                     fragment.appendChild(headerEl);
                 }
                 // スコープ対象の子ノードをトップレベルとして表示
@@ -4072,7 +4072,7 @@ var Outliner = (function() {
                             var firstNode = model.addNode(null, null, '');
                             renderTree();
                             focusNode(firstNode.id);
-                            syncData();
+                            scheduleSyncToHost();
                         } else {
                             renderTree();
                             if (msg.scopeToNodeId && currentScope.type === 'subtree') {
@@ -4098,8 +4098,8 @@ var Outliner = (function() {
                                 jumpToAndHighlightNode(msg.jumpToNodeId);
                             }, 100);
                         }
-                        // 新データの初期スナップショット（undo用ベースライン）
-                        saveSnapshot();
+                        // 新データの初期ベースライン（undoStackクリア → ボタンdisabled）
+                        saveBaseline();
                         updateScopeSearchIndicator();
                         break;
                     }

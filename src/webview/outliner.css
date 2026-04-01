@@ -400,18 +400,18 @@ body {
 }
 
 /* --- Scope Header Node --- */
-.outliner-node.is-scope-header {
+.outliner-node.outliner-scope-header {
     border-bottom: 1px solid var(--outliner-border, rgba(128,128,128,0.2));
     padding-bottom: 4px;
     margin-bottom: 4px;
 }
-.outliner-node.is-scope-header > .outliner-bullet {
+.outliner-node.outliner-scope-header > .outliner-bullet {
     display: none;
 }
-.outliner-node.is-scope-header > .outliner-scope-btn {
+.outliner-node.outliner-scope-header > .outliner-scope-btn {
     display: none;
 }
-.outliner-node.is-scope-header > .outliner-node-indent {
+.outliner-node.outliner-scope-header > .outliner-node-indent {
     width: 0px !important;
 }
 

@@ -288,6 +288,63 @@
         return patterns;
     }
 
+    // ===== Normalize multi-line table cells =====
+    // When pasting markdown tables where cell content contains raw newlines,
+    // the line-by-line parser cannot recognize table rows.
+    // This function joins broken rows by replacing newlines with <br>.
+    function normalizeMultiLineTableCells(text) {
+        var lines = text.split('\n');
+        var result = [];
+        var i = 0;
+
+        while (i < lines.length) {
+            var trimmed = lines[i].trimEnd();
+
+            // A line starting with | but not ending with | is a broken table row
+            if (trimmed.length > 1 && trimmed.charAt(0) === '|' && trimmed.charAt(trimmed.length - 1) !== '|') {
+                var combined = trimmed;
+                var j = i + 1;
+                var found = false;
+                var maxJoin = 50; // safety limit
+
+                while (j < lines.length && (j - i) <= maxJoin) {
+                    var nextTrimmed = lines[j].trimEnd();
+
+                    if (nextTrimmed === '') {
+                        // Blank line within cell content
+                        combined += '<br>';
+                        j++;
+                        continue;
+                    }
+
+                    combined += '<br>' + nextTrimmed;
+                    j++;
+
+                    if (nextTrimmed.charAt(nextTrimmed.length - 1) === '|') {
+                        found = true;
+                        break;
+                    }
+                }
+
+                if (found) {
+                    // Collapse multiple consecutive <br> into single
+                    combined = combined.replace(/(<br>)+/g, '<br>');
+                    result.push(combined);
+                    i = j;
+                } else {
+                    // Could not complete the row, output original line
+                    result.push(lines[i]);
+                    i++;
+                }
+            } else {
+                result.push(lines[i]);
+                i++;
+            }
+        }
+
+        return result.join('\n');
+    }
+
     // ===== Export =====
     window.__editorUtils = {
         LUCIDE_ICONS: LUCIDE_ICONS,
@@ -300,6 +357,7 @@
         getCodeFence: getCodeFence,
         wrapInlineCode: wrapInlineCode,
         cleanImageSrc: cleanImageSrc,
-        getHighlightPatterns: getHighlightPatterns
+        getHighlightPatterns: getHighlightPatterns,
+        normalizeMultiLineTableCells: normalizeMultiLineTableCells
     };
 })();

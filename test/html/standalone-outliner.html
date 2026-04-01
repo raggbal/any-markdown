@@ -1829,18 +1829,18 @@ body {
 }
 
 /* --- Scope Header Node --- */
-.outliner-node.is-scope-header {
+.outliner-node.outliner-scope-header {
     border-bottom: 1px solid var(--outliner-border, rgba(128,128,128,0.2));
     padding-bottom: 4px;
     margin-bottom: 4px;
 }
-.outliner-node.is-scope-header > .outliner-bullet {
+.outliner-node.outliner-scope-header > .outliner-bullet {
     display: none;
 }
-.outliner-node.is-scope-header > .outliner-scope-btn {
+.outliner-node.outliner-scope-header > .outliner-scope-btn {
     display: none;
 }
-.outliner-node.is-scope-header > .outliner-node-indent {
+.outliner-node.outliner-scope-header > .outliner-node-indent {
     width: 0px !important;
 }
 
@@ -3153,6 +3153,63 @@ body {
         return patterns;
     }
 
+    // ===== Normalize multi-line table cells =====
+    // When pasting markdown tables where cell content contains raw newlines,
+    // the line-by-line parser cannot recognize table rows.
+    // This function joins broken rows by replacing newlines with <br>.
+    function normalizeMultiLineTableCells(text) {
+        var lines = text.split('\n');
+        var result = [];
+        var i = 0;
+
+        while (i < lines.length) {
+            var trimmed = lines[i].trimEnd();
+
+            // A line starting with | but not ending with | is a broken table row
+            if (trimmed.length > 1 && trimmed.charAt(0) === '|' && trimmed.charAt(trimmed.length - 1) !== '|') {
+                var combined = trimmed;
+                var j = i + 1;
+                var found = false;
+                var maxJoin = 50; // safety limit
+
+                while (j < lines.length && (j - i) <= maxJoin) {
+                    var nextTrimmed = lines[j].trimEnd();
+
+                    if (nextTrimmed === '') {
+                        // Blank line within cell content
+                        combined += '<br>';
+                        j++;
+                        continue;
+                    }
+
+                    combined += '<br>' + nextTrimmed;
+                    j++;
+
+                    if (nextTrimmed.charAt(nextTrimmed.length - 1) === '|') {
+                        found = true;
+                        break;
+                    }
+                }
+
+                if (found) {
+                    // Collapse multiple consecutive <br> into single
+                    combined = combined.replace(/(<br>)+/g, '<br>');
+                    result.push(combined);
+                    i = j;
+                } else {
+                    // Could not complete the row, output original line
+                    result.push(lines[i]);
+                    i++;
+                }
+            } else {
+                result.push(lines[i]);
+                i++;
+            }
+        }
+
+        return result.join('\n');
+    }
+
     // ===== Export =====
     window.__editorUtils = {
         LUCIDE_ICONS: LUCIDE_ICONS,
@@ -3165,7 +3222,8 @@ body {
         getCodeFence: getCodeFence,
         wrapInlineCode: wrapInlineCode,
         cleanImageSrc: cleanImageSrc,
-        getHighlightPatterns: getHighlightPatterns
+        getHighlightPatterns: getHighlightPatterns,
+        normalizeMultiLineTableCells: normalizeMultiLineTableCells
     };
 })();
 
@@ -17921,9 +17979,11 @@ class EditorInstance {
             }
         } else {
             pastedMd = text || '';
+            // Normalize table rows with embedded newlines (cell content containing raw newlines)
+            pastedMd = window.__editorUtils.normalizeMultiLineTableCells(pastedMd);
             logger.log('Using plain text');
         }
-        
+
         if (!pastedMd) {
             logger.log('No content to paste');
             return;
@@ -20143,7 +20203,7 @@ var Outliner = (function() {
             if (scopeRootNode && (!scopeRootNode.children || scopeRootNode.children.length === 0)) {
                 // スコープヘッダーは表示
                 var emptyHeaderEl = createNodeElement(scopeRootNode, 0, null);
-                emptyHeaderEl.classList.add('is-scope-header');
+                emptyHeaderEl.classList.add('outliner-scope-header');
                 treeEl.appendChild(emptyHeaderEl);
                 // 空メッセージ
                 var emptyDiv = document.createElement('div');
@@ -20190,7 +20250,7 @@ var Outliner = (function() {
                 var scopeNode = model.getNode(currentScope.rootId);
                 if (scopeNode) {
                     var headerEl = createNodeElement(scopeNode, 0, searchQuery);
-                    headerEl.classList.add('is-scope-header');
+                    headerEl.classList.add('outliner-scope-header');
                     fragment.appendChild(headerEl);
                 }
                 // スコープ対象の子ノードをトップレベルとして表示
@@ -23850,7 +23910,7 @@ var Outliner = (function() {
                             var firstNode = model.addNode(null, null, '');
                             renderTree();
                             focusNode(firstNode.id);
-                            syncData();
+                            scheduleSyncToHost();
                         } else {
                             renderTree();
                             if (msg.scopeToNodeId && currentScope.type === 'subtree') {
@@ -23876,8 +23936,8 @@ var Outliner = (function() {
                                 jumpToAndHighlightNode(msg.jumpToNodeId);
                             }, 100);
                         }
-                        // 新データの初期スナップショット（undo用ベースライン）
-                        saveSnapshot();
+                        // 新データの初期ベースライン（undoStackクリア → ボタンdisabled）
+                        saveBaseline();
                         updateScopeSearchIndicator();
                         break;
                     }

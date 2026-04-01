@@ -14748,9 +14748,11 @@ class EditorInstance {
             }
         } else {
             pastedMd = text || '';
+            // Normalize table rows with embedded newlines (cell content containing raw newlines)
+            pastedMd = window.__editorUtils.normalizeMultiLineTableCells(pastedMd);
             logger.log('Using plain text');
         }
-        
+
         if (!pastedMd) {
             logger.log('No content to paste');
             return;
