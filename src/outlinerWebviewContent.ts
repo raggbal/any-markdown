@@ -10,6 +10,7 @@ interface OutlinerConfig {
     webviewMessages?: Record<string, string>;
     enableDebugLogging?: boolean;
     outlinerPageTitle?: boolean;
+    documentBaseUri?: string;
 }
 
 export function getOutlinerWebviewContent(
@@ -129,6 +130,7 @@ export function getOutlinerWebviewContent(
     <script nonce="${nonce}">
         window.__SKIP_EDITOR_AUTO_INIT__ = true;
         window.__outlinerMessages = ${JSON.stringify(config.webviewMessages || {})};
+        window.__outlinerImageBaseUri = "${config.documentBaseUri || ''}";
     </script>
     <script nonce="${nonce}">
         ${editorUtilsScript}

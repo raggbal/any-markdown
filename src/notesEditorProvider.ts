@@ -93,6 +93,7 @@ export class NotesEditorProvider {
 
         // HTML 生成
         const config = vscode.workspace.getConfiguration('fractal');
+        const folderBaseUri = panel.webview.asWebviewUri(vscode.Uri.file(folderPath)).toString();
         panel.webview.html = getNotesWebviewContent(
             panel.webview,
             this.context.extensionUri,
@@ -103,6 +104,7 @@ export class NotesEditorProvider {
                 webviewMessages: getWebviewMessages() as unknown as Record<string, string>,
                 enableDebugLogging: config.get<boolean>('enableDebugLogging', false),
                 outlinerPageTitle: config.get<boolean>('outlinerPageTitle', true),
+                documentBaseUri: folderBaseUri,
             },
             {
                 jsonContent,
@@ -224,6 +226,30 @@ export class NotesEditorProvider {
                         vscode.window.showErrorMessage('Failed to update page directory setting');
                     }
                 }
+            },
+            saveOutlinerImage: (nodeId: string, dataUrl: string, fileName: string) => {
+                const pagesDir = fileManager.getPagesDirPath();
+                const imagesDir = path.join(pagesDir, 'images');
+                if (!fs.existsSync(imagesDir)) fs.mkdirSync(imagesDir, { recursive: true });
+                let imgFileName = fileName;
+                if (!imgFileName) {
+                    const extMatch = dataUrl.match(/^data:image\/(\w+);/);
+                    const ext = extMatch ? extMatch[1].replace('jpeg', 'jpg') : 'png';
+                    imgFileName = `image_${Date.now()}.${ext}`;
+                }
+                const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, '');
+                const destPath = path.join(imagesDir, imgFileName);
+                fs.writeFileSync(destPath, Buffer.from(base64Data, 'base64'));
+                const outFilePath = fileManager.getCurrentFilePath();
+                const outDir = outFilePath ? path.dirname(outFilePath) : fileManager.getMainFolderPath();
+                const relativePath = path.relative(outDir, destPath).replace(/\\/g, '/');
+                const displayUri = panel.webview.asWebviewUri(vscode.Uri.file(destPath)).toString();
+                sender.postMessage({
+                    type: 'outlinerImageSaved',
+                    nodeId: nodeId,
+                    imagePath: relativePath,
+                    displayUri: displayUri
+                });
             },
             saveImageToDir: (dataUrl: string, fileName: string, sidePanelFilePath: string) => {
                 const pagesDir = fileManager.getPagesDirPath();

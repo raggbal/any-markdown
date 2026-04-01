@@ -66,6 +66,11 @@ var Outliner = (function() {
     var dragState = null;       // { nodeId, nodeEl } or null
     var dropIndicator = null;   // DOM element for drop indicator
 
+    // --- 画像 ---
+    var imageDir = null;           // .out JSON の imageDir フィールド
+    var selectedImageInfo = null;  // { nodeId, index, element } or null
+    var imageDragState = null;     // { nodeId, fromIndex } or null
+
     // --- Undo/Redo ---
     //
     // 設計:
@@ -204,6 +209,10 @@ var Outliner = (function() {
         // JSONからpageDirを復元
         if (data && data.pageDir) {
             pageDir = data.pageDir;
+        }
+        // JSONからimageDirを復元
+        if (data && data.imageDir) {
+            imageDir = data.imageDir;
         }
         // JSONからpinnedTagsを復元
         if (data && data.pinnedTags) {
@@ -648,6 +657,7 @@ var Outliner = (function() {
         textEl.dataset.nodeId = node.id;
 
         textEl.addEventListener('focus', function() {
+            clearImageSelection();
             setFocusedNode(node.id);
             // 編集モードに切替: マーカーを生テキストで表示 (フォーマットは非適用)
             var sourceText = node.text || '';
@@ -774,6 +784,16 @@ var Outliner = (function() {
         });
 
         contentEl.appendChild(subtextEl);
+
+        // 画像サムネイル行
+        var imagesEl = document.createElement('div');
+        imagesEl.className = 'outliner-images';
+        imagesEl.dataset.nodeId = node.id;
+        if (node.images && node.images.length > 0) {
+            renderNodeImages(imagesEl, node);
+        }
+        contentEl.appendChild(imagesEl);
+
         el.appendChild(contentEl);
 
         // D&D: ノード要素にドロップターゲットイベント
@@ -876,6 +896,162 @@ var Outliner = (function() {
         var firstLine = subtext.split('\n')[0];
         var hasMore = subtext.indexOf('\n') >= 0;
         return hasMore ? firstLine + ' ...' : firstLine;
+    }
+
+    // --- 画像サムネイル ---
+
+    function resolveImageSrc(imagePath) {
+        var baseUri = window.__outlinerImageBaseUri;
+        if (!baseUri) { return imagePath; }
+        return baseUri + '/' + imagePath.replace(/^\.\//, '');
+    }
+
+    /** コンテナ内のマウス位置から最も近いドロップインデックスを算出 */
+    function getImageDropIndex(container, clientX, clientY) {
+        var thumbs = container.querySelectorAll('.outliner-image-thumb');
+        if (thumbs.length === 0) { return 0; }
+        var bestIdx = 0;
+        var bestDist = Infinity;
+        for (var i = 0; i < thumbs.length; i++) {
+            var rect = thumbs[i].getBoundingClientRect();
+            var leftEdge = rect.left;
+            var rightEdge = rect.right;
+            var centerY = rect.top + rect.height / 2;
+            var dy = Math.abs(clientY - centerY);
+            // 左端との距離 → before this image
+            var dLeft = Math.sqrt(Math.pow(clientX - leftEdge, 2) + Math.pow(dy, 2));
+            if (dLeft < bestDist) { bestDist = dLeft; bestIdx = i; }
+            // 右端との距離 → after this image
+            var dRight = Math.sqrt(Math.pow(clientX - rightEdge, 2) + Math.pow(dy, 2));
+            if (dRight < bestDist) { bestDist = dRight; bestIdx = i + 1; }
+        }
+        return bestIdx;
+    }
+
+    /** ドロップインジケーターを表示（指定インデックスの左に青線） */
+    function showImageDropIndicator(container, dropIdx) {
+        var thumbs = container.querySelectorAll('.outliner-image-thumb');
+        for (var t = 0; t < thumbs.length; t++) {
+            thumbs[t].classList.remove('drop-before', 'drop-after');
+        }
+        if (dropIdx <= 0 && thumbs.length > 0) {
+            thumbs[0].classList.add('drop-before');
+        } else if (dropIdx >= thumbs.length && thumbs.length > 0) {
+            thumbs[thumbs.length - 1].classList.add('drop-after');
+        } else if (dropIdx > 0 && dropIdx < thumbs.length) {
+            thumbs[dropIdx].classList.add('drop-before');
+        }
+    }
+
+    function clearImageDropIndicators(container) {
+        var thumbs = container.querySelectorAll('.outliner-image-thumb');
+        for (var t = 0; t < thumbs.length; t++) {
+            thumbs[t].classList.remove('drop-before', 'drop-after', 'is-dragging');
+        }
+    }
+
+    function renderNodeImages(container, node) {
+        container.innerHTML = '';
+        if (!node || !node.images || node.images.length === 0) { return; }
+
+        for (var i = 0; i < node.images.length; i++) {
+            (function(idx) {
+                var img = document.createElement('img');
+                img.className = 'outliner-image-thumb';
+                img.dataset.index = idx;
+                img.dataset.nodeId = node.id;
+                img.src = resolveImageSrc(node.images[idx]);
+                img.draggable = true;
+                img.alt = '';
+
+                img.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    clearImageSelection();
+                    img.classList.add('is-selected');
+                    selectedImageInfo = { nodeId: node.id, index: idx, element: img };
+                });
+
+                img.addEventListener('dblclick', function(e) {
+                    e.stopPropagation();
+                    showImageOverlay(img.src);
+                });
+
+                img.addEventListener('dragstart', function(e) {
+                    e.stopPropagation();
+                    imageDragState = { nodeId: node.id, fromIndex: idx };
+                    img.classList.add('is-dragging');
+                    e.dataTransfer.effectAllowed = 'move';
+                    e.dataTransfer.setData('text/plain', 'outliner-image');
+                });
+
+                img.addEventListener('dragend', function() {
+                    imageDragState = null;
+                    clearImageDropIndicators(container);
+                });
+
+                container.appendChild(img);
+            })(i);
+        }
+
+        // コンテナレベルでのD&D（画像間の隙間でもドロップ可能にする）
+        container.addEventListener('dragover', function(e) {
+            if (!imageDragState || imageDragState.nodeId !== node.id) { return; }
+            e.preventDefault();
+            e.stopPropagation();
+            e.dataTransfer.dropEffect = 'move';
+            var dropIdx = getImageDropIndex(container, e.clientX, e.clientY);
+            showImageDropIndicator(container, dropIdx);
+        });
+
+        container.addEventListener('dragleave', function(e) {
+            if (container.contains(e.relatedTarget)) { return; }
+            clearImageDropIndicators(container);
+        });
+
+        container.addEventListener('drop', function(e) {
+            if (!imageDragState || imageDragState.nodeId !== node.id) { return; }
+            e.preventDefault();
+            e.stopPropagation();
+            var toIdx = getImageDropIndex(container, e.clientX, e.clientY);
+            if (imageDragState.fromIndex !== toIdx && imageDragState.fromIndex !== toIdx - 1) {
+                saveSnapshot();
+                model.moveImage(node.id, imageDragState.fromIndex, toIdx);
+                renderNodeImages(container, model.getNode(node.id));
+                scheduleSyncToHost();
+            }
+            imageDragState = null;
+            clearImageDropIndicators(container);
+        });
+    }
+
+    function clearImageSelection() {
+        if (selectedImageInfo) {
+            selectedImageInfo.element.classList.remove('is-selected');
+            selectedImageInfo = null;
+        }
+    }
+
+    function showImageOverlay(src) {
+        var overlay = document.createElement('div');
+        overlay.className = 'outliner-image-overlay';
+
+        var largeImg = document.createElement('img');
+        largeImg.className = 'outliner-image-large';
+        largeImg.src = src;
+
+        overlay.appendChild(largeImg);
+        document.body.appendChild(overlay);
+
+        overlay.addEventListener('click', function(ev) {
+            if (ev.target === overlay) { overlay.remove(); }
+        });
+        var escHandler = function(ev) {
+            if (ev.key === 'Escape') {
+                overlay.remove();
+                document.removeEventListener('keydown', escHandler);
+            }
+        };
+        document.addEventListener('keydown', escHandler);
     }
 
     /** プレーンテキストからインラインMarkdownをHTMLに変換 */
@@ -1221,7 +1397,8 @@ var Outliner = (function() {
                 text: nd.text,
                 level: relDepth,
                 isPage: nd.isPage || false,
-                pageId: nd.pageId || null
+                pageId: nd.pageId || null,
+                images: (nd.images && nd.images.length > 0) ? nd.images.slice() : []
             });
         }
         return nodes;
@@ -1319,6 +1496,26 @@ var Outliner = (function() {
 
     /** paste イベントハンドラ (keydownではなくpasteイベントで処理) */
     function handleNodePaste(e, nodeId, textEl) {
+        // 画像ペースト判定（テキストより先に判定）
+        if (e.clipboardData && e.clipboardData.items) {
+            for (var ci = 0; ci < e.clipboardData.items.length; ci++) {
+                var clipItem = e.clipboardData.items[ci];
+                if (clipItem.kind === 'file' && clipItem.type.startsWith('image/')) {
+                    e.preventDefault();
+                    var imgFile = clipItem.getAsFile();
+                    if (imgFile) {
+                        var reader = new FileReader();
+                        var capturedNodeId = nodeId;
+                        reader.onload = function(ev) {
+                            host.saveOutlinerImage(capturedNodeId, ev.target.result, null);
+                        };
+                        reader.readAsDataURL(imgFile);
+                    }
+                    return;
+                }
+            }
+        }
+
         var clipText = e.clipboardData ? e.clipboardData.getData('text/plain') : '';
         if (!clipText) { return; }
 
@@ -1358,11 +1555,13 @@ var Outliner = (function() {
             return;
         }
 
-        // 内部クリップボードにページノードが含まれるか判定
-        var hasPageInClipboard = clipNodes && clipNodes.some(function(cn) { return cn.isPage; });
+        // 内部クリップボードにページノードまたは画像が含まれるか判定
+        var hasMetadataInClipboard = clipNodes && clipNodes.some(function(cn) {
+            return cn.isPage || (cn.images && cn.images.length > 0);
+        });
 
-        // 単一行かつページノードなし: 現在ノードのカーソル位置に挿入
-        if (!clipText.includes('\n') && !hasPageInClipboard) {
+        // 単一行かつメタデータなし: 現在ノードのカーソル位置に挿入
+        if (!clipText.includes('\n') && !hasMetadataInClipboard) {
             saveSnapshot();
             var curOff = getCursorOffset(textEl);
             var curText = node.text || '';
@@ -1468,7 +1667,7 @@ var Outliner = (function() {
 
             var newNode = model.addNode(parentId, after, parsed[n].text);
 
-            // ページメタデータ復元
+            // ページメタデータ・画像復元
             if (clipboardNodes && clipboardNodes[clipNodeIndexMap[n]]) {
                 var clipNode = clipboardNodes[clipNodeIndexMap[n]];
                 if (clipNode.isPage && clipNode.pageId) {
@@ -1483,6 +1682,10 @@ var Outliner = (function() {
                         newNode.pageId = newPageId;
                         host.copyPageFile(clipNode.pageId, newPageId);
                     }
+                }
+                // 画像復元: カット=移動（同じパス）、コピー=複製（同じパス参照）
+                if (clipNode.images && clipNode.images.length > 0) {
+                    newNode.images = clipNode.images.slice();
                 }
             }
 
@@ -2475,6 +2678,16 @@ var Outliner = (function() {
                 host.setPageDir();
             });
             dropdown.appendChild(setPageDirItem);
+
+            // 画像フォルダ設定
+            var setImageDirItem = document.createElement('button');
+            setImageDirItem.className = 'menu-item';
+            setImageDirItem.textContent = i18n.outlinerSetImageDir || 'Set image directory...';
+            setImageDirItem.addEventListener('click', function() {
+                dropdown.remove();
+                host.setOutlinerImageDir();
+            });
+            dropdown.appendChild(setImageDirItem);
         }
 
         // 検索バーを基準に配置（メニューボタンの直下に表示）
@@ -3613,6 +3826,7 @@ var Outliner = (function() {
         var data = model.serialize();
         data.searchFocusMode = searchFocusMode;
         if (pageDir) { data.pageDir = pageDir; }
+        if (imageDir) { data.imageDir = imageDir; }
         if (sidePanelWidthSetting) { data.sidePanelWidth = sidePanelWidthSetting; }
         if (pinnedTags && pinnedTags.length > 0) { data.pinnedTags = pinnedTags; }
         host.syncData(JSON.stringify(data, null, 2));
@@ -3912,6 +4126,26 @@ var Outliner = (function() {
                     pageDir = msg.pageDir || null;
                     break;
 
+                case 'outlinerImageSaved':
+                    if (msg.nodeId && msg.imagePath) {
+                        saveSnapshot();
+                        model.addImage(msg.nodeId, msg.imagePath);
+                        var imgContainer = document.querySelector('.outliner-images[data-node-id="' + msg.nodeId + '"]');
+                        if (imgContainer) {
+                            renderNodeImages(imgContainer, model.getNode(msg.nodeId));
+                        }
+                        scheduleSyncToHost();
+                    }
+                    break;
+
+                case 'outlinerImageDirChanged':
+                    imageDir = msg.imageDir || null;
+                    scheduleSyncToHost();
+                    break;
+
+                case 'outlinerImageDirStatus':
+                    break;
+
                 // --- サイドパネル関連メッセージ ---
                 case 'openSidePanel':
                     openSidePanel(msg.markdown, msg.filePath, msg.fileName, msg.toc, msg.documentBaseUri);
@@ -3963,6 +4197,19 @@ var Outliner = (function() {
 
     function setupKeyHandlers() {
         document.addEventListener('keydown', function(e) {
+            // 画像選択中の Delete/Backspace
+            if ((e.key === 'Delete' || e.key === 'Backspace') && selectedImageInfo) {
+                e.preventDefault();
+                saveSnapshot();
+                var imgNodeId = selectedImageInfo.nodeId;
+                model.removeImage(imgNodeId, selectedImageInfo.index);
+                var imgC = document.querySelector('.outliner-images[data-node-id="' + imgNodeId + '"]');
+                if (imgC) { renderNodeImages(imgC, model.getNode(imgNodeId)); }
+                clearImageSelection();
+                scheduleSyncToHost();
+                return;
+            }
+
             // グローバル Cmd+] スコープイン / Cmd+Shift+] スコープアウト (ノード内keydownで未処理の場合)
             if ((e.metaKey || e.ctrlKey) && (e.key === ']' || e.code === 'BracketRight')) {
                 e.preventDefault();

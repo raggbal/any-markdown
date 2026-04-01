@@ -55,6 +55,13 @@
         createPageAuto: function() { /* no-op in outliner */ },
         updatePageH1: function() { /* no-op in outliner */ },
 
+        // Outlinerノード画像操作
+        saveOutlinerImage: function(nodeId, dataUrl, fileName) {
+            api.postMessage({ type: 'saveOutlinerImage', nodeId: nodeId, dataUrl: dataUrl, fileName: fileName });
+        },
+        setOutlinerImageDir: function() { /* no-op in notes — auto-managed */ },
+        getOutlinerImageDir: function() { /* no-op in notes — auto-managed */ },
+
         // Daily Notes ナビゲーション（outliner.jsから呼び出し）
         // .outファイル操作
         openInTextEditor: function() {

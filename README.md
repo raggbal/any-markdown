@@ -70,6 +70,7 @@ A Dynalist-like outliner built into VS Code.
 - **Move nodes** — `Ctrl+Shift+↑/↓` to reorder
 - **Subtext** — `Shift+Enter` to add notes below any bullet
 - **Navigation history** — Back / forward buttons to revisit previous search and scope states
+- **Node images** — Paste images with `Cmd+V`. Thumbnails shown below the node, drag to reorder, double-click to enlarge
 - **Undo / Redo** — Full undo/redo with `Cmd+Z` / `Cmd+Shift+Z`
 
 <!-- TODO: Add Outliner feature screenshot -->
@@ -414,6 +415,7 @@ FORCE_RELATIVE_PATH: true
 | `fractal.toolbarMode` | Toolbar display mode (`full`, `simple`) | `simple` |
 | `fractal.outlinerPageDir` | Default page directory for outliner | `./pages` |
 | `fractal.outlinerPageTitle` | Show page title input in outliner | `false` |
+| `fractal.outlinerImageDefaultDir` | Default image directory for outliner nodes | `./images` |
 | `fractal.enableDebugLogging` | Enable debug logging in browser console | `false` |
 
 ### Themes

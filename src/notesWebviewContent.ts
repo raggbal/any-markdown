@@ -10,6 +10,7 @@ interface NotesConfig {
     webviewMessages?: Record<string, string>;
     enableDebugLogging?: boolean;
     outlinerPageTitle?: boolean;
+    documentBaseUri?: string;
 }
 
 interface NotesInitData {
@@ -164,6 +165,7 @@ export function getNotesWebviewContent(
     <script nonce="${nonce}">
         window.__SKIP_EDITOR_AUTO_INIT__ = true;
         window.__outlinerMessages = ${JSON.stringify(config.webviewMessages || {})};
+        window.__outlinerImageBaseUri = "${config.documentBaseUri || ''}";
         window.__initialFileChangeId = ${initData.fileChangeId || 0};
     </script>
     <script nonce="${nonce}">${sidePanelBridgeScript}</script>

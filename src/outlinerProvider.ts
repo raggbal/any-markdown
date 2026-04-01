@@ -42,12 +42,14 @@ export class OutlinerProvider implements vscode.CustomTextEditorProvider {
         webviewPanel.webview.html = '';
 
         const documentDir = vscode.Uri.joinPath(document.uri, '..');
+        const outlinerImageDir = vscode.Uri.file(this.getOutlinerImageDirPath(document));
 
         webviewPanel.webview.options = {
             enableScripts: true,
             localResourceRoots: [
                 vscode.Uri.joinPath(this.context.extensionUri, 'media'),
-                documentDir
+                documentDir,
+                outlinerImageDir
             ]
         };
 
@@ -58,6 +60,7 @@ export class OutlinerProvider implements vscode.CustomTextEditorProvider {
             try {
                 const config = vscode.workspace.getConfiguration('fractal');
                 const content = document.getText();
+                const docBaseUri = webviewPanel.webview.asWebviewUri(documentDir).toString();
                 webviewPanel.webview.html = getOutlinerWebviewContent(
                     webviewPanel.webview,
                     this.context.extensionUri,
@@ -68,7 +71,8 @@ export class OutlinerProvider implements vscode.CustomTextEditorProvider {
                         toolbarMode: config.get<string>('toolbarMode', 'full'),
                         webviewMessages: getWebviewMessages() as unknown as Record<string, string>,
                         enableDebugLogging: config.get<boolean>('enableDebugLogging', false),
-                        outlinerPageTitle: config.get<boolean>('outlinerPageTitle', true)
+                        outlinerPageTitle: config.get<boolean>('outlinerPageTitle', true),
+                        documentBaseUri: docBaseUri
                     }
                 );
             } catch (error) {
@@ -336,6 +340,68 @@ export class OutlinerProvider implements vscode.CustomTextEditorProvider {
                     case 'setImageDir':
                         // outlinerページでは画像ディレクトリ変更不可 (要件PC-2)
                         break;
+
+                    case 'saveOutlinerImage': {
+                        // Outlinerノード用画像保存
+                        if (message.nodeId && message.dataUrl) {
+                            const imageDir = this.getOutlinerImageDirPath(document);
+                            if (!fs.existsSync(imageDir)) {
+                                fs.mkdirSync(imageDir, { recursive: true });
+                            }
+                            let imgFileName = message.fileName;
+                            if (!imgFileName) {
+                                const extMatch = message.dataUrl.match(/^data:image\/(\w+);/);
+                                const ext = extMatch ? extMatch[1].replace('jpeg', 'jpg') : 'png';
+                                imgFileName = `image_${Date.now()}.${ext}`;
+                            }
+                            const base64Data = message.dataUrl.replace(/^data:image\/\w+;base64,/, '');
+                            const destPath = path.join(imageDir, imgFileName);
+                            fs.writeFileSync(destPath, Buffer.from(base64Data, 'base64'));
+
+                            const outDir = path.dirname(document.uri.fsPath);
+                            const relativePath = path.relative(outDir, destPath).replace(/\\/g, '/');
+                            const displayUri = webviewPanel.webview.asWebviewUri(vscode.Uri.file(destPath)).toString();
+
+                            webviewPanel.webview.postMessage({
+                                type: 'outlinerImageSaved',
+                                nodeId: message.nodeId,
+                                imagePath: relativePath,
+                                displayUri: displayUri
+                            });
+                        }
+                        break;
+                    }
+
+                    case 'setOutlinerImageDir': {
+                        const currentImgDir = this.getOutlinerImageDirPath(document);
+                        const outDir = path.dirname(document.uri.fsPath);
+                        const relCurrent = path.relative(outDir, currentImgDir).replace(/\\/g, '/') || './images';
+                        const input = await vscode.window.showInputBox({
+                            prompt: 'Image directory path (relative to .out file or absolute)',
+                            value: relCurrent
+                        });
+                        if (input !== undefined) {
+                            webviewPanel.webview.postMessage({
+                                type: 'outlinerImageDirChanged',
+                                imageDir: input,
+                                displayPath: input || './images',
+                                source: 'file'
+                            });
+                        }
+                        break;
+                    }
+
+                    case 'getOutlinerImageDir': {
+                        const imgDir = this.getOutlinerImageDirPath(document);
+                        const outDir2 = path.dirname(document.uri.fsPath);
+                        const displayPath = path.relative(outDir2, imgDir).replace(/\\/g, '/') || '.';
+                        webviewPanel.webview.postMessage({
+                            type: 'outlinerImageDirStatus',
+                            displayPath: displayPath,
+                            source: 'settings'
+                        });
+                        break;
+                    }
                 }
             })
         );
@@ -455,6 +521,30 @@ export class OutlinerProvider implements vscode.CustomTextEditorProvider {
     }
 
     // --- ページ管理 ---
+
+    private getOutlinerImageDirPath(document: vscode.TextDocument): string {
+        // 1. out JSON内のimageDirフィールドを優先
+        try {
+            const data = JSON.parse(document.getText());
+            if (data.imageDir) {
+                if (path.isAbsolute(data.imageDir)) {
+                    return data.imageDir;
+                }
+                return path.resolve(path.dirname(document.uri.fsPath), data.imageDir);
+            }
+        } catch { /* ignore parse errors */ }
+
+        // 2. VSCode設定
+        const config = vscode.workspace.getConfiguration('fractal');
+        const configDir = config.get<string>('outlinerImageDefaultDir', './images');
+        if (!configDir) {
+            return path.dirname(document.uri.fsPath);
+        }
+        if (path.isAbsolute(configDir)) {
+            return configDir;
+        }
+        return path.resolve(path.dirname(document.uri.fsPath), configDir);
+    }
 
     private getPagesDirPath(document: vscode.TextDocument): string {
         // 1. out JSON内のpageDirフィールドを優先

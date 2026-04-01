@@ -85,6 +85,9 @@ var OutlinerModel = (function() {
             if (this.nodes[id].subtext === undefined) {
                 this.nodes[id].subtext = '';
             }
+            if (!this.nodes[id].images) {
+                this.nodes[id].images = [];
+            }
         }
     };
 
@@ -107,7 +110,8 @@ var OutlinerModel = (function() {
             pageId: null,
             collapsed: false,
             checked: null,
-            subtext: ''
+            subtext: '',
+            images: []
         };
 
         this.nodes[id] = node;
@@ -143,7 +147,8 @@ var OutlinerModel = (function() {
             pageId: null,
             collapsed: false,
             checked: null,
-            subtext: ''
+            subtext: '',
+            images: []
         };
         this.nodes[id] = node;
         if (parentId === null || parentId === undefined) {
@@ -192,6 +197,32 @@ var OutlinerModel = (function() {
         var node = this.nodes[nodeId];
         if (!node) { return; }
         node.subtext = subtext || '';
+    };
+
+    // --- 画像操作 ---
+
+    Model.prototype.addImage = function(nodeId, imagePath) {
+        var node = this.nodes[nodeId];
+        if (node) {
+            if (!node.images) { node.images = []; }
+            node.images.push(imagePath);
+        }
+    };
+
+    Model.prototype.removeImage = function(nodeId, index) {
+        var node = this.nodes[nodeId];
+        if (node && node.images && index >= 0 && index < node.images.length) {
+            node.images.splice(index, 1);
+        }
+    };
+
+    Model.prototype.moveImage = function(nodeId, fromIndex, toIndex) {
+        var node = this.nodes[nodeId];
+        if (node && node.images && fromIndex >= 0 && fromIndex < node.images.length) {
+            var img = node.images.splice(fromIndex, 1)[0];
+            if (toIndex > fromIndex) { toIndex--; }
+            node.images.splice(toIndex, 0, img);
+        }
     };
 
     /**

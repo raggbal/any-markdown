@@ -5,6 +5,24 @@ All notable changes to the "Fractal" extension extension will be documented in t
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.195.570] - 2026-04-01
+
+### Fixed
+
+- **Outliner: 画像付きノードのコピー/カット** — 画像付きノードを単一行でコピー/カットして貼り付けると画像が消失する問題を修正
+
+## [0.195.569] - 2026-04-01
+
+### Added
+
+- **Outliner: ノード画像機能** — Cmd+Vでノードに画像を貼り付け、サムネイルとして表示。ドラッグ&ドロップで並べ替え、ダブルクリックで拡大表示。Delete/Backspaceで削除
+- **Outliner: 画像保存先設定** — `fractal.outlinerImageDefaultDir` 設定追加。.outファイルごとの個別設定も可能。Notes modeではMDページ画像と同じフォルダに自動保存
+- **Outliner: コピー/カット時の画像保持** — Cmd+C/Xでノードをコピー/カットした際、画像パスも内部クリップボードで保持
+
+### Fixed
+
+- **Outliner: 画像ペースト時のファイル名重複** — 2枚目以降の画像が1枚目に見える問題を修正
+
 ## [0.195.566] - 2026-04-01
 
 ### Fixed

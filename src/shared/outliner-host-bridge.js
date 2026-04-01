@@ -51,6 +51,17 @@
         // ページ管理 (サイドパネル内EditorInstanceから呼ばれる — outlinerでは未使用)
         createPageAtPath: function() { /* no-op in outliner */ },
         createPageAuto: function() { /* no-op in outliner */ },
-        updatePageH1: function() { /* no-op in outliner */ }
+        updatePageH1: function() { /* no-op in outliner */ },
+
+        // Outlinerノード画像操作
+        saveOutlinerImage: function(nodeId, dataUrl, fileName) {
+            api.postMessage({ type: 'saveOutlinerImage', nodeId: nodeId, dataUrl: dataUrl, fileName: fileName });
+        },
+        setOutlinerImageDir: function() {
+            api.postMessage({ type: 'setOutlinerImageDir' });
+        },
+        getOutlinerImageDir: function() {
+            api.postMessage({ type: 'getOutlinerImageDir' });
+        }
     });
 })();

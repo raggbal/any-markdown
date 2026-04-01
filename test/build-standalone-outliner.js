@@ -116,6 +116,25 @@ const testOutlinerHostBridge = `
         createPageAuto: function() {},
         updatePageH1: function() {},
         postDailyNotes: function() {},
+        saveOutlinerImage: function(nodeId, dataUrl, fileName) {
+            window.__testApi.messages.push({ type: 'saveOutlinerImage', nodeId: nodeId, dataUrl: dataUrl, fileName: fileName });
+            // テスト用: 即座にモデルに追加して返す
+            var mockPath = './images/' + (fileName || 'test_image.png');
+            if (window.__hostMessageHandler) {
+                window.__hostMessageHandler({
+                    type: 'outlinerImageSaved',
+                    nodeId: nodeId,
+                    imagePath: mockPath,
+                    displayUri: dataUrl
+                });
+            }
+        },
+        setOutlinerImageDir: function() {
+            window.__testApi.messages.push({ type: 'setOutlinerImageDir' });
+        },
+        getOutlinerImageDir: function() {
+            window.__testApi.messages.push({ type: 'getOutlinerImageDir' });
+        },
         showConfirm: function(id, message) {
             window.__testApi.messages.push({ type: 'showConfirm', id: id, message: message });
         },
@@ -200,6 +219,7 @@ const html = `<!DOCTYPE html>
     <script>
     window.__SKIP_EDITOR_AUTO_INIT__ = true;
     window.__outlinerMessages = {};
+    window.__outlinerImageBaseUri = '';
     </script>
     <script>
     __EDITOR_UTILS_SCRIPT__

@@ -2,7 +2,7 @@
   "name": "fractal",
   "displayName": "Fractal - Outline & Markdown Editor",
   "description": "Combines a Dynalist-like outliner and a Typora-like WYSIWYG markdown editor",
-  "version": "0.195.566",
+  "version": "0.195.570",
   "publisher": "imaken",
   "author": "imaken",
   "icon": "media/icon.png",
@@ -195,6 +195,11 @@
           "type": "boolean",
           "default": false,
           "description": "Always insert image paths as relative paths, even when imageDefaultDir is an absolute path."
+        },
+        "fractal.outlinerImageDefaultDir": {
+          "type": "string",
+          "default": "./images",
+          "description": "Default directory for saving outliner node images. Uses relative path from .out file. Can be overridden per-file via imageDir field in .out JSON."
         },
         "fractal.language": {
           "type": "string",

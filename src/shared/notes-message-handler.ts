@@ -61,6 +61,8 @@ export interface NotesPlatformActions {
     s3LocalDeleteAndDownload?(bucketPath: string): void;
     /** S3ステータス取得（認証情報の有無、バケットパス） */
     s3GetStatus?(): void;
+    /** Outlinerノード画像保存 */
+    saveOutlinerImage?(nodeId: string, dataUrl: string, fileName: string): void;
 }
 
 /**
@@ -158,6 +160,13 @@ export function handleNotesMessage(
         case 'setPageDir':
             platform.requestSetPageDir();
             break;
+
+        case 'saveOutlinerImage': {
+            if (platform.saveOutlinerImage && message.nodeId && message.dataUrl) {
+                platform.saveOutlinerImage(message.nodeId, message.dataUrl, message.fileName);
+            }
+            break;
+        }
 
         // ── Side Panel ──
 
