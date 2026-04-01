@@ -67,28 +67,83 @@ var Outliner = (function() {
     var dropIndicator = null;   // DOM element for drop indicator
 
     // --- Undo/Redo ---
+    //
+    // 設計:
+    // - baselineSnapshot: 「これ以上戻れない」初期状態。init/updateData/外部変更時に設定。
+    //   undoStack には入れない（ボタンが不必要に active にならないため）。
+    // - undoStack: 編集前の状態を積む。saveSnapshot() は編集操作の直前に呼ばれる。
+    // - redoStack: undo時に現在の状態を積む。
+    // - saveSnapshotDebounced(): テキスト入力用。500ms debounce で入力後の状態を積む。
+    //
+    // フロー:
+    //   初期化: baselineSnapshot = serialize() → undo disabled
+    //   最初の編集: saveSnapshot() → undoStack が空なので baselineSnapshot を push → 編集実行
+    //   undo: current → redo, pop undo → restore (skip if top === current)
+    //
     var undoStack = [];
     var redoStack = [];
     var MAX_UNDO = 200;
     var isUndoRedo = false;
+    var snapshotDebounceTimer = null;
+    var SNAPSHOT_DEBOUNCE_MS = 500;
+    var baselineSnapshot = null; // 初期状態（undoStackには入れない）
 
     function saveSnapshot() {
         if (isUndoRedo) { return; }
         var snapshot = JSON.stringify(model.serialize());
         // 前回と同じなら保存しない
         if (undoStack.length > 0 && undoStack[undoStack.length - 1] === snapshot) { return; }
+        // baselineSnapshot と同じなら保存しない（初期状態から変化なし）
+        if (undoStack.length === 0 && baselineSnapshot === snapshot) { return; }
+        // 最初の編集: baseline を undoStack に入れてから現在の状態を積む
+        if (undoStack.length === 0 && baselineSnapshot && baselineSnapshot !== snapshot) {
+            undoStack.push(baselineSnapshot);
+        }
         undoStack.push(snapshot);
         if (undoStack.length > MAX_UNDO) { undoStack.shift(); }
         redoStack.length = 0;
         updateUndoRedoButtons();
     }
 
+    /** 初期状態を記録（undoStackには入れない） */
+    function saveBaseline() {
+        baselineSnapshot = JSON.stringify(model.serialize());
+        undoStack.length = 0;
+        redoStack.length = 0;
+        updateUndoRedoButtons();
+    }
+
+    /** テキスト入力用デバウンス付きスナップショット（500ms後に保存） */
+    function saveSnapshotDebounced() {
+        if (isUndoRedo) { return; }
+        clearTimeout(snapshotDebounceTimer);
+        snapshotDebounceTimer = setTimeout(function() {
+            snapshotDebounceTimer = null;
+            saveSnapshot();
+        }, SNAPSHOT_DEBOUNCE_MS);
+    }
+
     function undo() {
+        // デバウンス中のスナップショットをフラッシュ
+        if (snapshotDebounceTimer) {
+            clearTimeout(snapshotDebounceTimer);
+            snapshotDebounceTimer = null;
+            saveSnapshot();
+        }
         if (undoStack.length === 0) { return; }
-        // 現在の状態をredoに保存
-        redoStack.push(JSON.stringify(model.serialize()));
-        var snapshot = undoStack.pop();
         isUndoRedo = true;
+        var currentSnapshot = JSON.stringify(model.serialize());
+        // top が現在と同じならスキップ（実質的に変化がないため）
+        if (undoStack[undoStack.length - 1] === currentSnapshot) {
+            undoStack.pop();
+            if (undoStack.length === 0) {
+                isUndoRedo = false;
+                updateUndoRedoButtons();
+                return;
+            }
+        }
+        redoStack.push(currentSnapshot);
+        var snapshot = undoStack.pop();
         model = new OutlinerModel(JSON.parse(snapshot));
         searchEngine = new OutlinerSearch.SearchEngine(model);
         renderTree();
@@ -102,9 +157,19 @@ var Outliner = (function() {
 
     function redo() {
         if (redoStack.length === 0) { return; }
-        undoStack.push(JSON.stringify(model.serialize()));
-        var snapshot = redoStack.pop();
         isUndoRedo = true;
+        var currentSnapshot = JSON.stringify(model.serialize());
+        // top が現在と同じならスキップ
+        if (redoStack[redoStack.length - 1] === currentSnapshot) {
+            redoStack.pop();
+            if (redoStack.length === 0) {
+                isUndoRedo = false;
+                updateUndoRedoButtons();
+                return;
+            }
+        }
+        undoStack.push(currentSnapshot);
+        var snapshot = redoStack.pop();
         model = new OutlinerModel(JSON.parse(snapshot));
         searchEngine = new OutlinerSearch.SearchEngine(model);
         renderTree();
@@ -152,6 +217,7 @@ var Outliner = (function() {
         treeEl = document.querySelector('.outliner-tree');
         searchInput = document.querySelector('.outliner-search-input');
         breadcrumbEl = document.querySelector('.outliner-breadcrumb');
+        if (searchInput) { defaultSearchPlaceholder = searchInput.placeholder; }
         searchModeToggleBtn = document.querySelector('.outliner-search-mode-toggle');
         menuBtn = document.querySelector('.outliner-menu-btn');
         undoBtn = document.querySelector('.outliner-undo-btn');
@@ -191,8 +257,8 @@ var Outliner = (function() {
         setupHostMessages();
         initSidePanel();
 
-        // 初期スナップショット
-        saveSnapshot();
+        // 初期ベースライン（undoStackには入れない → ボタンdisabled）
+        saveBaseline();
 
         // D&D: treeEl全体のdragover/drop（空エリアへのドロップ対応）
         treeEl.addEventListener('dragover', function(e) {
@@ -646,6 +712,7 @@ var Outliner = (function() {
                 textEl.innerHTML = renderEditingText(plainText);
                 setCursorAtOffset(textEl, off);
             }
+            saveSnapshotDebounced();
             scheduleSyncToHost();
         });
 
@@ -698,6 +765,7 @@ var Outliner = (function() {
             // リアルタイムでモデル更新
             var raw = getSubtextPlainText(subtextEl);
             model.updateSubtext(node.id, raw);
+            saveSnapshotDebounced();
             scheduleSyncToHost();
         });
 
@@ -1164,6 +1232,58 @@ var Outliner = (function() {
         if (!internalClipboard) { return null; }
         if (internalClipboard.plainText !== clipText) { return null; }
         return internalClipboard;
+    }
+
+    /** 選択ノードデータからネストされた <ul>/<li> HTML を生成（clipboard text/html 用） */
+    function buildSelectedNodesHtml(nodesData) {
+        if (!nodesData || nodesData.length === 0) { return ''; }
+        var esc = function(s) {
+            return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        };
+        var html = '';
+        var prevLevel = -1;
+        for (var i = 0; i < nodesData.length; i++) {
+            var level = nodesData[i].level;
+            if (level > prevLevel) {
+                // ネスト深化: 新しい <ul> を開く
+                for (var j = prevLevel; j < level; j++) {
+                    html += '<ul>';
+                }
+            } else if (level < prevLevel) {
+                // ネスト浅化: 現在の </li> を閉じ、差分の </ul></li> を閉じる
+                html += '</li>';
+                for (var j = prevLevel; j > level; j--) {
+                    html += '</ul></li>';
+                }
+            } else if (i > 0) {
+                // 同レベル: 前の </li> を閉じる
+                html += '</li>';
+            }
+            html += '<li>' + esc(nodesData[i].text);
+            prevLevel = level;
+        }
+        // 残りのタグを閉じる
+        html += '</li>';
+        for (var j = prevLevel; j > 0; j--) {
+            html += '</ul></li>';
+        }
+        html += '</ul>';
+        return html;
+    }
+
+    /** クリップボードに text/plain + text/html を書き込む */
+    function writeClipboardWithHtml(plainText, nodesData) {
+        var htmlText = buildSelectedNodesHtml(nodesData);
+        try {
+            navigator.clipboard.write([
+                new ClipboardItem({
+                    'text/plain': new Blob([plainText], { type: 'text/plain' }),
+                    'text/html': new Blob([htmlText], { type: 'text/html' })
+                })
+            ]);
+        } catch (err) {
+            navigator.clipboard.writeText(plainText);
+        }
     }
 
     /** 選択中ノードを削除 */
@@ -1770,14 +1890,15 @@ var Outliner = (function() {
                     break;
                 case 'c':
                     if (selectedNodeIds.size > 0) {
-                        // 複数選択時はノードテキスト+ページメタデータをコピー
+                        // 複数選択時はノードテキスト+ページメタデータをコピー（text/html付き）
                         e.preventDefault();
                         var copyText = getSelectedText();
-                        navigator.clipboard.writeText(copyText);
+                        var copyNodesData = getSelectedNodesData();
+                        writeClipboardWithHtml(copyText, copyNodesData);
                         internalClipboard = {
                             plainText: copyText,
                             isCut: false,
-                            nodes: getSelectedNodesData()
+                            nodes: copyNodesData
                         };
                     } else {
                         // 単一ノード: テキスト選択があればブラウザデフォルト、
@@ -1792,14 +1913,15 @@ var Outliner = (function() {
                     break;
                 case 'x':
                     if (selectedNodeIds.size > 0) {
-                        // 複数選択時はカット（ページメタデータ付き）
+                        // 複数選択時はカット（ページメタデータ付き、text/html付き）
                         e.preventDefault();
                         var cutText = getSelectedText();
-                        navigator.clipboard.writeText(cutText);
+                        var cutNodesData = getSelectedNodesData();
+                        writeClipboardWithHtml(cutText, cutNodesData);
                         internalClipboard = {
                             plainText: cutText,
                             isCut: true,
-                            nodes: getSelectedNodesData()
+                            nodes: cutNodesData
                         };
                         deleteSelectedNodes();
                     } else {
@@ -2705,11 +2827,22 @@ var Outliner = (function() {
         if (navForwardBtn) { navForwardBtn.disabled = (navForwardStack.length === 0); }
     }
 
+    var defaultSearchPlaceholder = '';
+    function updateScopeSearchIndicator() {
+        if (!searchInput) { return; }
+        if (currentScope.type === 'subtree') {
+            searchInput.placeholder = i18n.outlinerSearchInScope || 'Search in scope';
+        } else {
+            searchInput.placeholder = defaultSearchPlaceholder;
+        }
+    }
+
     function setScope(scope) {
         pushNavState();
         var previousRootId = (currentScope.type === 'subtree') ? currentScope.rootId : null;
         currentScope = scope;
         updateBreadcrumb();
+        updateScopeSearchIndicator();
         if (searchInput.value.trim()) { executeSearch(); }
         renderTree();
         // scope out時は直前のscopeノードにカーソルを移動
@@ -3440,9 +3573,6 @@ var Outliner = (function() {
         // isDailyNotes は変更しない（外部変更はファイル切替ではない）
         // currentScope も変更しない（スコープ保持）
 
-        undoStack.length = 0;
-        redoStack.length = 0;
-        updateUndoRedoButtons();
         updatePinnedTagBar();
 
         if (pageTitleInput && document.activeElement !== pageTitleInput) {
@@ -3457,6 +3587,8 @@ var Outliner = (function() {
         if (savedFocus && model.getNode(savedFocus)) {
             setFocusedNode(savedFocus);
         }
+        // 初期ベースライン（undoStackには入れない → ボタンdisabled）
+        saveBaseline();
     }
 
     function applyQueuedExternalUpdate() {
@@ -3700,9 +3832,6 @@ var Outliner = (function() {
                         pageDir = msg.data.pageDir || null;
                         sidePanelWidthSetting = msg.data.sidePanelWidth || null;
                         pinnedTags = msg.data.pinnedTags || [];
-                        undoStack.length = 0;
-                        redoStack.length = 0;
-                        updateUndoRedoButtons();
                         isDailyNotes = !!msg.isDailyNotes;
                         updatePinnedTagBar();
                         // Notes ファイル切替: 検索・スコープを全リセット
@@ -3755,6 +3884,9 @@ var Outliner = (function() {
                                 jumpToAndHighlightNode(msg.jumpToNodeId);
                             }, 100);
                         }
+                        // 新データの初期スナップショット（undo用ベースライン）
+                        saveSnapshot();
+                        updateScopeSearchIndicator();
                         break;
                     }
 
@@ -3855,11 +3987,15 @@ var Outliner = (function() {
             if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
                 // ノード内keydownで処理済みの場合はスキップ
                 if (document.activeElement && document.activeElement.classList.contains('outliner-text')) { return; }
+                // editor.js capture handler で sidepanel markdown の undo が処理済みならスキップ
+                if (e.defaultPrevented) { return; }
                 e.preventDefault();
                 undo();
             }
             if ((e.metaKey || e.ctrlKey) && ((e.key === 'z' && e.shiftKey) || e.key === 'y')) {
                 if (document.activeElement && document.activeElement.classList.contains('outliner-text')) { return; }
+                // editor.js capture handler で sidepanel markdown の redo が処理済みならスキップ
+                if (e.defaultPrevented) { return; }
                 e.preventDefault();
                 redo();
             }

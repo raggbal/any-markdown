@@ -141,6 +141,7 @@ const html = `<!DOCTYPE html>
         <div class="outliner-page-title" style="display:none">
             <input type="text" class="outliner-page-title-input" placeholder="Untitled" />
         </div>
+        <div class="outliner-scope-search-indicator" style="display:none"><span class="outliner-scope-search-tag"></span></div>
         <div class="outliner-search-bar">
             <button class="outliner-nav-back-btn" title="Back" disabled></button>
             <button class="outliner-nav-forward-btn" title="Forward" disabled></button>

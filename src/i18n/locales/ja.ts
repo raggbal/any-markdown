@@ -112,6 +112,7 @@ export const webviewMessages = {
   outlinerFocusMode: 'フォーカスモード: マッチノード＋子のみ',
   outlinerTreeMode: 'ツリーモード: ルートまで表示',
   outlinerScope: 'スコープ',
+  outlinerSearchInScope: 'スコープ内を検索',
   outlinerClearScope: 'スコープ解除',
   outlinerTop: 'TOP',
   outlinerRemovePage: 'ページ解除',

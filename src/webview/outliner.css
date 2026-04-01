@@ -224,6 +224,22 @@ body {
     background: var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.1));
 }
 
+/* --- Scope search indicator --- */
+.outliner-scope-search-indicator {
+    padding: 2px 8px 0;
+    flex-shrink: 0;
+}
+.outliner-scope-search-tag {
+    font-size: 11px;
+    padding: 1px 8px;
+    border-radius: 10px;
+    background: var(--outliner-accent-fg, #007aff);
+    color: #fff;
+    opacity: 0.7;
+    white-space: nowrap;
+    display: inline-block;
+}
+
 /* --- Breadcrumb --- */
 .outliner-breadcrumb {
     display: none;

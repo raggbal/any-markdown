@@ -104,6 +104,7 @@ export const webviewMessages = {
   outlinerFocusMode: 'Mode focus : nœud + enfants',
   outlinerTreeMode: 'Mode arbre : afficher jusqu\'à la racine',
   outlinerScope: 'Portée',
+  outlinerSearchInScope: 'Recherche dans la portée',
   outlinerClearScope: 'Effacer la portée',
   outlinerTop: 'TOP',
   outlinerRemovePage: 'Supprimer la page',

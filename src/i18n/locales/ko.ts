@@ -104,6 +104,7 @@ export const webviewMessages = {
   outlinerFocusMode: '포커스 모드: 일치 노드 + 하위만',
   outlinerTreeMode: '트리 모드: 루트까지 표시',
   outlinerScope: '범위 지정',
+  outlinerSearchInScope: '범위 내 검색',
   outlinerClearScope: '범위 해제',
   outlinerTop: 'TOP',
   outlinerRemovePage: '페이지 제거',

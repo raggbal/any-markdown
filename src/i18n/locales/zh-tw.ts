@@ -104,6 +104,7 @@ export const webviewMessages = {
   outlinerFocusMode: '聚焦模式：匹配節點+子節點',
   outlinerTreeMode: '樹狀模式：顯示到根節點',
   outlinerScope: '範圍',
+  outlinerSearchInScope: '在範圍內搜尋',
   outlinerClearScope: '清除範圍',
   outlinerTop: 'TOP',
   outlinerRemovePage: '移除頁面',

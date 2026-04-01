@@ -112,6 +112,7 @@ export const webviewMessages = {
   outlinerFocusMode: 'Focus mode: matched node + children only',
   outlinerTreeMode: 'Tree mode: show ancestors to root',
   outlinerScope: 'Scope',
+  outlinerSearchInScope: 'Search in scope',
   outlinerClearScope: 'Clear Scope',
   outlinerTop: 'TOP',
   outlinerRemovePage: 'Remove Page',

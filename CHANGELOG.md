@@ -5,6 +5,18 @@ All notable changes to the "Fractal" extension extension will be documented in t
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.195.566] - 2026-04-01
+
+### Fixed
+
+- **Outliner: Undo/Redo根本修正** — ファイル切替後にundo/redoが効かない、テキスト入力でundoスナップショットが作られない、初期状態でundoボタンがactiveになる等の複数バグを修正
+- **Notes: Sidepanel Markdown編集中のUndo分離** — sidepanel markdown編集中にCmd+Zを押してもoutliner側のundoが発火しないよう修正
+
+### Added
+
+- **Outliner: Scope検索インジケーター** — scope in中に検索ボックスのplaceholderが「Search in scope」に変わり、スコープ内検索であることを明示
+- **Outliner: コピー時HTML形式対応** — 複数ノード選択してCmd+Cした内容をsidepanel markdownにCmd+Vすると、階層構造を保ったMarkdownリストとして貼り付け可能
+
 ## [0.195.563] - 2026-03-31
 
 ### Fixed
