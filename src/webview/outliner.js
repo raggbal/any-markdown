@@ -1109,11 +1109,25 @@ var Outliner = (function() {
         // 取り消し線
         html = html.replace(/~~([^~]+)~~/g, '<del>$1</del>');
 
-        // リンク
-        html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" title="$2">$1</a>');
+        // リンク — Markdownリンクと生URLを一時退避してからタグ変換（URL内の@をタグ化しない）
+        var linkPlaceholders = [];
+        // まずMarkdownリンク [text](url) を退避
+        html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, function(match, text, url) {
+            var aTag = '<a href="' + url + '" title="' + url + '">' + text + '</a>';
+            linkPlaceholders.push(aTag);
+            return '\x00LINK' + (linkPlaceholders.length - 1) + '\x00';
+        });
+        // 次に生URL (https://...) も退避
+        html = html.replace(/https?:\/\/\S+/g, function(match) {
+            linkPlaceholders.push(match);
+            return '\x00LINK' + (linkPlaceholders.length - 1) + '\x00';
+        });
 
         // タグ (#tag / @tag) — \w では日本語にマッチしないため Unicode プロパティを使用
         html = html.replace(/(?<![&#\w\p{L}])([#@][\w\p{L}][\w\p{L}-]*)/gu, '<span class="outliner-tag">$1</span>');
+        html = html.replace(/\x00LINK(\d+)\x00/g, function(_, idx) {
+            return linkPlaceholders[parseInt(idx, 10)];
+        });
 
         // 末尾スペースをNBSPに変換 (contenteditableで末尾空白が描画されない問題を回避)
         html = html.replace(/ $/, '\u00A0');
@@ -1146,7 +1160,16 @@ var Outliner = (function() {
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;');
         // タグのみハイライト (テキスト内容を変えないのでオフセットに影響なし)
+        // URL内の@をタグ化しないよう、URLを一時退避してからタグ変換
+        var urlPlaceholders = [];
+        html = html.replace(/https?:\/\/\S+/g, function(match) {
+            urlPlaceholders.push(match);
+            return '\x00URL' + (urlPlaceholders.length - 1) + '\x00';
+        });
         html = html.replace(/(?<![&#\w\p{L}])([#@][\w\p{L}][\w\p{L}-]*)/gu, '<span class="outliner-tag">$1</span>');
+        html = html.replace(/\x00URL(\d+)\x00/g, function(_, idx) {
+            return urlPlaceholders[parseInt(idx, 10)];
+        });
         // 末尾スペースをNBSPに変換
         html = html.replace(/ $/, '\u00A0');
         return html;

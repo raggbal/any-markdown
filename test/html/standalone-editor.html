@@ -565,6 +565,12 @@ body {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     min-width: 350px;
 }
+/* サイドパネル内ではabsoluteに切替（fixedだとビューポート基準でパネル外に表示される） */
+.side-panel-editor-root .search-replace-box {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+}
 .search-replace-box .search-row,
 .search-replace-box .replace-row {
     display: flex;

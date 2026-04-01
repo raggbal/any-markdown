@@ -447,6 +447,12 @@ body {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     min-width: 350px;
 }
+/* サイドパネル内: 検索ボックスはeditor-wrapperの外に配置済みなのでabsoluteで固定 */
+.side-panel-editor-root .search-replace-box {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+}
 .search-replace-box .search-row,
 .search-replace-box .replace-row {
     display: flex;
@@ -1403,6 +1409,7 @@ body {
     display: flex;
     flex-direction: column;
     height: 100%;
+    position: relative;
 }
 /* Overlay behind side panel to darken main editor */
 .side-panel-overlay {

@@ -34,6 +34,8 @@ var OutlinerModel = (function() {
         var tags = [];
         // インラインコード内のタグは除外
         var cleaned = text.replace(/`[^`]*`/g, '');
+        // URL内のタグは除外（https://example.com/@user 等）
+        cleaned = cleaned.replace(/https?:\/\/\S+/g, '');
         var regex = /(?<![&#\w\p{L}])([#@][\w\p{L}][\w\p{L}-]*)/gu;
         var match;
         while ((match = regex.exec(cleaned)) !== null) {

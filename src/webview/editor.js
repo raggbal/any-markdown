@@ -170,13 +170,27 @@ class EditorInstance {
                 </div>
                 <button class="toolbar-scroll-btn toolbar-scroll-btn--right hidden">&#x276F;</button>
             </div>
-            <div class="editor-wrapper">
-                <div class="search-replace-box" style="display:none">
-                    <input class="search-input" type="text"><input class="replace-input" type="text"><span class="search-count"></span>
-                    <button class="search-prev"></button><button class="search-next"></button><button class="toggle-replace"></button><button class="close-search"></button>
-                    <div class="replace-row"><button class="replace-one"></button><button class="replace-all"></button></div>
-                    <input class="search-case-sensitive" type="checkbox"><input class="search-whole-word" type="checkbox"><input class="search-regex" type="checkbox">
+            <div class="search-replace-box" style="display:none">
+                <div class="search-row">
+                    <input type="text" class="search-input" placeholder="Search..." />
+                    <span class="search-count">0/0</span>
+                    <button class="search-prev" title="Previous">&#9650;</button>
+                    <button class="search-next" title="Next">&#9660;</button>
+                    <button class="toggle-replace" title="Toggle Replace">&#8693;</button>
+                    <button class="close-search" title="Close">&#10005;</button>
                 </div>
+                <div class="replace-row" style="display: none;">
+                    <input type="text" class="replace-input" placeholder="Replace..." />
+                    <button class="replace-one" title="Replace">Replace</button>
+                    <button class="replace-all" title="Replace All">All</button>
+                </div>
+                <div class="search-options">
+                    <label><input type="checkbox" class="search-case-sensitive" /> Aa</label>
+                    <label><input type="checkbox" class="search-whole-word" /> Ab|</label>
+                    <label><input type="checkbox" class="search-regex" /> .*</label>
+                </div>
+            </div>
+            <div class="editor-wrapper">
                 <div class="editor" contenteditable="true" spellcheck="true"></div>
                 <textarea class="source-editor" style="display:none"></textarea>
             </div>
