@@ -289,29 +289,75 @@
     }
 
     // ===== Normalize multi-line table cells =====
-    // When pasting markdown tables where cell content contains raw newlines,
-    // the line-by-line parser cannot recognize table rows.
-    // This function joins broken rows by replacing newlines with <br>.
+    // Handles two cases of malformed table markdown:
+    // 1. Flattened tables: entire table on one line with | <br> | as row separators
+    // 2. Broken rows: cell content contains raw newlines splitting a row across lines
     function normalizeMultiLineTableCells(text) {
+        // Step 1: De-flatten tables where | <br> | is used as row separator
+        // (e.g., Notion exports flatten all rows into one line)
+        // Match | followed by only <br> content, followed by | (lookahead)
+        text = text.replace(/\|\s*<br>\s*(?=\|)/gi, '|\n');
+
+        // Step 2: Remove orphaned separator rows created by de-flattening
+        // After de-flatten, the source may have an extra separator row with wrong column count
         var lines = text.split('\n');
         var result = [];
-        var i = 0;
+        var separatorSeen = false;
+        var inTable = false;
 
-        while (i < lines.length) {
-            var trimmed = lines[i].trimEnd();
+        for (var i = 0; i < lines.length; i++) {
+            var trimmed = lines[i].trim();
+            var isTableRow = trimmed.charAt(0) === '|' && trimmed.charAt(trimmed.length - 1) === '|' && trimmed.length > 2;
 
-            // A line starting with | but not ending with | is a broken table row
-            if (trimmed.length > 1 && trimmed.charAt(0) === '|' && trimmed.charAt(trimmed.length - 1) !== '|') {
-                var combined = trimmed;
-                var j = i + 1;
+            if (isTableRow) {
+                // Check if this is a separator row (all cells are ---)
+                var isSep = false;
+                var inner = trimmed.slice(1, -1);
+                var cells = inner.split('|');
+                if (cells.length > 0) {
+                    isSep = true;
+                    for (var c = 0; c < cells.length; c++) {
+                        if (!/^\s*:?-+:?\s*$/.test(cells[c])) {
+                            isSep = false;
+                            break;
+                        }
+                    }
+                }
+
+                if (isSep) {
+                    if (separatorSeen && inTable) {
+                        // Duplicate separator in same table block - skip
+                        continue;
+                    }
+                    separatorSeen = true;
+                }
+                inTable = true;
+            } else {
+                inTable = false;
+                separatorSeen = false;
+            }
+
+            result.push(lines[i]);
+        }
+
+        // Step 3: Join broken table rows (lines starting with | but not ending with |)
+        lines = result;
+        result = [];
+        var i2 = 0;
+
+        while (i2 < lines.length) {
+            var trimmed2 = lines[i2].trimEnd();
+
+            if (trimmed2.length > 1 && trimmed2.charAt(0) === '|' && trimmed2.charAt(trimmed2.length - 1) !== '|') {
+                var combined = trimmed2;
+                var j = i2 + 1;
                 var found = false;
-                var maxJoin = 50; // safety limit
+                var maxJoin = 50;
 
-                while (j < lines.length && (j - i) <= maxJoin) {
+                while (j < lines.length && (j - i2) <= maxJoin) {
                     var nextTrimmed = lines[j].trimEnd();
 
                     if (nextTrimmed === '') {
-                        // Blank line within cell content
                         combined += '<br>';
                         j++;
                         continue;
@@ -327,18 +373,16 @@
                 }
 
                 if (found) {
-                    // Collapse multiple consecutive <br> into single
                     combined = combined.replace(/(<br>)+/g, '<br>');
                     result.push(combined);
-                    i = j;
+                    i2 = j;
                 } else {
-                    // Could not complete the row, output original line
-                    result.push(lines[i]);
-                    i++;
+                    result.push(lines[i2]);
+                    i2++;
                 }
             } else {
-                result.push(lines[i]);
-                i++;
+                result.push(lines[i2]);
+                i2++;
             }
         }
 

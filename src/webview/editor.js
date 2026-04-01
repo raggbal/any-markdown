@@ -14542,10 +14542,20 @@ class EditorInstance {
         let pastedMd = '';
         
         // Priority: internal markdown > external HTML > plain text
+        // Exception: If plain text looks like a markdown table and HTML has no <table>,
+        // prefer plain text (Turndown mangles markdown tables from <p>-wrapped HTML)
+        const textLooksLikeMarkdownTable = text && /\|\s*---/.test(text) && (text.match(/^\s*\|/gm) || []).length >= 2;
+        const htmlHasTable = html && /<table[\s>]/i.test(html);
+
         if (internalMd) {
             // Internal copy - use the markdown directly (same format as htmlToMarkdown)
             pastedMd = internalMd;
             logger.log('Using internal markdown');
+        } else if (textLooksLikeMarkdownTable && !htmlHasTable) {
+            // Plain text contains a markdown table but HTML has no <table> element
+            // Use plain text directly (Turndown would break table structure with double newlines)
+            pastedMd = text;
+            logger.log('Using plain text for markdown table (bypassing Turndown)');
         } else if (html && typeof TurndownService !== 'undefined') {
             // External HTML - convert via Turndown
             try {
@@ -14748,8 +14758,6 @@ class EditorInstance {
             }
         } else {
             pastedMd = text || '';
-            // Normalize table rows with embedded newlines (cell content containing raw newlines)
-            pastedMd = window.__editorUtils.normalizeMultiLineTableCells(pastedMd);
             logger.log('Using plain text');
         }
 
@@ -14757,7 +14765,11 @@ class EditorInstance {
             logger.log('No content to paste');
             return;
         }
-        
+
+        // Normalize table rows with embedded newlines (cell content containing raw newlines)
+        // Applied to all paste sources (internal, Turndown, plain text)
+        pastedMd = window.__editorUtils.normalizeMultiLineTableCells(pastedMd);
+
         logger.log('Pasted markdown (raw):', pastedMd.substring(0, 100));
         
         // Check if cursor is inside a list item (for special handling)
