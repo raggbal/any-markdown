@@ -135,7 +135,13 @@ const testNotesHostBridge = `
             window.__testApi.messages.push({ type: 'showConfirm', id: id, message: message });
         },
         onMessage: function(handler) {
-            window.__hostMessageHandler = handler;
+            // updateData受信時にcurrentFileChangeIdを自動更新（本番のnotes-host-bridge.jsと同等）
+            window.__hostMessageHandler = function(msg) {
+                if (msg && msg.type === 'updateData' && msg.fileChangeId !== undefined) {
+                    currentFileChangeId = msg.fileChangeId;
+                }
+                handler(msg);
+            };
         }
     });
 

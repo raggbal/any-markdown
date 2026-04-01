@@ -13,6 +13,7 @@ export default defineConfig({
         baseURL: 'http://localhost:3000',
         trace: 'on-first-retry',
         headless: true,
+        permissions: ['clipboard-read', 'clipboard-write'],
     },
 
     projects: [

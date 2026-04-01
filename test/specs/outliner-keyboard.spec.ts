@@ -41,7 +41,7 @@ async function focusNode(page: import('@playwright/test').Page, nth: number) {
 async function focusById(page: import('@playwright/test').Page, id: string, offset: number = -1) {
     const textEl = page.locator('.outliner-node[data-id="' + id + '"] .outliner-text');
     await textEl.click();
-    await page.waitForTimeout(100);
+    await page.waitForTimeout(200);
     await page.evaluate(({ id, offset }) => {
         const nodeEl = document.querySelector('.outliner-node[data-id="' + id + '"]');
         if (!nodeEl) return;
@@ -339,7 +339,7 @@ test.describe('Outliner Keyboard Operations', () => {
     // Backspace key
     // -----------------------------------------------------------------------
 
-    test.describe('Backspace key', () => {
+    test.describe.serial('Backspace key', () => {
 
         test('7. Backspace at start of empty node without children deletes it, focuses previous', async ({ page }) => {
             await init(page, twoNodes('first', ''));
@@ -391,7 +391,7 @@ test.describe('Outliner Keyboard Operations', () => {
     // Tab (Indent)
     // -----------------------------------------------------------------------
 
-    test.describe('Tab (Indent)', () => {
+    test.describe.serial('Tab (Indent)', () => {
 
         test('11. Tab indents node under previous sibling', async ({ page }) => {
             await init(page, twoNodes('alpha', 'beta'));
@@ -418,7 +418,7 @@ test.describe('Outliner Keyboard Operations', () => {
     // Shift+Tab (Outdent)
     // -----------------------------------------------------------------------
 
-    test.describe('Shift+Tab (Outdent)', () => {
+    test.describe.serial('Shift+Tab (Outdent)', () => {
 
         test('13. Shift+Tab outdents nested node to parent level', async ({ page }) => {
             await init(page, parentChild('parent', 'child'));
@@ -530,7 +530,7 @@ test.describe('Outliner Keyboard Operations', () => {
     // Ctrl+Shift+Up/Down (Move node)
     // -----------------------------------------------------------------------
 
-    test.describe('Ctrl+Shift+Up/Down (Move node)', () => {
+    test.describe.serial('Ctrl+Shift+Up/Down (Move node)', () => {
 
         test('21. Meta+Shift+ArrowUp moves node up among siblings', async ({ page }) => {
             await init(page, threeNodes('one', 'two', 'three'));
@@ -873,7 +873,7 @@ test.describe('Outliner Keyboard Operations', () => {
     // Additional edge cases
     // -----------------------------------------------------------------------
 
-    test.describe('Additional edge cases', () => {
+    test.describe.serial('Additional edge cases', () => {
 
         test('ArrowDown navigates into nested children', async ({ page }) => {
             await init(page, parentChild('parent', 'child'));

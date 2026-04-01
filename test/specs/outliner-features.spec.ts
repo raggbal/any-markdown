@@ -90,7 +90,7 @@ test.describe('折りたたみ/展開', () => {
 
         // 折りたたみ後、子要素の高さが0
         const childrenHeight = await page.evaluate(() => {
-            const children = document.querySelector('.outliner-node[data-id="p1"] > .outliner-children');
+            const children = document.querySelector('.outliner-children[data-parent="p1"]');
             if (!children) return -1;
             return children.getBoundingClientRect().height;
         });
@@ -111,7 +111,7 @@ test.describe('折りたたみ/展開', () => {
         await page.waitForTimeout(300);
 
         const childrenHeight = await page.evaluate(() => {
-            const children = document.querySelector('.outliner-node[data-id="p1"] > .outliner-children');
+            const children = document.querySelector('.outliner-children[data-parent="p1"]');
             if (!children) return 0;
             return children.getBoundingClientRect().height;
         });
@@ -127,7 +127,8 @@ test.describe('折りたたみ/展開', () => {
 
         // 折りたたみ後、バレットに子の数が表示される
         const bulletText = await page.evaluate(() => {
-            const bulletEl = document.querySelector('.outliner-node[data-id="p1"] > .outliner-bullet');
+            const nodeEl = document.querySelector('.outliner-node[data-id="p1"]');
+            const bulletEl = nodeEl ? nodeEl.querySelector('.outliner-bullet') : null;
             return bulletEl ? bulletEl.textContent?.trim() : '';
         });
         expect(bulletText).toContain('2');
@@ -236,13 +237,13 @@ test.describe('Undo/Redo', () => {
         await page.evaluate(() => {
             (window as any).__hostMessageHandler({
                 type: 'updateData',
-                content: JSON.stringify({
+                data: {
                     version: 1,
                     rootIds: ['n2'],
                     nodes: {
                         n2: { id: 'n2', parentId: null, children: [], text: 'File B', tags: [] }
                     }
-                }),
+                },
                 fileChangeId: 42
             });
         });
@@ -635,13 +636,13 @@ test.describe('外部変更検知', () => {
         await page.evaluate(() => {
             (window as any).__hostMessageHandler({
                 type: 'updateData',
-                content: JSON.stringify({
+                data: {
                     version: 1,
                     rootIds: ['n1'],
                     nodes: {
                         n1: { id: 'n1', parentId: null, children: [], text: 'After external', tags: [] }
                     }
-                })
+                }
             });
         });
         await page.waitForTimeout(300);
@@ -670,13 +671,13 @@ test.describe('外部変更検知', () => {
         await page.evaluate(() => {
             (window as any).__hostMessageHandler({
                 type: 'updateData',
-                content: JSON.stringify({
+                data: {
                     version: 1,
                     rootIds: ['n1'],
                     nodes: {
                         n1: { id: 'n1', parentId: null, children: [], text: 'External update', tags: [] }
                     }
-                })
+                }
             });
         });
 
@@ -697,8 +698,10 @@ test.describe('外部変更検知', () => {
 // ===========================================================================
 
 test.describe('Daily Notes ナビバー', () => {
+    // Daily Notesナビバーは notesWebviewContent.ts にのみ存在するため standalone-notes.html を使用
     test.beforeEach(async ({ page }) => {
-        await setup(page);
+        await page.goto('/standalone-notes.html');
+        await page.waitForFunction(() => (window as any).__testApi?.ready);
     });
 
     test('24. isDailyNotes=true のupdateData → ナビバー表示', async ({ page }) => {
@@ -714,13 +717,13 @@ test.describe('Daily Notes ナビバー', () => {
         await page.evaluate(() => {
             (window as any).__hostMessageHandler({
                 type: 'updateData',
-                content: JSON.stringify({
+                data: {
                     version: 1,
                     rootIds: ['n1'],
                     nodes: {
                         n1: { id: 'n1', parentId: null, children: [], text: '2026-03-31 Today', tags: [] }
                     }
-                }),
+                },
                 isDailyNotes: true,
                 fileChangeId: 1
             });
@@ -728,7 +731,7 @@ test.describe('Daily Notes ナビバー', () => {
         await page.waitForTimeout(300);
 
         // Daily Notesナビバーが表示される
-        const navBar = page.locator('.outliner-daily-nav');
+        const navBar = page.locator('.outliner-daily-nav-area');
         const isVisible = await navBar.isVisible();
         expect(isVisible).toBe(true);
     });
@@ -746,20 +749,20 @@ test.describe('Daily Notes ナビバー', () => {
         await page.evaluate(() => {
             (window as any).__hostMessageHandler({
                 type: 'updateData',
-                content: JSON.stringify({
+                data: {
                     version: 1,
                     rootIds: ['n1'],
                     nodes: {
                         n1: { id: 'n1', parentId: null, children: [], text: 'Regular note', tags: [] }
                     }
-                }),
+                },
                 isDailyNotes: false,
                 fileChangeId: 2
             });
         });
         await page.waitForTimeout(300);
 
-        const navBar = page.locator('.outliner-daily-nav');
+        const navBar = page.locator('.outliner-daily-nav-area');
         const count = await navBar.count();
         if (count > 0) {
             const isVisible = await navBar.isVisible();

@@ -23,7 +23,7 @@ async function init(page: import('@playwright/test').Page, data: any) {
 async function focusNode(page: import('@playwright/test').Page, nth: number) {
     const el = page.locator('.outliner-text').nth(nth);
     await el.click();
-    await page.waitForTimeout(100);
+    await page.waitForTimeout(200);
 }
 
 async function nodeCount(page: import('@playwright/test').Page): Promise<number> {
@@ -143,7 +143,7 @@ test.describe('OutlinerModel', () => {
     // CRUD操作（ノード追加・削除・更新）
     // =======================================================================
 
-    test.describe('CRUD操作', () => {
+    test.describe.serial('CRUD操作', () => {
 
         test('1. 空データで初期化→ノード追加→ノードが表示される', async ({ page }) => {
             // 空データで初期化（デフォルトの空ノード1つが作られる）
@@ -202,7 +202,7 @@ test.describe('OutlinerModel', () => {
     // ツリー操作（indent/outdent/move）
     // =======================================================================
 
-    test.describe('ツリー操作', () => {
+    test.describe.serial('ツリー操作', () => {
 
         test('5. Tab→前の兄弟の子に移動（indent）', async ({ page }) => {
             await init(page, twoNodes('parent', 'child'));

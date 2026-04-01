@@ -3284,7 +3284,13 @@ window.__createSidePanelBridgeMethods = function(postFn) {
             window.__testApi.messages.push({ type: 'showConfirm', id: id, message: message });
         },
         onMessage: function(handler) {
-            window.__hostMessageHandler = handler;
+            // updateData受信時にcurrentFileChangeIdを自動更新（本番のnotes-host-bridge.jsと同等）
+            window.__hostMessageHandler = function(msg) {
+                if (msg && msg.type === 'updateData' && msg.fileChangeId !== undefined) {
+                    currentFileChangeId = msg.fileChangeId;
+                }
+                handler(msg);
+            };
         }
     });
 
@@ -20269,10 +20275,11 @@ var Outliner = (function() {
         var snapshot = JSON.stringify(model.serialize());
         // 前回と同じなら保存しない
         if (undoStack.length > 0 && undoStack[undoStack.length - 1] === snapshot) { return; }
-        // baselineSnapshot と同じなら保存しない（初期状態から変化なし）
-        if (undoStack.length === 0 && baselineSnapshot === snapshot) { return; }
         // 最初の編集: baseline を undoStack に入れてから現在の状態を積む
-        if (undoStack.length === 0 && baselineSnapshot && baselineSnapshot !== snapshot) {
+        // （baseline と同じ場合でも push する — Enter等の構造変更ハンドラは
+        //   モデル変更前に saveSnapshot() を呼ぶため、この時点では baseline と同じ。
+        //   push しないと Undo 先がなくなる）
+        if (undoStack.length === 0 && baselineSnapshot) {
             undoStack.push(baselineSnapshot);
         }
         undoStack.push(snapshot);
@@ -22637,8 +22644,19 @@ var Outliner = (function() {
         if (bulletEl) {
             if (node.collapsed) {
                 bulletEl.dataset.collapsed = 'true';
+                // 子の数を表示
+                var existingCount = bulletEl.querySelector('.outliner-child-count');
+                if (!existingCount && node.children.length > 0) {
+                    var countEl = document.createElement('span');
+                    countEl.className = 'outliner-child-count';
+                    countEl.textContent = String(node.children.length);
+                    bulletEl.appendChild(countEl);
+                }
             } else {
                 delete bulletEl.dataset.collapsed;
+                // 子の数を非表示
+                var countEl = bulletEl.querySelector('.outliner-child-count');
+                if (countEl) { countEl.remove(); }
             }
         }
 

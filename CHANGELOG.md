@@ -5,6 +5,12 @@ All notable changes to the "Fractal" extension extension will be documented in t
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.195.571] - 2026-04-02
+
+### Added
+
+- **Markdown: セル内改行テーブルのペースト対応** — セル内に生の改行を含むMarkdownテーブルをペーストした際、自動的に改行を`<br>`に変換してテーブルとして正しく表示
+
 ## [0.195.570] - 2026-04-01
 
 ### Fixed
