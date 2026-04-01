@@ -75,6 +75,9 @@
         copyFilePath: function() {
             api.postMessage({ type: 'copyFilePath' });
         },
+        copyPagePaths: function(pageIds) {
+            api.postMessage({ type: 'copyPagePaths', pageIds: pageIds });
+        },
 
         postDailyNotes: function(type, dayOffset, currentDate) {
             if (window.Outliner && window.Outliner.flushSync) {

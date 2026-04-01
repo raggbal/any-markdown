@@ -48,6 +48,8 @@ export interface NotesPlatformActions {
     openInTextEditor?(): void;
     /** .outファイルパスをクリップボードにコピー */
     copyFilePath?(): void;
+    /** ページファイルパスをクリップボードにコピー */
+    copyPagePaths?(paths: string[]): void;
     /** 外部エディタでファイルを開く */
     openFileExternal?(filePath: string): void;
     /** 最後に開いたファイルを記録 */
@@ -118,6 +120,17 @@ export function handleNotesMessage(
         case 'copyFilePath':
             platform.copyFilePath?.();
             break;
+
+        case 'copyPagePaths': {
+            const pageIds: string[] = message.pageIds || [];
+            const paths = pageIds
+                .map((pid: string) => fileManager.getPageFilePath(pid))
+                .filter((p: string) => fs.existsSync(p));
+            if (paths.length > 0) {
+                platform.copyPagePaths?.(paths);
+            }
+            break;
+        }
 
         // ── Page Operations ──
 

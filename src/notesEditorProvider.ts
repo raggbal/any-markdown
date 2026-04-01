@@ -174,6 +174,9 @@ export class NotesEditorProvider {
                     vscode.env.clipboard.writeText(fp);
                 }
             },
+            copyPagePaths: (paths: string[]) => {
+                vscode.env.clipboard.writeText(paths.join('\n'));
+            },
             requestInsertImage: async (sidePanelFilePath: string) => {
                 const pagesDir = fileManager.getPagesDirPath();
                 const imagesDir = path.join(pagesDir, 'images');

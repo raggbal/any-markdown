@@ -126,6 +126,9 @@ const testNotesHostBridge = `
         copyFilePath: function() {
             window.__testApi.messages.push({ type: 'copyFilePath' });
         },
+        copyPagePaths: function(pageIds) {
+            window.__testApi.messages.push({ type: 'copyPagePaths', pageIds: pageIds });
+        },
         createPageAtPath: function() {},
         createPageAuto: function() {},
         updatePageH1: function() {},

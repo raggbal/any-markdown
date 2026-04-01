@@ -110,6 +110,7 @@ export const webviewMessages = {
   outlinerRemovePage: '페이지 제거',
   outlinerDeletePage: '페이지 삭제',
   outlinerOpenPage: '페이지 열기',
+  outlinerCopyPagePath: '페이지 경로 복사',
   outlinerMakePage: '페이지 만들기',
   outlinerAddSibling: '형제 노드 추가',
   outlinerAddChild: '자식 노드 추가',

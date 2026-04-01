@@ -110,6 +110,7 @@ export const webviewMessages = {
   outlinerRemovePage: '移除页面',
   outlinerDeletePage: '删除页面',
   outlinerOpenPage: '打开页面',
+  outlinerCopyPagePath: '复制页面路径',
   outlinerMakePage: '创建页面',
   outlinerAddSibling: '添加兄弟节点',
   outlinerAddChild: '添加子节点',

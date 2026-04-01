@@ -143,6 +143,17 @@ export class OutlinerProvider implements vscode.CustomTextEditorProvider {
                         await vscode.env.clipboard.writeText(document.uri.fsPath);
                         break;
 
+                    case 'copyPagePaths': {
+                        const pageIds: string[] = message.pageIds || [];
+                        const paths = pageIds
+                            .map((pid: string) => this.getPageFilePath(document, pid))
+                            .filter((p: string) => fs.existsSync(p));
+                        if (paths.length > 0) {
+                            await vscode.env.clipboard.writeText(paths.join('\n'));
+                        }
+                        break;
+                    }
+
                     case 'importMdFilesDialog': {
                         const options: vscode.OpenDialogOptions = {
                             canSelectMany: true,

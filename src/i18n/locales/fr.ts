@@ -110,6 +110,7 @@ export const webviewMessages = {
   outlinerRemovePage: 'Supprimer la page',
   outlinerDeletePage: 'Supprimer la page',
   outlinerOpenPage: 'Ouvrir la page',
+  outlinerCopyPagePath: 'Copier le chemin de la page',
   outlinerMakePage: 'Créer une page',
   outlinerAddSibling: 'Ajouter un nœud frère',
   outlinerAddChild: 'Ajouter un nœud enfant',

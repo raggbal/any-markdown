@@ -118,6 +118,7 @@ export const webviewMessages = {
   outlinerRemovePage: 'ページ解除',
   outlinerDeletePage: 'ページ削除',
   outlinerOpenPage: 'ページを開く',
+  outlinerCopyPagePath: 'ページパスをコピー',
   outlinerMakePage: 'ページ化',
   outlinerAddSibling: '兄弟ノードを追加',
   outlinerAddChild: '子ノードを追加',

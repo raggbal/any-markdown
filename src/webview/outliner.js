@@ -691,8 +691,10 @@ var Outliner = (function() {
                 if (!selectionAnchorId) { selectionAnchorId = focusedNodeId; }
                 selectRange(selectionAnchorId, node.id);
             } else if (!e.shiftKey) {
-                // 通常クリック: 選択クリア
-                clearSelection();
+                // 通常クリック: 選択クリア（右クリック時は選択を維持）
+                if (e.button !== 2 || selectedNodeIds.size === 0) {
+                    clearSelection();
+                }
             }
         });
 
@@ -2150,6 +2152,32 @@ var Outliner = (function() {
             return;
         }
 
+        // Cmd+Shift+C: ページパスをコピー
+        if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'c' || e.key === 'C')) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (selectedNodeIds.size > 0) {
+                var pageIds = [];
+                var sortedIds = model.getFlattenedIds(true).filter(function(id) {
+                    return selectedNodeIds.has(id);
+                });
+                sortedIds.forEach(function(id) {
+                    var n = model.getNode(id);
+                    if (n && n.isPage && n.pageId) {
+                        pageIds.push(n.pageId);
+                    }
+                });
+                if (pageIds.length > 0) {
+                    host.copyPagePaths(pageIds);
+                }
+            } else {
+                if (node.isPage && node.pageId) {
+                    host.copyPagePaths([node.pageId]);
+                }
+            }
+            return;
+        }
+
         // その他ショートカット
         if ((e.metaKey || e.ctrlKey) && !e.shiftKey) {
             switch (e.key) {
@@ -3284,12 +3312,39 @@ var Outliner = (function() {
         contextMenuEl.style.left = x + 'px';
         contextMenuEl.style.top = y + 'px';
 
+        // --- 複数選択時のページパスコピー ---
+        if (selectedNodeIds.size > 0) {
+            var selectedPageIds = [];
+            var sortedSelectedIds = model.getFlattenedIds(true).filter(function(id) {
+                return selectedNodeIds.has(id);
+            });
+            sortedSelectedIds.forEach(function(id) {
+                var n = model.getNode(id);
+                if (n && n.isPage && n.pageId) {
+                    selectedPageIds.push(n.pageId);
+                }
+            });
+            if (selectedPageIds.length > 0) {
+                addMenuItem(contextMenuEl, i18n.outlinerCopyPagePath || 'Copy Page Path', function() {
+                    host.copyPagePaths(selectedPageIds);
+                    hideContextMenu();
+                }, modLabel + '+Shift+C');
+                addMenuSeparator(contextMenuEl);
+            }
+        }
+
         // --- ページ操作 ---
         if (node.isPage) {
             addMenuItem(contextMenuEl, i18n.outlinerOpenPage || 'Open Page', function() {
                 openPage(nodeId);
                 hideContextMenu();
             }, modLabel + '+Enter');
+            if (selectedNodeIds.size === 0) {
+                addMenuItem(contextMenuEl, i18n.outlinerCopyPagePath || 'Copy Page Path', function() {
+                    host.copyPagePaths([node.pageId]);
+                    hideContextMenu();
+                }, modLabel + '+Shift+C');
+            }
             addMenuItem(contextMenuEl, i18n.outlinerDeletePage || 'Delete Page', function() {
                 removePage(nodeId);
                 hideContextMenu();
