@@ -34,7 +34,8 @@ export function getNotesWebviewContent(
 
     // Load CSS
     const outlinerCssPath = path.join(__dirname, 'webview', 'outliner.css');
-    const outlinerCss = fs.readFileSync(outlinerCssPath, 'utf8');
+    const outlinerCss = fs.readFileSync(outlinerCssPath, 'utf8')
+        .replace('__FONT_SIZE__', String(config.fontSize));
 
     const stylesPath = path.join(__dirname, 'webview', 'styles.css');
     const editorStyles = fs.readFileSync(stylesPath, 'utf8')

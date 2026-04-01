@@ -44,8 +44,9 @@ if (fs.existsSync(vendorSrc)) {
 
 // --- CSS読み込み ---
 const stylesContent = fs.readFileSync(stylesPath, 'utf-8')
-    .replace('__FONT_SIZE__', '16px');
-const outlinerCss = fs.readFileSync(outlinerCssPath, 'utf-8');
+    .replace('__FONT_SIZE__', '14');
+const outlinerCss = fs.readFileSync(outlinerCssPath, 'utf-8')
+    .replace('__FONT_SIZE__', '14');
 
 // --- スクリプト読み込み ---
 const editorUtilsScript = fs.readFileSync(editorUtilsJsPath, 'utf-8');

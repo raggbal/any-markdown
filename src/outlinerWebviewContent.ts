@@ -26,7 +26,8 @@ export function getOutlinerWebviewContent(
 
     // Load CSS
     const outlinerCssPath = path.join(__dirname, 'webview', 'outliner.css');
-    const outlinerCss = fs.readFileSync(outlinerCssPath, 'utf8');
+    const outlinerCss = fs.readFileSync(outlinerCssPath, 'utf8')
+        .replace('__FONT_SIZE__', String(config.fontSize));
 
     // Load editor styles (for side panel)
     const stylesPath = path.join(__dirname, 'webview', 'styles.css');

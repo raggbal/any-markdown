@@ -5,6 +5,18 @@ All notable changes to the "Fractal" extension extension will be documented in t
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.195.580] - 2026-04-02
+
+### Changed
+
+- **フォントサイズのデフォルトを 16px → 14px に変更** — `fractal.fontSize` の初期値を変更。既存ユーザーは設定で任意のサイズに変更可能
+- **コンテンツ領域のサイズをフォントサイズに連動** — Outliner/Notes のノード高さ・行高さ・インデント、Markdown のコードブロック・ソースエディタが `fractal.fontSize` の変更に自動追従するよう em 相対指定に移行
+
+### Fixed
+
+- **Outliner/Notes: フォントサイズ設定が反映されないバグを修正** — `fractal.fontSize` を変更しても Outliner/Notes エディタのフォントサイズが 16px 固定のままだった問題を修正
+- **テストビルドスクリプト: CSS変数の値が不正になるバグを修正**
+
 ## [0.195.579] - 2026-04-02
 
 ### Added

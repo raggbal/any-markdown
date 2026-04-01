@@ -46,8 +46,9 @@ if (fs.existsSync(vendorSrc)) {
 
 // --- CSS読み込み ---
 const stylesContent = fs.readFileSync(stylesPath, 'utf-8')
-    .replace('__FONT_SIZE__', '16px');
-const outlinerCss = fs.readFileSync(outlinerCssPath, 'utf-8');
+    .replace('__FONT_SIZE__', '14');
+const outlinerCss = fs.readFileSync(outlinerCssPath, 'utf-8')
+    .replace('__FONT_SIZE__', '14');
 
 // Notes左パネルCSS+HTML
 const notesBodyHtml = require(notesBodyHtmlPath);

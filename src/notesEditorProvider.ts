@@ -100,7 +100,7 @@ export class NotesEditorProvider {
             this.context.extensionUri,
             {
                 theme: config.get<string>('theme', 'github'),
-                fontSize: config.get<number>('fontSize', 16),
+                fontSize: config.get<number>('fontSize', 14),
                 toolbarMode: config.get<string>('toolbarMode', 'full'),
                 webviewMessages: getWebviewMessages() as unknown as Record<string, string>,
                 enableDebugLogging: config.get<boolean>('enableDebugLogging', false),

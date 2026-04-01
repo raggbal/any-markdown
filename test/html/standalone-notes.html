@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Standalone Notes Test</title>
     <style>:root {
-    --font-size: 16pxpx;
+    --font-size: 14px;
     --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
     --font-mono: 'Menlo', 'Consolas', 'Liberation Mono', 'DejaVu Sans Mono', monospace;
 }
@@ -435,7 +435,7 @@ body {
     outline: none;
     resize: none;
     font-family: var(--font-mono);
-    font-size: 14px;
+    font-size: 0.875em;
     color: var(--text-color);
     background: var(--bg-color);
 }
@@ -641,7 +641,7 @@ body {
     overflow-x: auto;
     margin: 1em 0;
     font-family: var(--font-mono);
-    font-size: 14px;
+    font-size: 0.875em;
     white-space: pre;
     word-wrap: normal;
 }
@@ -1434,10 +1434,10 @@ body {
 :root {
     --outliner-bg: var(--vscode-editor-background, #1e1e1e);
     --outliner-fg: var(--vscode-editor-foreground, #cccccc);
-    --outliner-indent: 24px;
+    --outliner-indent: 1.5em;
     --outliner-bullet-size: 6px;
     --outliner-line-height: 1.5;
-    --outliner-font-size: 16px;
+    --outliner-font-size: 14px;
     --outliner-border: var(--vscode-panel-border, #333);
     --outliner-hover-bg: var(--vscode-list-hoverBackground, rgba(255,255,255,0.05));
     --outliner-focus-bg: var(--vscode-list-activeSelectionBackground, rgba(0,120,212,0.15));
@@ -1716,7 +1716,7 @@ body {
     align-items: flex-start;
     padding: 1px 0 1px 0;
     position: relative;
-    min-height: 28px;
+    min-height: 1.75em;
 }
 
 .outliner-node:hover {
@@ -1759,7 +1759,7 @@ body {
     align-items: center;
     justify-content: center;
     width: 24px;
-    height: 28px;
+    height: 1.75em;
     flex-shrink: 0;
     cursor: pointer;
     position: relative;
@@ -1812,7 +1812,7 @@ body {
     align-items: center;
     justify-content: center;
     width: 20px;
-    height: 28px;
+    height: 1.75em;
     flex-shrink: 0;
     cursor: pointer;
     opacity: 0;
@@ -1850,7 +1850,7 @@ body {
     align-items: center;
     justify-content: center;
     width: 20px;
-    height: 28px;
+    height: 1.75em;
     flex-shrink: 0;
     cursor: pointer;
     color: var(--outliner-page-icon-color);
@@ -1868,7 +1868,7 @@ body {
     align-items: center;
     justify-content: center;
     width: 20px;
-    height: 28px;
+    height: 1.75em;
     flex-shrink: 0;
 }
 
@@ -1889,8 +1889,8 @@ body {
 
 /* --- Text --- */
 .outliner-text {
-    min-height: 24px;
-    line-height: 24px;
+    min-height: 1.5em;
+    line-height: 1.5;
     outline: none;
     word-break: break-word;
     padding: 0 4px;
@@ -1915,7 +1915,7 @@ body {
 /* --- Subtext --- */
 .outliner-subtext {
     display: none;
-    font-size: 12px;
+    font-size: 0.75em;
     color: var(--outliner-placeholder);
     line-height: 1.4;
     padding: 0 4px 2px;

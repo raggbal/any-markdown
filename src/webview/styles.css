@@ -429,7 +429,7 @@ body {
     outline: none;
     resize: none;
     font-family: var(--font-mono);
-    font-size: 14px;
+    font-size: 0.875em;
     color: var(--text-color);
     background: var(--bg-color);
 }
@@ -635,7 +635,7 @@ body {
     overflow-x: auto;
     margin: 1em 0;
     font-family: var(--font-mono);
-    font-size: 14px;
+    font-size: 0.875em;
     white-space: pre;
     word-wrap: normal;
 }

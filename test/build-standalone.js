@@ -39,7 +39,7 @@ if (fs.existsSync(vendorSrc)) {
 // styles.css を読み込み（テーマCSS変数・hljsカラー等を含む）
 const stylesPath = path.join(__dirname, '../src/webview/styles.css');
 const stylesContent = fs.readFileSync(stylesPath, 'utf-8')
-    .replace('__FONT_SIZE__', '16px');
+    .replace('__FONT_SIZE__', '14');
 
 // editor-utils.js を読み込み（editor.jsより前にロードされる）
 const editorUtilsScript = fs.readFileSync(editorUtilsJsPath, 'utf-8');
@@ -70,7 +70,7 @@ const html = `<!DOCTYPE html>
     <title>Standalone Editor Test</title>
     <style>
         :root {
-            --font-size: 16px;
+            --font-size: 14px;
             --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             --font-mono: 'SF Mono', Consolas, monospace;
             --bg-color: #ffffff;
