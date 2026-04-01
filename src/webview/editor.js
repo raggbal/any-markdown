@@ -4638,7 +4638,23 @@ class EditorInstance {
         if (!range.collapsed) return false;
 
         let node = range.startContainer;
-        if (node.nodeType !== 3) return false; // Must be text node
+        let resolvedOffset = range.startOffset;
+        if (node.nodeType !== 3) {
+            // M-16: startContainer may be an element node (e.g., at start of block elements,
+            // after checkbox in task lists, after insertLineBreak).
+            // When startContainer is an element, startOffset is a child index, not a character offset.
+            // Resolve to the actual text node and compute the correct character offset.
+            const childIdx = range.startOffset;
+            if (childIdx > 0 && node.childNodes[childIdx - 1] && node.childNodes[childIdx - 1].nodeType === 3) {
+                node = node.childNodes[childIdx - 1];
+                resolvedOffset = node.textContent.length;
+            } else if (node.childNodes[childIdx] && node.childNodes[childIdx].nodeType === 3) {
+                node = node.childNodes[childIdx];
+                resolvedOffset = 0;
+            } else {
+                return false;
+            }
+        }
 
         // Check if we're inside a code block (pre element) or inline code (code element)
         // If so, skip all inline conversions - code should preserve literal text
@@ -4657,9 +4673,8 @@ class EditorInstance {
         }
 
         const text = node.textContent;
-        const offset = range.startOffset;
         // Space is now preventDefault'd so offset is correct as-is (no browser-inserted space to skip)
-        const checkOffset = offset;
+        const checkOffset = resolvedOffset;
         if (checkOffset < 0) return false;
         
         const beforeCursor = text.substring(0, checkOffset);
