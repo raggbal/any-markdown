@@ -65,7 +65,8 @@
           "notes-file-panel.js",
           "notes-file-manager.js",
           "notes-message-handler.js",
-          "notes-host-bridge.js"
+          "notes-host-bridge.js",
+          "markdown-import.js"
         ]
       },
       {

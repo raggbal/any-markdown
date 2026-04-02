@@ -14,9 +14,12 @@ export interface ElectronSettings {
     imageDefaultDir: string;
     forceRelativeImagePath: boolean;
     enableDebugLogging: boolean;
+    // Markdown settings
+    linkOpenMode: string;
     // Outliner settings
     outlinerPageTitle: boolean;
-    linkOpenMode: string;
+    outlinerImageDefaultDir: string;
+    outlinerPageDir: string;
     // S3 settings
     s3AccessKeyId: string;
     s3SecretAccessKey: string;
@@ -35,14 +38,16 @@ export interface ElectronSettings {
 
 const DEFAULTS: ElectronSettings = {
     theme: 'things',
-    fontSize: 16,
+    fontSize: 14,
     toolbarMode: 'simple',
     language: 'default',
     imageDefaultDir: '',
     forceRelativeImagePath: false,
     enableDebugLogging: false,
-    outlinerPageTitle: true,
     linkOpenMode: 'sidePanel',
+    outlinerPageTitle: true,
+    outlinerImageDefaultDir: '',
+    outlinerPageDir: '',
     s3AccessKeyId: '',
     s3SecretAccessKey: '',
     s3Region: 'us-east-1',
@@ -178,7 +183,7 @@ export class SettingsManager {
         </select>
     </div>
 
-    <h2>Images</h2>
+    <h2>Markdown</h2>
     <div class="field field-text">
         <label>Default Dir</label>
         <input type="text" id="imageDefaultDir" value="${settings.imageDefaultDir}" onchange="save('imageDefaultDir', this.value)" placeholder="(document directory)">
@@ -190,13 +195,6 @@ export class SettingsManager {
         <input type="checkbox" id="forceRelativeImagePath" ${settings.forceRelativeImagePath ? 'checked' : ''} onchange="save('forceRelativeImagePath', this.checked)">
     </div>
     <div class="field-desc">When enabled, image paths in Markdown are always saved as relative paths, even if Default Dir is absolute.</div>
-
-    <h2>Outliner</h2>
-    <div class="field">
-        <label>Show Page Title</label>
-        <input type="checkbox" id="outlinerPageTitle" ${settings.outlinerPageTitle ? 'checked' : ''} onchange="save('outlinerPageTitle', this.checked)">
-    </div>
-    <div class="field-desc">Show the page title input field at the top of the outliner.</div>
     <div class="field">
         <label>Link Open Mode</label>
         <select id="linkOpenMode" onchange="save('linkOpenMode', this.value)">
@@ -204,7 +202,24 @@ export class SettingsManager {
             <option value="tab" ${settings.linkOpenMode === 'tab' ? 'selected' : ''}>New Tab</option>
         </select>
     </div>
-    <div class="field-desc">How to open linked Markdown files from the editor.</div>
+    <div class="field-desc">How to open linked .md files from the editor.</div>
+
+    <h2>Outliner</h2>
+    <div class="field">
+        <label>Show Page Title</label>
+        <input type="checkbox" id="outlinerPageTitle" ${settings.outlinerPageTitle ? 'checked' : ''} onchange="save('outlinerPageTitle', this.checked)">
+    </div>
+    <div class="field-desc">Show the page title input field at the top of the outliner.</div>
+    <div class="field field-text">
+        <label>Image Dir</label>
+        <input type="text" id="outlinerImageDefaultDir" value="${settings.outlinerImageDefaultDir}" onchange="save('outlinerImageDefaultDir', this.value)" placeholder="./images">
+    </div>
+    <div class="field-desc">Default directory for outliner node images. Relative to .out file. e.g. <code>./images</code></div>
+    <div class="field field-text">
+        <label>Page Dir</label>
+        <input type="text" id="outlinerPageDir" value="${settings.outlinerPageDir}" onchange="save('outlinerPageDir', this.value)" placeholder="./pages">
+    </div>
+    <div class="field-desc">Default directory for outliner page files. Relative to .out file. e.g. <code>./pages</code></div>
 
     <h2>S3 Sync</h2>
     <div class="field field-text">

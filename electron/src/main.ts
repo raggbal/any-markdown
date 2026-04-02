@@ -36,6 +36,8 @@ const { NotesFileManager } = require(getSharedModulePath('out/shared/notes-file-
 const { handleNotesMessage } = require(getSharedModulePath('out/shared/notes-message-handler.js'));
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { s3Sync: s3SyncFn, s3RemoteDeleteAndUpload: s3RemoteDeleteAndUploadFn, s3LocalDeleteAndDownload: s3LocalDeleteAndDownloadFn } = require(getSharedModulePath('out/notes-s3-sync.js'));
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { importMdFiles } = require(getSharedModulePath('out/shared/markdown-import.js'));
 
 // NotesFileManager instances per window
 const notesManagers = new Map<BrowserWindow, InstanceType<typeof NotesFileManager>>();
@@ -347,6 +349,69 @@ function createNotesPlatformActions(win: BrowserWindow): Record<string, unknown>
                 type: 'fileSearchResults', results, query
             });
         },
+        openInTextEditor: () => {
+            const nfm = notesManagers.get(win);
+            const fp = nfm?.getCurrentFilePath();
+            if (fp) shell.openPath(fp);
+        },
+        copyFilePath: () => {
+            const nfm = notesManagers.get(win);
+            const fp = nfm?.getCurrentFilePath();
+            if (fp) clipboard.writeText(fp);
+        },
+        copyPagePaths: (paths: string[]) => {
+            clipboard.writeText(paths.join('\n'));
+        },
+        saveOutlinerImage: (nodeId: string, dataUrl: string, fileName: string | null) => {
+            const nfm = notesManagers.get(win);
+            if (!nfm) return;
+            const pagesDir = nfm.getPagesDirPath();
+            const imagesDir = path.join(pagesDir, 'images');
+            if (!fs.existsSync(imagesDir)) fs.mkdirSync(imagesDir, { recursive: true });
+            let imgFileName = fileName;
+            if (!imgFileName) {
+                const extMatch = dataUrl.match(/^data:image\/(\w+);/);
+                const ext = extMatch ? extMatch[1].replace('jpeg', 'jpg') : 'png';
+                imgFileName = `image_${Date.now()}.${ext}`;
+            }
+            const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, '');
+            const destPath = path.join(imagesDir, imgFileName);
+            fs.writeFileSync(destPath, Buffer.from(base64Data, 'base64'));
+            const outFilePath = nfm.getCurrentFilePath();
+            const outDir = outFilePath ? path.dirname(outFilePath) : nfm.getMainFolderPath();
+            const relativePath = path.relative(outDir, destPath).replace(/\\/g, '/');
+            const displayUri = fileUri(destPath);
+            win.webContents.send('host-message', {
+                type: 'outlinerImageSaved',
+                nodeId,
+                imagePath: relativePath,
+                displayUri,
+            });
+        },
+        importMdFilesDialog: async (targetNodeId: string | null, senderRef: { postMessage: (msg: unknown) => void }) => {
+            try {
+                const nfm = notesManagers.get(win);
+                if (!nfm) return;
+                const result = await dialog.showOpenDialog(win, {
+                    properties: ['openFile', 'multiSelections'],
+                    filters: [{ name: 'Markdown', extensions: ['md'] }],
+                    title: 'Import .md files',
+                });
+                if (result.canceled || result.filePaths.length === 0) return;
+                const filePaths = result.filePaths.sort();
+                const pagesDir = nfm.getPagesDirPath();
+                const imageDir = path.join(pagesDir, 'images');
+                const results = importMdFiles(filePaths, pagesDir, imageDir);
+                senderRef.postMessage({
+                    type: 'importMdFilesResult',
+                    results,
+                    targetNodeId,
+                    position: 'after',
+                });
+            } catch (e) {
+                console.error('[importMdFilesDialog] Error:', e);
+            }
+        },
         // S3 Sync
         s3Sync: (bucketPath: string) => {
             runElectronS3Operation('s3Sync', bucketPath, win, sender);
@@ -456,6 +521,8 @@ async function loadOutlinerMode(win: BrowserWindow, folderPath: string, openFile
     const panelWidth = structure.panelWidth || undefined;
     const useFolderPanel = opts?.folderPanelEnabled ?? (win as any).__folderPanelEnabled ?? false;
     const settings = settingsManager.getAll();
+    const outDir = filePath ? path.dirname(filePath) : folderPath;
+    const docBaseUri = 'file://' + (outDir.startsWith('/') ? '' : '/') + outDir.replace(/\\/g, '/') + '/';
     const html = generateOutlinerHtml(outJson, fileList, nfm.getCurrentFilePath(), {
         theme: settings.theme,
         fontSize: settings.fontSize,
@@ -468,6 +535,7 @@ async function loadOutlinerMode(win: BrowserWindow, folderPath: string, openFile
         fileChangeId: nfm.getFileChangeId(),
         outlinerPageTitle: settings.outlinerPageTitle !== false,
         folderPanelEnabled: useFolderPanel,
+        documentBaseUri: docBaseUri,
     });
     const tempFile = writeHtmlToTempFile(html);
     await win.loadFile(tempFile);
@@ -529,6 +597,7 @@ async function loadEmptyNotesMode(win: BrowserWindow): Promise<void> {
         fileChangeId: 0,
         outlinerPageTitle: settings.outlinerPageTitle !== false,
         folderPanelEnabled: true,
+        documentBaseUri: '',
     });
     const tempFile = writeHtmlToTempFile(html);
     await win.loadFile(tempFile);
@@ -720,7 +789,12 @@ ipcMain.on('open-link', (event, href: string) => {
     const resolvedPath = href.startsWith('/') ? href : path.resolve(docDir, href);
     const lc = resolvedPath.toLowerCase();
     if (lc.endsWith('.md') || lc.endsWith('.markdown')) {
-        openInSidePanel(win, resolvedPath);
+        const linkOpenMode = settingsManager.get('linkOpenMode') || 'sidePanel';
+        if (linkOpenMode === 'tab') {
+            createWindow(resolvedPath);
+        } else {
+            openInSidePanel(win, resolvedPath);
+        }
     } else {
         shell.openPath(resolvedPath);
     }

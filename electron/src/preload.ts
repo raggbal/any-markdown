@@ -111,6 +111,28 @@ contextBridge.exposeInMainWorld('outlinerHostBridge', {
         ipcRenderer.send('notes-message', { type: 'readAndInsertImage', filePath, sidePanelFilePath: spPath }),
     searchFiles: (query: string) => ipcRenderer.send('search-files', query),
 
+    // .outファイル操作
+    openInTextEditor: () =>
+        ipcRenderer.send('notes-message', { type: 'openInTextEditor' }),
+    copyFilePath: () =>
+        ipcRenderer.send('notes-message', { type: 'copyFilePath' }),
+    copyPagePaths: (pageIds: string[]) =>
+        ipcRenderer.send('notes-message', { type: 'copyPagePaths', pageIds }),
+    copyPageFile: (sourcePageId: string, newPageId: string) =>
+        ipcRenderer.send('notes-message', { type: 'copyPageFile', sourcePageId, newPageId }),
+
+    // .mdファイルインポート
+    importMdFilesDialog: (targetNodeId: string) =>
+        ipcRenderer.send('notes-message', { type: 'importMdFilesDialog', targetNodeId }),
+
+    // Outlinerノード画像操作
+    saveOutlinerImage: (nodeId: string, dataUrl: string, fileName: string | null) =>
+        ipcRenderer.send('notes-message', { type: 'saveOutlinerImage', nodeId, dataUrl, fileName }),
+    setOutlinerImageDir: () =>
+        ipcRenderer.send('notes-message', { type: 'setOutlinerImageDir' }),
+    getOutlinerImageDir: () =>
+        ipcRenderer.send('notes-message', { type: 'getOutlinerImageDir' }),
+
     // No-ops (called by EditorInstance in side panel but not needed in outliner)
     createPageAtPath: () => {},
     createPageAuto: () => {},

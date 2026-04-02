@@ -279,6 +279,7 @@ interface ElectronOutlinerConfig {
     fileChangeId?: number;
     outlinerPageTitle?: boolean;
     folderPanelEnabled?: boolean;
+    documentBaseUri?: string;
 }
 
 interface OutlinerFileEntry {
@@ -393,7 +394,7 @@ export function generateOutlinerHtml(
                 <div class="folder-panel-header">
                     <span class="folder-panel-title">Notes</span>
                     <button id="folderPanelAdd" title="Add folder">+</button>
-                    <button id="folderPanelCollapse" title="Collapse">\u25C0</button>
+                    <button id="folderPanelCollapse" title="Collapse">&#9776;</button>
                 </div>
                 <div class="folder-panel-list" id="folderPanelList"></div>
             </div>
@@ -456,6 +457,7 @@ export function generateOutlinerHtml(
         window.__SKIP_EDITOR_AUTO_INIT__ = true;
         window.__outlinerMessages = ${JSON.stringify(config.webviewMessages || {})};
         window.__initialFileChangeId = ${config.fileChangeId || 0};
+        window.__outlinerImageBaseUri = "${config.documentBaseUri || ''}";
     </script>
     <script>${editorUtilsScript}</script>
     <script>${editorScript}</script>
