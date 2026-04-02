@@ -11382,6 +11382,7 @@ class EditorInstance {
                 }
             } else if (e.key === 'Escape') {
                 e.preventDefault();
+                e.stopPropagation();
                 closeCommandPalette();
             }
         });
@@ -11745,6 +11746,7 @@ class EditorInstance {
                 confirmPathInput(input);
             } else if (e.key === 'Escape') {
                 e.preventDefault();
+                e.stopPropagation();
                 actionPanelState.step = 'menu';
                 actionPanelState.selectedIndex = 0;
                 renderActionPanelMenu();
@@ -11867,6 +11869,7 @@ class EditorInstance {
                 finalizeAddPage(filePath, linkName);
             } else if (e.key === 'Escape') {
                 e.preventDefault();
+                e.stopPropagation();
                 actionPanelState.step = 'menu';
                 actionPanelState.selectedIndex = 0;
                 renderActionPanelMenu();
@@ -12035,6 +12038,7 @@ class EditorInstance {
                 executeActionPanelMenuItem(actionPanelState.selectedIndex);
             } else if (e.key === 'Escape') {
                 e.preventDefault();
+                e.stopPropagation();
                 closeActionPanel();
             }
         }
@@ -13818,6 +13822,8 @@ class EditorInstance {
     }
     if (isMainInstance) document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape' && sidePanel && sidePanel.classList.contains('open')) {
+            // Don't close side panel if action panel or command palette is handling ESC
+            if (actionPanelVisible || commandPaletteVisible) return;
             closeSidePanel();
             e.preventDefault();
         }
@@ -15579,19 +15585,21 @@ class EditorInstance {
                 goToMatch(currentMatchIndex + 1);
             }
         } else if (e.key === 'Escape') {
+            e.stopPropagation();
             closeSearchBox();
         }
     });
-    
+
     replaceInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
             e.preventDefault();
             replaceCurrentMatch();
         } else if (e.key === 'Escape') {
+            e.stopPropagation();
             closeSearchBox();
         }
     });
-    
+
     searchPrev.addEventListener('click', () => goToMatch(currentMatchIndex - 1));
     searchNext.addEventListener('click', () => goToMatch(currentMatchIndex + 1));
     closeSearch.addEventListener('click', closeSearchBox);

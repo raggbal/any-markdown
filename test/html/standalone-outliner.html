@@ -453,7 +453,7 @@ body {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     min-width: 350px;
 }
-/* サイドパネル内ではabsoluteに切替（fixedだとビューポート基準でパネル外に表示される） */
+/* サイドパネル内: 検索ボックスはeditor-wrapperの外に配置済みなのでabsoluteで固定 */
 .side-panel-editor-root .search-replace-box {
     position: absolute;
     top: 10px;
@@ -1415,6 +1415,7 @@ body {
     display: flex;
     flex-direction: column;
     height: 100%;
+    position: relative;
 }
 /* Overlay behind side panel to darken main editor */
 .side-panel-overlay {
@@ -3452,13 +3453,27 @@ class EditorInstance {
                 </div>
                 <button class="toolbar-scroll-btn toolbar-scroll-btn--right hidden">&#x276F;</button>
             </div>
-            <div class="editor-wrapper">
-                <div class="search-replace-box" style="display:none">
-                    <input class="search-input" type="text"><input class="replace-input" type="text"><span class="search-count"></span>
-                    <button class="search-prev"></button><button class="search-next"></button><button class="toggle-replace"></button><button class="close-search"></button>
-                    <div class="replace-row"><button class="replace-one"></button><button class="replace-all"></button></div>
-                    <input class="search-case-sensitive" type="checkbox"><input class="search-whole-word" type="checkbox"><input class="search-regex" type="checkbox">
+            <div class="search-replace-box" style="display:none">
+                <div class="search-row">
+                    <input type="text" class="search-input" placeholder="Search..." />
+                    <span class="search-count">0/0</span>
+                    <button class="search-prev" title="Previous">&#9650;</button>
+                    <button class="search-next" title="Next">&#9660;</button>
+                    <button class="toggle-replace" title="Toggle Replace">&#8693;</button>
+                    <button class="close-search" title="Close">&#10005;</button>
                 </div>
+                <div class="replace-row" style="display: none;">
+                    <input type="text" class="replace-input" placeholder="Replace..." />
+                    <button class="replace-one" title="Replace">Replace</button>
+                    <button class="replace-all" title="Replace All">All</button>
+                </div>
+                <div class="search-options">
+                    <label><input type="checkbox" class="search-case-sensitive" /> Aa</label>
+                    <label><input type="checkbox" class="search-whole-word" /> Ab|</label>
+                    <label><input type="checkbox" class="search-regex" /> .*</label>
+                </div>
+            </div>
+            <div class="editor-wrapper">
                 <div class="editor" contenteditable="true" spellcheck="true"></div>
                 <textarea class="source-editor" style="display:none"></textarea>
             </div>
@@ -14650,6 +14665,7 @@ class EditorInstance {
                 }
             } else if (e.key === 'Escape') {
                 e.preventDefault();
+                e.stopPropagation();
                 closeCommandPalette();
             }
         });
@@ -15013,6 +15029,7 @@ class EditorInstance {
                 confirmPathInput(input);
             } else if (e.key === 'Escape') {
                 e.preventDefault();
+                e.stopPropagation();
                 actionPanelState.step = 'menu';
                 actionPanelState.selectedIndex = 0;
                 renderActionPanelMenu();
@@ -15135,6 +15152,7 @@ class EditorInstance {
                 finalizeAddPage(filePath, linkName);
             } else if (e.key === 'Escape') {
                 e.preventDefault();
+                e.stopPropagation();
                 actionPanelState.step = 'menu';
                 actionPanelState.selectedIndex = 0;
                 renderActionPanelMenu();
@@ -15303,6 +15321,7 @@ class EditorInstance {
                 executeActionPanelMenuItem(actionPanelState.selectedIndex);
             } else if (e.key === 'Escape') {
                 e.preventDefault();
+                e.stopPropagation();
                 closeActionPanel();
             }
         }
@@ -17086,6 +17105,8 @@ class EditorInstance {
     }
     if (isMainInstance) document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape' && sidePanel && sidePanel.classList.contains('open')) {
+            // Don't close side panel if action panel or command palette is handling ESC
+            if (actionPanelVisible || commandPaletteVisible) return;
             closeSidePanel();
             e.preventDefault();
         }
@@ -18847,19 +18868,21 @@ class EditorInstance {
                 goToMatch(currentMatchIndex + 1);
             }
         } else if (e.key === 'Escape') {
+            e.stopPropagation();
             closeSearchBox();
         }
     });
-    
+
     replaceInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
             e.preventDefault();
             replaceCurrentMatch();
         } else if (e.key === 'Escape') {
+            e.stopPropagation();
             closeSearchBox();
         }
     });
-    
+
     searchPrev.addEventListener('click', () => goToMatch(currentMatchIndex - 1));
     searchNext.addEventListener('click', () => goToMatch(currentMatchIndex + 1));
     closeSearch.addEventListener('click', closeSearchBox);
@@ -23572,9 +23595,13 @@ var Outliner = (function() {
             });
         }
 
-        // ESC to close side panel
+        // ESC to close side panel (but not if action panel or command palette is open)
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape' && sidePanelEl && sidePanelEl.classList.contains('open')) {
+                // Don't close side panel if a modal panel (action panel, command palette) is handling ESC
+                var ap = document.querySelector('.action-panel');
+                var cp = document.querySelector('.command-palette');
+                if ((ap && ap.style.display !== 'none') || (cp && cp.style.display !== 'none')) return;
                 e.preventDefault();
                 e.stopPropagation();
                 closeSidePanel();

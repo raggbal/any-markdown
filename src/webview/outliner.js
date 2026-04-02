@@ -3661,9 +3661,13 @@ var Outliner = (function() {
             });
         }
 
-        // ESC to close side panel
+        // ESC to close side panel (but not if action panel or command palette is open)
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape' && sidePanelEl && sidePanelEl.classList.contains('open')) {
+                // Don't close side panel if a modal panel (action panel, command palette) is handling ESC
+                var ap = document.querySelector('.action-panel');
+                var cp = document.querySelector('.command-palette');
+                if ((ap && ap.style.display !== 'none') || (cp && cp.style.display !== 'none')) return;
                 e.preventDefault();
                 e.stopPropagation();
                 closeSidePanel();
