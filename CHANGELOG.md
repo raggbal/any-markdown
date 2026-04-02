@@ -5,6 +5,14 @@ All notable changes to the "Fractal" extension extension will be documented in t
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.195.603] - 2026-04-03
+
+### Added
+- In-App Link: Copy link to specific Outliner node (right-click menu in Notes mode)
+- In-App Link: Copy link to specific page/md (sidepanel header button in Notes mode)
+- In-App Link: Click fractal:// links to navigate across notes, outliners, and pages
+- Markdown Editor: Right-click context menu with Cut, Copy, Paste (all editors)
+
 ## [0.195.581] - 2026-04-02
 
 ### Added

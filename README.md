@@ -156,6 +156,11 @@ npm run compile
 2. Add a folder to register it as a notes workspace
 3. Click a folder to open the 3-pane Notes UI
 
+### In-App Links
+- Right-click an outliner node → **Copy In-App Link** to create a link to that node
+- Click the 🔗 button in the sidepanel header to create a link to the current page
+- Paste the link in any outliner or markdown editor — click to navigate instantly
+
 ---
 
 ## 📝 Creating Markdown Elements
