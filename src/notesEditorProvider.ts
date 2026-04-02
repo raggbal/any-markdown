@@ -14,16 +14,21 @@ import { importMdFiles } from './shared/markdown-import';
  * 複数パネル対応: 各パネルが独立したfileManager/watcher/disposablesをクロージャで保持
  */
 export class NotesEditorProvider {
-    // 開いているパネルを追跡（folderPath → WebviewPanel）
-    private openPanels = new Map<string, vscode.WebviewPanel>();
+    // 開いているパネルを追跡（folderPath → { panel, postMessage, fileManager, openPage }）
+    private openPanels = new Map<string, {
+        panel: vscode.WebviewPanel;
+        postMessage: (msg: any) => void;
+        fileManager: NotesFileManager;
+        openPage?: (filePath: string) => Promise<void>;
+    }>();
 
     constructor(private context: vscode.ExtensionContext) {}
 
     async openNotesFolder(folderPath: string): Promise<void> {
         // 同じフォルダのパネルが既に存在する場合はrevealして再利用
-        const existingPanel = this.openPanels.get(folderPath);
-        if (existingPanel) {
-            existingPanel.reveal(vscode.ViewColumn.One);
+        const existing = this.openPanels.get(folderPath);
+        if (existing) {
+            existing.panel.reveal(vscode.ViewColumn.One);
             return;
         }
 
@@ -87,7 +92,11 @@ export class NotesEditorProvider {
         );
 
         // パネルをMapに登録、dispose時に除去
-        this.openPanels.set(folderPath, panel);
+        this.openPanels.set(folderPath, {
+            panel,
+            postMessage: (msg: any) => panel.webview.postMessage(msg),
+            fileManager,
+        });
         panel.onDidDispose(() => {
             this.openPanels.delete(folderPath);
         });
@@ -106,6 +115,7 @@ export class NotesEditorProvider {
                 enableDebugLogging: config.get<boolean>('enableDebugLogging', false),
                 outlinerPageTitle: config.get<boolean>('outlinerPageTitle', true),
                 documentBaseUri: folderBaseUri,
+                folderName: path.basename(folderPath),
             },
             {
                 jsonContent,
@@ -127,6 +137,14 @@ export class NotesEditorProvider {
             { logPrefix: '[Notes]' }
         );
 
+        // Register openPage function for external access (in-app page links)
+        const panelEntry = this.openPanels.get(folderPath);
+        if (panelEntry) {
+            panelEntry.openPage = async (filePath: string) => {
+                await sidePanel.openFile(filePath);
+            };
+        }
+
         // Sender
         const sender: NotesSender = {
             postMessage: (msg: unknown) => {
@@ -138,6 +156,9 @@ export class NotesEditorProvider {
         const platform: NotesPlatformActions = {
             openExternalLink: (href: string) => {
                 vscode.env.openExternal(vscode.Uri.parse(href));
+            },
+            navigateInAppLink: (href: string) => {
+                vscode.commands.executeCommand('fractal.navigateInAppLink', href);
             },
             openFileInEditor: (filePath: string) => {
                 const uri = vscode.Uri.file(filePath);
@@ -423,6 +444,7 @@ export class NotesEditorProvider {
                             webviewMessages: getWebviewMessages() as unknown as Record<string, string>,
                             enableDebugLogging: refreshConfig.get<boolean>('enableDebugLogging', false),
                             outlinerPageTitle: refreshConfig.get<boolean>('outlinerPageTitle', true),
+                            folderName: path.basename(folderPath),
                         },
                         { jsonContent: refreshJsonContent, fileList: refreshFileList, currentFilePath: refreshCurrentFile, panelCollapsed: refreshPanelCollapsed, structure: fileManager.getStructure(), panelWidth: fileManager.getPanelWidth(), fileChangeId: fileManager.getFileChangeId() }
                     );
@@ -570,5 +592,58 @@ export class NotesEditorProvider {
             const message = e instanceof Error ? e.message : String(e);
             sender.postMessage({ type: 'notesS3Progress', phase: 'error', message });
         }
+    }
+
+    /**
+     * Resolve page md file path from note folder + outFileId + pageId.
+     * Does not require the note to be open — reads .out file directly from disk.
+     */
+    resolvePagePath(noteFolderPath: string, outFileId: string, pageId: string): string | null {
+        const outFilePath = path.join(noteFolderPath, `${outFileId}.out`);
+        if (!fs.existsSync(outFilePath)) return null;
+        let outData: Record<string, unknown> | undefined;
+        try {
+            outData = JSON.parse(fs.readFileSync(outFilePath, 'utf8'));
+        } catch { /* ignore */ }
+        // Resolve pageDir from .out JSON (or default ./pages)
+        const pageDir = (outData?.pageDir as string) || './pages';
+        const resolvedPageDir = path.isAbsolute(pageDir)
+            ? pageDir
+            : path.resolve(path.dirname(outFilePath), pageDir);
+        const pagePath = path.join(resolvedPageDir, `${pageId}.md`);
+        return fs.existsSync(pagePath) ? pagePath : null;
+    }
+
+    /**
+     * Open a page md file in the currently visible (active) note panel's sidepanel.
+     * No note switching or outliner navigation — just opens the md.
+     */
+    async openPageInCurrentPanel(filePath: string): Promise<void> {
+        // Find the currently visible panel
+        for (const [, entry] of this.openPanels) {
+            if (entry.panel.visible && entry.openPage) {
+                await entry.openPage(filePath);
+                return;
+            }
+        }
+        // Fallback: use the first panel with openPage
+        for (const [, entry] of this.openPanels) {
+            if (entry.openPage) {
+                entry.panel.reveal(vscode.ViewColumn.One);
+                await entry.openPage(filePath);
+                return;
+            }
+        }
+    }
+
+    async navigateToLink(folderPath: string, params: { outFileId?: string; nodeId?: string; pageId?: string }): Promise<void> {
+        const entry = this.openPanels.get(folderPath);
+        if (!entry) return;
+        entry.panel.reveal(vscode.ViewColumn.One);
+        entry.postMessage({
+            type: 'notesNavigateInAppLink',
+            outFileId: params.outFileId,
+            nodeId: params.nodeId,
+        });
     }
 }

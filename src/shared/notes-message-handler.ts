@@ -68,6 +68,8 @@ export interface NotesPlatformActions {
     saveOutlinerImage?(nodeId: string, dataUrl: string, fileName: string): void;
     /** .mdファイルインポートダイアログ表示 */
     importMdFilesDialog?(targetNodeId: string | null, sender: NotesSender): void;
+    /** アプリ内リンクナビゲーション */
+    navigateInAppLink?(href: string): void;
 }
 
 /**
@@ -250,7 +252,13 @@ export function handleNotesMessage(
 
         case 'openLink':
             if (message.href) {
-                platform.openExternalLink(message.href);
+                if (message.href.startsWith('fractal://')) {
+                    if (platform.navigateInAppLink) {
+                        platform.navigateInAppLink(message.href);
+                    }
+                } else {
+                    platform.openExternalLink(message.href);
+                }
             }
             break;
 
@@ -593,6 +601,30 @@ export function handleNotesMessage(
             if (platform.openFileExternal) {
                 platform.openFileExternal(message.filePath);
             }
+            break;
+        }
+
+        case 'notesNavigateInAppLink': {
+            // Node link only — navigate to note + outliner + node
+            fileManager.flushSave();
+            const navFilePath = fileManager.getFilePathById(message.outFileId);
+            if (!navFilePath) break;
+            const navContent = fileManager.openFile(navFilePath);
+            if (navContent === null) break;
+
+            if (platform.saveLastOpenedFile) {
+                platform.saveLastOpenedFile(navFilePath);
+            }
+
+            const navData = JSON.parse(navContent);
+            sendFileListWithStructure(fileManager, sender, navFilePath);
+
+            sender.postMessage({
+                type: 'updateData',
+                data: navData,
+                fileChangeId: fileManager.getFileChangeId(),
+                jumpToNodeId: message.nodeId,
+            });
             break;
         }
 

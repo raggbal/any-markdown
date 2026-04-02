@@ -1,9 +1,39 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
 import { AnyMarkdownEditorProvider } from './editorProvider';
 import { OutlinerProvider } from './outlinerProvider';
 import { NotesFolderProvider } from './notesFolderProvider';
 import { NotesEditorProvider } from './notesEditorProvider';
 import { initLocale, t } from './i18n/messages';
+
+interface FractalLinkParams {
+    noteFolderName: string;
+    outFileId: string;
+    nodeId?: string;
+    pageId?: string;
+}
+
+function parseFractalLink(url: string): FractalLinkParams | null {
+    // Page link: fractal://note/{folder}/{outFileId}/page/{pageId}
+    const pageMatch = url.match(/^fractal:\/\/note\/([^/]+)\/([^/]+)\/page\/([^/?]+)$/);
+    if (pageMatch) {
+        return {
+            noteFolderName: decodeURIComponent(pageMatch[1]),
+            outFileId: decodeURIComponent(pageMatch[2]),
+            pageId: decodeURIComponent(pageMatch[3]),
+        };
+    }
+    // Node link: fractal://note/{folder}/{outFileId}/{nodeId}
+    const nodeMatch = url.match(/^fractal:\/\/note\/([^/]+)\/([^/]+)\/([^/?]+)$/);
+    if (nodeMatch) {
+        return {
+            noteFolderName: decodeURIComponent(nodeMatch[1]),
+            outFileId: decodeURIComponent(nodeMatch[2]),
+            nodeId: decodeURIComponent(nodeMatch[3]),
+        };
+    }
+    return null;
+}
 
 export function activate(context: vscode.ExtensionContext) {
     // Initialize localization
@@ -156,6 +186,39 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.commands.registerCommand('fractal.openNotesFolder', (folderPath: string) => {
             notesEditorProvider.openNotesFolder(folderPath);
+        })
+    );
+
+    // In-app link navigation command
+    context.subscriptions.push(
+        vscode.commands.registerCommand('fractal.navigateInAppLink', async (linkUrl: string) => {
+            const parsed = parseFractalLink(linkUrl);
+            if (!parsed) {
+                vscode.window.showErrorMessage('Invalid in-app link format');
+                return;
+            }
+            const folders = notesFolderProvider.getFolders();
+            const folderPath = folders.find(f => path.basename(f) === parsed.noteFolderName);
+            if (!folderPath) {
+                vscode.window.showErrorMessage(`Notes folder "${parsed.noteFolderName}" not found. Register it in the Notes panel first.`);
+                return;
+            }
+            if (parsed.pageId) {
+                // Page link: open md in CURRENT note's sidepanel (no note/outliner switch)
+                // Resolve file path from target note's folder, then open in current panel
+                const pagePath = notesEditorProvider.resolvePagePath(folderPath, parsed.outFileId, parsed.pageId!);
+                if (pagePath) {
+                    notesEditorProvider.openPageInCurrentPanel(pagePath);
+                } else {
+                    vscode.window.showWarningMessage('Page file not found');
+                }
+            } else {
+                // Node link: navigate to note + outliner + node
+                await notesEditorProvider.openNotesFolder(folderPath);
+                setTimeout(() => {
+                    notesEditorProvider.navigateToLink(folderPath, parsed);
+                }, 500);
+            }
         })
     );
 

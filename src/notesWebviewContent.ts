@@ -11,6 +11,7 @@ interface NotesConfig {
     enableDebugLogging?: boolean;
     outlinerPageTitle?: boolean;
     documentBaseUri?: string;
+    folderName?: string;
 }
 
 interface NotesInitData {
@@ -112,7 +113,7 @@ export function getNotesWebviewContent(
     <style>${notesCss}</style>
 </head>
 <body>
-    <div class="notes-layout">
+    <div class="notes-layout" data-note-folder-name="${config.folderName || ''}">
         ${notesHtml}
         <div class="notes-main-wrapper">
             <div class="outliner-container">

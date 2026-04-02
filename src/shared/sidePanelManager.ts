@@ -226,7 +226,9 @@ export class SidePanelManager {
      * サイドパネル内のリンククリック → 同じサイドパネル内で遷移。
      */
     async handleOpenLink(href: string, sidePanelFilePath: string): Promise<void> {
-        if (href.startsWith('http')) {
+        if (href.startsWith('fractal://')) {
+            vscode.commands.executeCommand('fractal.navigateInAppLink', href);
+        } else if (href.startsWith('http')) {
             vscode.env.openExternal(vscode.Uri.parse(href));
         } else if (href.startsWith('#')) {
             this.host.postMessage({

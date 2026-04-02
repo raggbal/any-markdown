@@ -800,7 +800,9 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
                 case 'openLinkInTab': {
                     const linkHref: string = message.href;
                     const forceTab = message.type === 'openLinkInTab';
-                    if (linkHref.startsWith('http')) {
+                    if (linkHref.startsWith('fractal://')) {
+                        vscode.commands.executeCommand('fractal.navigateInAppLink', linkHref);
+                    } else if (linkHref.startsWith('http')) {
                         vscode.env.openExternal(vscode.Uri.parse(linkHref));
                     } else if (linkHref.startsWith('#')) {
                         webviewPanel.webview.postMessage({

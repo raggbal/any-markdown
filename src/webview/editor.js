@@ -547,6 +547,126 @@ class EditorInstance {
     init();
     logger.log('[Any MD] init() completed, editor.innerHTML length:', editor.innerHTML.length);
 
+    // ========== EDITOR CONTEXT MENU (right-click) ==========
+    var editorContextMenuEl = null;
+
+    function hideEditorContextMenu() {
+        if (editorContextMenuEl) {
+            editorContextMenuEl.remove();
+            editorContextMenuEl = null;
+        }
+    }
+
+    function showEditorContextMenu(x, y) {
+        hideEditorContextMenu();
+        var sel = window.getSelection();
+        var hasSelection = sel && !sel.isCollapsed;
+        // M-11: Save selection range before menu steals focus
+        var savedRange = (sel && sel.rangeCount > 0) ? sel.getRangeAt(0).cloneRange() : null;
+        var isInNotesContext = !!document.querySelector('.notes-layout');
+        var isMac = navigator.platform.indexOf('Mac') !== -1;
+        var mod = isMac ? 'Cmd' : 'Ctrl';
+
+        function restoreSelectionAndFocus() {
+            // preventScroll to avoid jumping to top (問題2対策)
+            editor.focus({ preventScroll: true });
+            if (savedRange) {
+                var s = window.getSelection();
+                s.removeAllRanges();
+                s.addRange(savedRange);
+            }
+        }
+
+        editorContextMenuEl = document.createElement('div');
+        editorContextMenuEl.className = 'editor-context-menu';
+        // Compute theme-aware colors from CSS variables (fallback for non-themed contexts)
+        var cs = getComputedStyle(document.documentElement);
+        var menuBg = cs.getPropertyValue('--bg-color').trim() || '#252526';
+        var menuFg = cs.getPropertyValue('--text-color').trim() || '#cccccc';
+        var menuBorder = cs.getPropertyValue('--border-color').trim() || '#454545';
+        editorContextMenuEl.style.cssText = 'position:fixed;left:' + x + 'px;top:' + y + 'px;background:' + menuBg + ';border:1px solid ' + menuBorder + ';border-radius:6px;padding:4px 0;min-width:160px;box-shadow:0 4px 16px rgba(0,0,0,0.3);z-index:10000;font-size:13px;color:' + menuFg + ';';
+        // Prevent native context menu on our custom menu
+        editorContextMenuEl.addEventListener('contextmenu', function(ev) { ev.preventDefault(); ev.stopPropagation(); });
+
+        function addCtxItem(label, handler, shortcut, disabled) {
+            var item = document.createElement('div');
+            item.className = 'editor-context-menu-item' + (disabled ? ' disabled' : '');
+            item.style.cssText = 'padding:6px 20px 6px 12px;cursor:' + (disabled ? 'default' : 'pointer') + ';display:flex;align-items:center;justify-content:space-between;gap:16px;white-space:nowrap;' + (disabled ? 'opacity:0.4;' : '');
+            if (!disabled) {
+                item.addEventListener('mouseenter', function() { item.style.background = (cs.getPropertyValue('--link-color').trim() || '#094771'); item.style.color = '#ffffff'; });
+                item.addEventListener('mouseleave', function() { item.style.background = ''; item.style.color = ''; });
+            }
+            var labelSpan = document.createElement('span');
+            labelSpan.className = 'context-menu-label';
+            labelSpan.textContent = label;
+            item.appendChild(labelSpan);
+            if (shortcut) {
+                var kbdSpan = document.createElement('span');
+                kbdSpan.className = 'context-menu-shortcut';
+                kbdSpan.style.cssText = 'font-size:11px;opacity:0.6;margin-left:24px;';
+                kbdSpan.textContent = shortcut;
+                item.appendChild(kbdSpan);
+            }
+            if (!disabled) {
+                item.addEventListener('click', function() { handler(); hideEditorContextMenu(); });
+            }
+            editorContextMenuEl.appendChild(item);
+        }
+
+        function addCtxSeparator() {
+            var sep = document.createElement('div');
+            sep.className = 'editor-context-menu-separator';
+            sep.style.cssText = 'height:1px;background:#454545;margin:4px 0;';
+            editorContextMenuEl.appendChild(sep);
+        }
+
+        // Cut
+        addCtxItem(i18n.contextCut || 'Cut', function() {
+            restoreSelectionAndFocus();
+            document.execCommand('cut');
+        }, mod + '+X', !hasSelection);
+
+        // Copy
+        addCtxItem(i18n.contextCopy || 'Copy', function() {
+            restoreSelectionAndFocus();
+            document.execCommand('copy');
+        }, mod + '+C', !hasSelection);
+
+        // Paste — use execCommand('paste') which triggers the editor's native paste handler
+        addCtxItem(i18n.contextPaste || 'Paste', function() {
+            restoreSelectionAndFocus();
+            document.execCommand('paste');
+        }, mod + '+V');
+
+        document.body.appendChild(editorContextMenuEl);
+
+        // Auto-adjust position
+        var rect = editorContextMenuEl.getBoundingClientRect();
+        if (rect.right > window.innerWidth) {
+            editorContextMenuEl.style.left = (window.innerWidth - rect.width - 8) + 'px';
+        }
+        if (rect.bottom > window.innerHeight) {
+            editorContextMenuEl.style.top = (window.innerHeight - rect.height - 8) + 'px';
+        }
+
+        // Close on outside click
+        setTimeout(function() {
+            document.addEventListener('click', hideEditorContextMenu, { once: true });
+        }, 0);
+    }
+
+    // Register on document level — VSCode webview does not deliver contextmenu
+    // events to individual elements reliably. Each EditorInstance registers its own
+    // handler with editor.contains() guard so closures (editor, isSourceMode, host,
+    // i18n, self) remain intact per instance.
+    document.addEventListener('contextmenu', function(e) {
+        if (!e.target || !editor.contains(e.target)) return; // Not our editor
+        if (isSourceMode) return; // Let browser handle in source mode
+        e.preventDefault();
+        e.stopImmediatePropagation(); // Prevent other instances & outliner handler
+        showEditorContextMenu(e.clientX, e.clientY);
+    });
+
     // ========== UNDO / REDO MANAGER ==========
     var undoManager = (function() {
         var MAX_STACK = 200;

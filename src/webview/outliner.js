@@ -3309,6 +3309,10 @@ var Outliner = (function() {
 
     function setupContextMenu() {
         document.addEventListener('contextmenu', function(e) {
+            // Skip if right-click is inside side panel editor (editor.js handles it)
+            if (e.target.closest && e.target.closest('.side-panel-editor-root')) {
+                return;
+            }
             var nodeEl = e.target.closest('.outliner-node');
             if (!nodeEl) {
                 hideContextMenu();
@@ -3502,6 +3506,29 @@ var Outliner = (function() {
             }, 'Backspace');
         }
 
+        // --- アプリ内リンクをコピー (Notes mode のみ) ---
+        var notesLayoutEl = document.querySelector('.notes-layout');
+        if (notesLayoutEl && selectedNodeIds.size <= 1) {
+            addMenuSeparator(contextMenuEl);
+            addMenuItem(contextMenuEl, i18n.copyInAppLink || 'Copy In-App Link', function() {
+                var folderName = notesLayoutEl.dataset.noteFolderName;
+                var outFileId = (typeof notesFilePanel !== 'undefined' && notesFilePanel.getCurrentOutFileId)
+                    ? notesFilePanel.getCurrentOutFileId() : null;
+                if (!folderName || !outFileId) { hideContextMenu(); return; }
+                var node = model.getNode(nodeId);
+                var text = stripInlineMarkers(node ? node.text : '') || 'Untitled';
+                // Remove #tag and @tag from display text
+                text = text.replace(/\s*[#@]\S+/g, '').trim() || 'Untitled';
+                var link = 'fractal://note/' +
+                    encodeURIComponent(folderName) + '/' +
+                    encodeURIComponent(outFileId) + '/' +
+                    encodeURIComponent(nodeId);
+                var mdLink = '[' + text.replace(/[\[\]]/g, '') + '](' + link + ')';
+                navigator.clipboard.writeText(mdLink);
+                hideContextMenu();
+            });
+        }
+
         document.body.appendChild(contextMenuEl);
 
         var rect = contextMenuEl.getBoundingClientRect();
@@ -3644,6 +3671,48 @@ var Outliner = (function() {
                     console.error('Failed to copy path:', err);
                 });
             });
+        }
+
+        // Copy In-App Link button (Notes mode only)
+        var sidePanelCopyInAppLinkBtn = document.querySelector('.side-panel-copy-inapp-link');
+        if (sidePanelCopyInAppLinkBtn) {
+            // Show only in Notes mode
+            var notesLayoutForBtn = document.querySelector('.notes-layout');
+            if (notesLayoutForBtn) {
+                sidePanelCopyInAppLinkBtn.style.display = '';
+                sidePanelCopyInAppLinkBtn.addEventListener('click', function() {
+                    if (!sidePanelOriginNodeId) return;
+                    var folderName = notesLayoutForBtn.dataset.noteFolderName;
+                    var outFileId = (typeof notesFilePanel !== 'undefined' && notesFilePanel.getCurrentOutFileId)
+                        ? notesFilePanel.getCurrentOutFileId() : null;
+                    if (!folderName || !outFileId) return;
+                    var originNode = model.getNode(sidePanelOriginNodeId);
+                    var pageId = originNode ? originNode.pageId : null;
+                    if (!pageId) return;
+                    // Display text: prefer H1 from sidepanel md, fallback to node text
+                    var linkDisplayText = '';
+                    if (sidePanelInstance && sidePanelInstance.container) {
+                        var spH1 = sidePanelInstance.container.querySelector('.editor h1');
+                        if (spH1) { linkDisplayText = (spH1.textContent || '').trim(); }
+                    }
+                    if (!linkDisplayText) {
+                        linkDisplayText = stripInlineMarkers(originNode.text || '') || 'Untitled';
+                    }
+                    // Page link: fractal://note/{folder}/{outFileId}/page/{pageId}
+                    var link = 'fractal://note/' +
+                        encodeURIComponent(folderName) + '/' +
+                        encodeURIComponent(outFileId) + '/page/' +
+                        encodeURIComponent(pageId);
+                    var mdLink = '[' + linkDisplayText.replace(/[\[\]]/g, '') + '](' + link + ')';
+                    navigator.clipboard.writeText(mdLink).then(function() {
+                        var originalHTML = sidePanelCopyInAppLinkBtn.innerHTML;
+                        sidePanelCopyInAppLinkBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+                        setTimeout(function() {
+                            sidePanelCopyInAppLinkBtn.innerHTML = originalHTML;
+                        }, 2000);
+                    });
+                });
+            }
         }
 
         // Outline sidebar open/close
@@ -4277,7 +4346,7 @@ var Outliner = (function() {
                         if (msg.jumpToNodeId) {
                             setTimeout(function() {
                                 jumpToAndHighlightNode(msg.jumpToNodeId);
-                            }, 100);
+                            }, 300);
                         }
                         // 新データの初期ベースライン（undoStackクリア → ボタンdisabled）
                         saveBaseline();
@@ -4373,6 +4442,19 @@ var Outliner = (function() {
 
                 case 'outlinerImageDirStatus':
                     break;
+
+                case 'notesNavigateInAppLink':
+                    // Node link navigation: close sidepanel + jump to node
+                    var notesBridge = window.notesHostBridge;
+                    if (notesBridge) {
+                        // Close sidepanel immediately if open
+                        if (sidePanelEl && sidePanelEl.classList.contains('open')) {
+                            closeSidePanelImmediate();
+                        }
+                        notesBridge.jumpToNode(msg.outFileId, msg.nodeId);
+                    }
+                    break;
+
 
                 // --- サイドパネル関連メッセージ ---
                 case 'openSidePanel':

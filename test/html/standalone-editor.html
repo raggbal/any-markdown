@@ -638,6 +638,47 @@ body {
 
 }
 
+/* Editor context menu (right-click) */
+.editor-context-menu {
+    position: fixed;
+    background: var(--vscode-menu-background, #252526);
+    border: 1px solid var(--vscode-menu-border, #454545);
+    border-radius: 6px;
+    padding: 4px 0;
+    min-width: 160px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    z-index: 1000;
+    font-size: 13px;
+    color: var(--vscode-menu-foreground, #cccccc);
+}
+.editor-context-menu-item {
+    padding: 6px 20px 6px 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    white-space: nowrap;
+}
+.editor-context-menu-item:hover:not(.disabled) {
+    background: var(--vscode-menu-selectionBackground, #094771);
+    color: var(--vscode-menu-selectionForeground, #ffffff);
+}
+.editor-context-menu-item.disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+.editor-context-menu-separator {
+    height: 1px;
+    background: var(--vscode-menu-separatorBackground, #454545);
+    margin: 4px 0;
+}
+.editor-context-menu .context-menu-shortcut {
+    font-size: 11px;
+    opacity: 0.6;
+    margin-left: 24px;
+}
+
 /* External change toast notification */
 .external-change-toast {
     position: fixed;
@@ -1632,6 +1673,9 @@ window.__createSidePanelBridgeMethods = function(postFn) {
         sidePanelOpenInTextEditor: function(sidePanelFilePath) {
             postFn({ type: 'sidePanelOpenInTextEditor', sidePanelFilePath: sidePanelFilePath });
         },
+        requestInAppLinkData: function(lineNumber, lineText) {
+            postFn({ type: 'requestInAppLinkData', lineNumber: lineNumber, lineText: lineText });
+        },
         getSidePanelImageDir: function(sidePanelFilePath) {
             postFn({ type: 'getSidePanelImageDir', sidePanelFilePath: sidePanelFilePath });
         },
@@ -2182,6 +2226,12 @@ class SidePanelHostBridge {
         this._mainHost.sendToChat(startLine, endLine, selectedMarkdown, this.filePath);
     }
     notifySidePanelClosed() {}
+    requestInAppLinkData(lineNumber, lineText) {
+        // Handled by outliner.js via callback, not via host bridge
+        if (this._onRequestInAppLink) {
+            this._onRequestInAppLink(lineNumber, lineText);
+        }
+    }
     searchFiles(query) { this._mainHost.searchFiles(query); }
     createPageAtPath(path) { this._mainHost.createPageAtPath(path); }
     createPageAuto() { this._mainHost.createPageAuto(); }
@@ -2689,6 +2739,123 @@ class EditorInstance {
     logger.log('[Any MD] Starting init(), markdown length:', markdown.length, 'editor element:', !!editor);
     init();
     logger.log('[Any MD] init() completed, editor.innerHTML length:', editor.innerHTML.length);
+
+    // ========== EDITOR CONTEXT MENU (right-click) ==========
+    var editorContextMenuEl = null;
+
+    function hideEditorContextMenu() {
+        if (editorContextMenuEl) {
+            editorContextMenuEl.remove();
+            editorContextMenuEl = null;
+        }
+    }
+
+    container.addEventListener('contextmenu', function(e) {
+        // Only handle if the click is inside our .editor element
+        if (!e.target.closest || !editor.contains(e.target)) return;
+        if (isSourceMode) return;
+        e.preventDefault();
+        e.stopPropagation();
+
+        hideEditorContextMenu();
+        var sel = window.getSelection();
+        var hasSelection = sel && !sel.isCollapsed;
+        var isInNotesContext = !!document.querySelector('.notes-layout');
+        var isMac = navigator.platform.indexOf('Mac') !== -1;
+        var mod = isMac ? 'Cmd' : 'Ctrl';
+
+        editorContextMenuEl = document.createElement('div');
+        editorContextMenuEl.className = 'editor-context-menu';
+        editorContextMenuEl.style.left = e.clientX + 'px';
+        editorContextMenuEl.style.top = e.clientY + 'px';
+
+        function addCtxItem(label, handler, shortcut, disabled) {
+            var item = document.createElement('div');
+            item.className = 'editor-context-menu-item' + (disabled ? ' disabled' : '');
+            var labelSpan = document.createElement('span');
+            labelSpan.className = 'context-menu-label';
+            labelSpan.textContent = label;
+            item.appendChild(labelSpan);
+            if (shortcut) {
+                var kbdSpan = document.createElement('span');
+                kbdSpan.className = 'context-menu-shortcut';
+                kbdSpan.textContent = shortcut;
+                item.appendChild(kbdSpan);
+            }
+            if (!disabled) {
+                item.addEventListener('click', function() { handler(); hideEditorContextMenu(); });
+            }
+            editorContextMenuEl.appendChild(item);
+        }
+
+        function addCtxSeparator() {
+            var sep = document.createElement('div');
+            sep.className = 'editor-context-menu-separator';
+            editorContextMenuEl.appendChild(sep);
+        }
+
+        addCtxItem(i18n.contextCut || 'Cut', function() {
+            document.execCommand('cut');
+        }, mod + '+X', !hasSelection);
+
+        addCtxItem(i18n.contextCopy || 'Copy', function() {
+            document.execCommand('copy');
+        }, mod + '+C', !hasSelection);
+
+        addCtxItem(i18n.contextPaste || 'Paste', function() {
+            navigator.clipboard.readText().then(function(text) {
+                if (text) { document.execCommand('insertText', false, text); }
+            }).catch(function() {});
+        }, mod + '+V');
+
+        // Copy In-App Link (Notes sidepanel only)
+        if (isInNotesContext && self.options && self.options.isSidePanel) {
+            addCtxSeparator();
+            addCtxItem(i18n.copyInAppLink || 'Copy In-App Link', function() {
+                var lineText = '';
+                var cursorLine = 0;
+                try {
+                    var md = htmlToMarkdown();
+                    var mdLines = md.split('\n');
+                    if (sel && sel.rangeCount > 0) {
+                        var range = sel.getRangeAt(0);
+                        var blockEl = range.startContainer.nodeType === 3 ? range.startContainer.parentElement : range.startContainer;
+                        while (blockEl && blockEl !== editor && blockEl.parentElement !== editor) {
+                            blockEl = blockEl.parentElement;
+                        }
+                        if (blockEl && blockEl !== editor) {
+                            var blocks = Array.from(editor.querySelectorAll(':scope > *'));
+                            var blockIndex = blocks.indexOf(blockEl);
+                            var lineCount = 0;
+                            for (var bi = 0; bi < blocks.length && bi <= blockIndex; bi++) {
+                                if (bi === blockIndex) { cursorLine = lineCount; break; }
+                                var blockMd = mdProcessNode(blocks[bi]);
+                                lineCount += blockMd.split('\n').filter(function(l) { return l !== ''; }).length || 1;
+                            }
+                        }
+                    }
+                    lineText = (mdLines[cursorLine] || '').replace(/^#+\s*/, '').replace(/^[-*+]\s*(\[[ xX]\]\s*)?/, '').replace(/^\d+\.\s*/, '').replace(/^>\s*/, '').trim();
+                } catch (err) {
+                    logger.warn('In-app link data extraction failed:', err);
+                }
+                host.requestInAppLinkData(cursorLine, lineText || 'Link');
+            });
+        }
+
+        document.body.appendChild(editorContextMenuEl);
+
+        var rect = editorContextMenuEl.getBoundingClientRect();
+        if (rect.right > window.innerWidth) {
+            editorContextMenuEl.style.left = (window.innerWidth - rect.width - 8) + 'px';
+        }
+        if (rect.bottom > window.innerHeight) {
+            editorContextMenuEl.style.top = (window.innerHeight - rect.height - 8) + 'px';
+        }
+
+        setTimeout(function() {
+            document.addEventListener('click', hideEditorContextMenu, { once: true });
+        }, 0);
+    });
 
     // ========== UNDO / REDO MANAGER ==========
     var undoManager = (function() {
@@ -15532,6 +15699,12 @@ class EditorInstance {
         } else if (message.type === 'scrollToLine') {
             // Scroll to a specific line number in the document
             scrollToLine(message.lineNumber);
+        } else if (message.type === 'inAppLinkData') {
+            // Received in-app link data from host — copy to clipboard
+            if (message.link && message.text) {
+                var mdLink = '[' + message.text.replace(/[\[\]]/g, '') + '](' + message.link + ')';
+                navigator.clipboard.writeText(mdLink);
+            }
         } else if (message.type === 'pasteText') {
             // Paste text relayed from main webview (side panel can't receive paste events directly)
             logger.log('pasteText received from main webview');

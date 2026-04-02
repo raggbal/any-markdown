@@ -1162,7 +1162,18 @@ var notesFilePanel = (function() {
         }
     }
 
-    return { init: init };
+    function getCurrentOutFileId() {
+        if (!currentFile) return null;
+        for (var i = 0; i < fileList.length; i++) {
+            if (fileList[i].filePath === currentFile) {
+                return fileList[i].id;
+            }
+        }
+        // Fallback: extract from file path
+        return currentFile.replace(/^.*[/\\]/, '').replace(/\.out$/, '');
+    }
+
+    return { init: init, getCurrentOutFileId: getCurrentOutFileId };
 })();
 
 // Export for both browser (global) and CommonJS

@@ -132,6 +132,10 @@ export const webviewMessages = {
   outlinerMoveDown: 'Move Down',
   outlinerDelete: 'Delete',
   outlinerDeleteNode: 'Delete Node',
+  copyInAppLink: 'Copy In-App Link',
+  contextCut: 'Cut',
+  contextCopy: 'Copy',
+  contextPaste: 'Paste',
   // Notes left panel
   notesTabNotes: 'Notes',
   notesTabSearch: 'Search',

@@ -132,6 +132,10 @@ export const webviewMessages = {
   outlinerMoveDown: '下へ移動',
   outlinerDelete: '削除',
   outlinerDeleteNode: 'ノードを削除',
+  copyInAppLink: 'アプリ内リンクをコピー',
+  contextCut: '切り取り',
+  contextCopy: 'コピー',
+  contextPaste: '貼り付け',
   // Notes left panel
   notesTabNotes: 'ノート',
   notesTabSearch: '検索',

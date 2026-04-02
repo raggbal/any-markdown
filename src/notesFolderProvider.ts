@@ -41,6 +41,10 @@ export class NotesFolderProvider implements vscode.TreeDataProvider<NotesFolderI
         this._onDidChangeTreeData.fire(undefined);
     }
 
+    getFolders(): string[] {
+        return [...this.folders];
+    }
+
     async removeFolder(item: NotesFolderItem): Promise<void> {
         const idx = this.folders.indexOf(item.folderPath);
         if (idx >= 0) {

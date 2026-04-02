@@ -520,6 +520,47 @@ body {
 
 }
 
+/* Editor context menu (right-click) */
+.editor-context-menu {
+    position: fixed;
+    background: var(--vscode-menu-background, #252526);
+    border: 1px solid var(--vscode-menu-border, #454545);
+    border-radius: 6px;
+    padding: 4px 0;
+    min-width: 160px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    z-index: 1000;
+    font-size: 13px;
+    color: var(--vscode-menu-foreground, #cccccc);
+}
+.editor-context-menu-item {
+    padding: 6px 20px 6px 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    white-space: nowrap;
+}
+.editor-context-menu-item:hover:not(.disabled) {
+    background: var(--vscode-menu-selectionBackground, #094771);
+    color: var(--vscode-menu-selectionForeground, #ffffff);
+}
+.editor-context-menu-item.disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+.editor-context-menu-separator {
+    height: 1px;
+    background: var(--vscode-menu-separatorBackground, #454545);
+    margin: 4px 0;
+}
+.editor-context-menu .context-menu-shortcut {
+    font-size: 11px;
+    opacity: 0.6;
+    margin-left: 24px;
+}
+
 /* External change toast notification */
 .external-change-toast {
     position: fixed;

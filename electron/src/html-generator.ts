@@ -387,7 +387,7 @@ export function generateOutlinerHtml(
     </style>` : ''}
 </head>
 <body>
-    <div class="notes-layout">
+    <div class="notes-layout" data-note-folder-name="${config.folderName || ''}">
         ${config.folderPanelEnabled ? `
         <div class="folder-panel" id="folderPanel">
             <div class="folder-panel-expanded" id="folderPanelExpanded">

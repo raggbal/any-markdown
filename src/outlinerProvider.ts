@@ -197,7 +197,11 @@ export class OutlinerProvider implements vscode.CustomTextEditorProvider {
 
                     case 'openLink':
                         if (message.href) {
-                            vscode.env.openExternal(vscode.Uri.parse(message.href));
+                            if (message.href.startsWith('fractal://')) {
+                                vscode.commands.executeCommand('fractal.navigateInAppLink', message.href);
+                            } else {
+                                vscode.env.openExternal(vscode.Uri.parse(message.href));
+                            }
                         }
                         break;
 
