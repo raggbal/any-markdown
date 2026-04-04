@@ -2060,13 +2060,22 @@ var Outliner = (function() {
                                     selRootSet.add(sortedIds[si]);
                                 }
                             }
-                            // 逆順で処理（挿入位置の正確性を保つため）
-                            for (var ri = selRootIds.length - 1; ri >= 0; ri--) {
-                                if (model.outdentNode(selRootIds[ri], selRootSet)) { anyMoved = true; }
+                            // 一番上の選択ルートがoutdent不可ならスキップ
+                            var topRoot = selRootIds.length > 0 ? model.getNode(selRootIds[0]) : null;
+                            if (topRoot && topRoot.parentId) {
+                                // 逆順で処理（挿入位置の正確性を保つため）
+                                for (var ri = selRootIds.length - 1; ri >= 0; ri--) {
+                                    if (model.outdentNode(selRootIds[ri], selRootSet)) { anyMoved = true; }
+                                }
                             }
                         } else {
-                            for (var ti = 0; ti < sortedIds.length; ti++) {
-                                if (model.indentNode(sortedIds[ti])) { anyMoved = true; }
+                            // 一番上の選択ノードがindent不可（前に兄弟なし）ならスキップ
+                            var topNode = model.getNode(sortedIds[0]);
+                            var topInfo = topNode ? model._getSiblingInfo(sortedIds[0]) : null;
+                            if (topInfo && topInfo.index > 0) {
+                                for (var ti = 0; ti < sortedIds.length; ti++) {
+                                    if (model.indentNode(sortedIds[ti])) { anyMoved = true; }
+                                }
                             }
                         }
                         if (anyMoved) {

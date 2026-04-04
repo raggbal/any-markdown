@@ -5,13 +5,15 @@ All notable changes to the "Fractal" extension extension will be documented in t
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.195.605] - 2026-04-04
+## [0.195.607] - 2026-04-05
 
 ### Added
 - Outliner: Cross-outliner copy/paste now preserves pages(.md) and images across different outliners
 
 ### Fixed
 - Outliner: Backspace on empty node with children no longer deletes children — they are promoted to parent level
+- Outliner: Multi-select Shift+Tab now preserves relative hierarchy instead of flattening all nodes
+- Outliner: Multi-select Tab/Shift+Tab skips operation if topmost node cannot be indented/outdented
 - Outliner: Single node copy (Cmd+C without selection) now preserves page/image metadata
 
 ## [0.195.603] - 2026-04-03

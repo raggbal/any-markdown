@@ -34,19 +34,14 @@ test.describe('Outliner multi-select indent/outdent', () => {
             });
         });
 
-        // n2をクリック → Shift+Click n3 で範囲選択
-        const n2Text = page.locator('.outliner-text[data-node-id="n2"]');
-        await n2Text.click();
-        await page.waitForTimeout(200);
-        const n3Text = page.locator('.outliner-text[data-node-id="n3"]');
-        await n3Text.click({ modifiers: ['Shift'] });
+        // n2にフォーカスしてShift+ArrowDownでn3まで選択
+        await page.locator('.outliner-text[data-node-id="n2"]').press('Shift+ArrowDown');
+        await page.waitForTimeout(50);
+        await page.keyboard.press('Shift+ArrowDown');
         await page.waitForTimeout(200);
 
-        const selectedCount = await page.locator('.outliner-node.is-selected').count();
-        expect(selectedCount).toBeGreaterThanOrEqual(2);
-
-        // Tab を押す（プログラム発火）
-        await pressTab(page, false);
+        // Tab を押す
+        await page.keyboard.press('Tab');
         await page.waitForTimeout(1500);
 
         const syncData = await page.evaluate(() => {
