@@ -181,6 +181,86 @@ function createNotesSender(win: BrowserWindow): { postMessage: (msg: unknown) =>
     };
 }
 
+function parseFractalLink(url: string): { noteFolderName: string; outFileId: string; nodeId?: string; pageId?: string } | null {
+    // Page link: fractal://note/{folder}/{outFileId}/page/{pageId}
+    const pageMatch = url.match(/^fractal:\/\/note\/([^/]+)\/([^/]+)\/page\/([^/?]+)$/);
+    if (pageMatch) {
+        return {
+            noteFolderName: decodeURIComponent(pageMatch[1]),
+            outFileId: decodeURIComponent(pageMatch[2]),
+            pageId: decodeURIComponent(pageMatch[3]),
+        };
+    }
+    // Node link: fractal://note/{folder}/{outFileId}/{nodeId}
+    const nodeMatch = url.match(/^fractal:\/\/note\/([^/]+)\/([^/]+)\/([^/?]+)$/);
+    if (nodeMatch) {
+        return {
+            noteFolderName: decodeURIComponent(nodeMatch[1]),
+            outFileId: decodeURIComponent(nodeMatch[2]),
+            nodeId: decodeURIComponent(nodeMatch[3]),
+        };
+    }
+    return null;
+}
+
+
+function resolveNoteFolderPath(folderName: string): string | null {
+    const folders: string[] = settingsManager.get('notesFolders') || [];
+    return folders.find(f => path.basename(f) === folderName) || null;
+}
+
+function resolvePageFilePath(folderPath: string, outFileId: string, pageId: string): string | null {
+    const outFilePath = path.join(folderPath, `${outFileId}.out`);
+    if (!fs.existsSync(outFilePath)) return null;
+    let outData: Record<string, unknown> | undefined;
+    try { outData = JSON.parse(fs.readFileSync(outFilePath, 'utf8')); } catch { /* ignore */ }
+    const pageDir = (outData?.pageDir as string) || './pages';
+    const resolvedPageDir = path.isAbsolute(pageDir)
+        ? pageDir
+        : path.resolve(path.dirname(outFilePath), pageDir);
+    const pagePath = path.join(resolvedPageDir, `${pageId}.md`);
+    return fs.existsSync(pagePath) ? pagePath : null;
+}
+
+async function handleFractalLink(win: BrowserWindow, href: string): Promise<void> {
+    const parsed = parseFractalLink(href);
+    if (!parsed) return;
+
+    // Resolve target folder path from registered folders
+    const targetFolderPath = resolveNoteFolderPath(parsed.noteFolderName);
+    if (!targetFolderPath) {
+        console.warn(`[fractal-link] Notes folder "${parsed.noteFolderName}" not found`);
+        return;
+    }
+
+    if (parsed.pageId) {
+        // Page link: open md in current window's sidepanel (no folder switch)
+        const pagePath = resolvePageFilePath(targetFolderPath, parsed.outFileId, parsed.pageId);
+        if (pagePath) {
+            openInSidePanel(win, pagePath);
+        }
+    } else if (parsed.nodeId) {
+        // Node link: switch to target folder if needed, then jump to node
+        const currentNfm = notesManagers.get(win);
+        const isSameFolder = currentNfm && currentNfm.getMainFolderPath() === targetFolderPath;
+
+        if (!isSameFolder) {
+            // Switch folder first, then navigate after load
+            await loadOutlinerMode(win, targetFolderPath, undefined, { folderPanelEnabled: (win as any).__folderPanelEnabled ?? true });
+            sendFolderUpdate(win);
+        }
+
+        // Small delay to ensure webview is ready after folder switch
+        setTimeout(() => {
+            win.webContents.send('host-message', {
+                type: 'notesNavigateInAppLink',
+                outFileId: parsed.outFileId,
+                nodeId: parsed.nodeId,
+            });
+        }, isSameFolder ? 0 : 500);
+    }
+}
+
 function createNotesPlatformActions(win: BrowserWindow): Record<string, unknown> {
     const sender: S3Sender = {
         postMessage: (message: unknown) => {
@@ -192,6 +272,9 @@ function createNotesPlatformActions(win: BrowserWindow): Record<string, unknown>
             if (href.startsWith('http://') || href.startsWith('https://')) {
                 shell.openExternal(href);
             }
+        },
+        navigateInAppLink: (href: string) => {
+            handleFractalLink(win, href);
         },
         openFileInEditor: (filePath: string) => {
             createWindow(filePath);
@@ -313,7 +396,9 @@ function createNotesPlatformActions(win: BrowserWindow): Record<string, unknown>
             if (state) setTimeout(() => { state.isOwnWrite = false; }, 200);
         },
         handleSidePanelOpenLink: (href: string, sidePanelFilePath: string) => {
-            if (href.startsWith('http://') || href.startsWith('https://')) {
+            if (href.startsWith('fractal://')) {
+                handleFractalLink(win, href);
+            } else if (href.startsWith('http://') || href.startsWith('https://')) {
                 shell.openExternal(href);
             } else if (href.startsWith('#')) {
                 win.webContents.send('host-message', {
@@ -536,6 +621,7 @@ async function loadOutlinerMode(win: BrowserWindow, folderPath: string, openFile
         outlinerPageTitle: settings.outlinerPageTitle !== false,
         folderPanelEnabled: useFolderPanel,
         documentBaseUri: docBaseUri,
+        folderName: path.basename(folderPath),
     });
     const tempFile = writeHtmlToTempFile(html);
     await win.loadFile(tempFile);
@@ -598,6 +684,7 @@ async function loadEmptyNotesMode(win: BrowserWindow): Promise<void> {
         outlinerPageTitle: settings.outlinerPageTitle !== false,
         folderPanelEnabled: true,
         documentBaseUri: '',
+        folderName: '',
     });
     const tempFile = writeHtmlToTempFile(html);
     await win.loadFile(tempFile);
@@ -768,6 +855,11 @@ ipcMain.on('save', async (event) => {
 });
 
 ipcMain.on('open-link', (event, href: string) => {
+    if (href.startsWith('fractal://')) {
+        const win = BrowserWindow.fromWebContents(event.sender);
+        if (win) handleFractalLink(win, href);
+        return;
+    }
     if (href.startsWith('http://') || href.startsWith('https://')) {
         shell.openExternal(href);
         return;

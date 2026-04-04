@@ -280,6 +280,7 @@ interface ElectronOutlinerConfig {
     outlinerPageTitle?: boolean;
     folderPanelEnabled?: boolean;
     documentBaseUri?: string;
+    folderName?: string;
 }
 
 interface OutlinerFileEntry {
