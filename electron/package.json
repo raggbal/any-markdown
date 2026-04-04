@@ -1,6 +1,6 @@
 {
   "name": "fractal-desktop",
-  "version": "0.195.603",
+  "version": "0.195.605",
   "description": "Fractal — WYSIWYG Markdown editor for desktop",
   "main": "out/main.js",
   "author": {

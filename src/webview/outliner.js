@@ -1467,6 +1467,16 @@ var Outliner = (function() {
         return internalClipboard;
     }
 
+    /** HTMLクリップボードからcross-outlinerメタデータを抽出 */
+    function extractOutlinerClipboardMeta(html) {
+        if (!html) { return null; }
+        var match = html.match(/data-outliner-clipboard="([^"]*)"/);
+        if (!match) { return null; }
+        try {
+            return JSON.parse(decodeURIComponent(match[1]));
+        } catch (e) { return null; }
+    }
+
     /** 選択ノードデータからネストされた <ul>/<li> HTML を生成（clipboard text/html 用） */
     function buildSelectedNodesHtml(nodesData) {
         if (!nodesData || nodesData.length === 0) { return ''; }
@@ -1504,9 +1514,12 @@ var Outliner = (function() {
         return html;
     }
 
-    /** クリップボードに text/plain + text/html を書き込む */
+    /** クリップボードに text/plain + text/html を書き込む (cross-outlinerメタデータ埋め込み) */
     function writeClipboardWithHtml(plainText, nodesData) {
         var htmlText = buildSelectedNodesHtml(nodesData);
+        // メタデータをHTMLに埋め込み (cross-webview paste用)
+        var metaJson = JSON.stringify({ nodes: nodesData, sourcePageDir: pageDir });
+        htmlText = htmlText.replace(/^<ul>/, '<ul data-outliner-clipboard="' + encodeURIComponent(metaJson) + '">');
         try {
             navigator.clipboard.write([
                 new ClipboardItem({
@@ -1580,10 +1593,22 @@ var Outliner = (function() {
         var node = model.getNode(nodeId);
         if (!node) { return; }
 
-        // 内部クリップボードの照合
+        // 内部クリップボードの照合 (Priority 1: 同一webview)
         var intClip = getValidInternalClipboard(clipText);
         var clipNodes = intClip ? intClip.nodes : null;
         var isCutPaste = intClip ? intClip.isCut : false;
+        var sourcePageDir = intClip ? intClip.sourcePageDir : null;
+
+        // Priority 2: HTMLクリップボードからcross-outlinerメタデータ抽出
+        if (!intClip) {
+            var htmlData = e.clipboardData ? e.clipboardData.getData('text/html') : '';
+            var crossMeta = extractOutlinerClipboardMeta(htmlData);
+            if (crossMeta && crossMeta.nodes) {
+                clipNodes = crossMeta.nodes;
+                isCutPaste = false; // cross-webviewでは常にコピー扱い
+                sourcePageDir = crossMeta.sourcePageDir || null;
+            }
+        }
 
         // カット時は1回消費
         if (intClip && intClip.isCut) {
@@ -1607,7 +1632,7 @@ var Outliner = (function() {
                 if (selectedNodeIds.has(flat[di])) { model.removeNode(flat[di]); }
             }
             clearSelection();
-            pasteNodesFromText(clipText, insertParentId, insertAfter, clipNodes, isCutPaste);
+            pasteNodesFromText(clipText, insertParentId, insertAfter, clipNodes, isCutPaste, sourcePageDir);
             return;
         }
 
@@ -1643,15 +1668,15 @@ var Outliner = (function() {
             var sibIdx = siblings.indexOf(nodeId);
             var insertAfterForEmpty = sibIdx > 0 ? siblings[sibIdx - 1] : null;
             model.removeNode(nodeId);
-            pasteNodesFromText(clipText, parentId, insertAfterForEmpty, clipNodes, isCutPaste);
+            pasteNodesFromText(clipText, parentId, insertAfterForEmpty, clipNodes, isCutPaste, sourcePageDir);
         } else {
             // テキストありノード: 現在ノードの後に全行を挿入
-            pasteNodesFromText(clipText, node.parentId, nodeId, clipNodes, isCutPaste);
+            pasteNodesFromText(clipText, node.parentId, nodeId, clipNodes, isCutPaste, sourcePageDir);
         }
     }
 
     /** インデント付きテキストからノード階層を構築してモデルに追加 */
-    function pasteNodesFromText(text, baseParentId, afterId, clipboardNodes, isCut) {
+    function pasteNodesFromText(text, baseParentId, afterId, clipboardNodes, isCut, srcPageDir) {
         var lines = text.split('\n');
         if (lines.length === 0) { return; }
 
@@ -1734,22 +1759,42 @@ var Outliner = (function() {
             // ページメタデータ・画像復元
             if (clipboardNodes && clipboardNodes[clipNodeIndexMap[n]]) {
                 var clipNode = clipboardNodes[clipNodeIndexMap[n]];
+                var isCrossFile = srcPageDir && srcPageDir !== pageDir;
                 if (clipNode.isPage && clipNode.pageId) {
                     if (isCut) {
                         // カット→ペースト: 元のpageIdをそのまま使う（移動扱い）
                         newNode.isPage = true;
                         newNode.pageId = clipNode.pageId;
+                        if (isCrossFile) {
+                            host.movePageFileCross(clipNode.pageId, text);
+                        }
                     } else {
                         // コピー→ペースト: 新pageId発行 + .mdファイル複製
                         var newPageId = model.generatePageId();
                         newNode.isPage = true;
                         newNode.pageId = newPageId;
-                        host.copyPageFile(clipNode.pageId, newPageId);
+                        if (isCrossFile) {
+                            host.copyPageFileCross(clipNode.pageId, newPageId, text);
+                        } else {
+                            host.copyPageFile(clipNode.pageId, newPageId);
+                        }
                     }
                 }
-                // 画像復元: カット=移動（同じパス）、コピー=複製（同じパス参照）
+                // 画像復元
                 if (clipNode.images && clipNode.images.length > 0) {
-                    newNode.images = clipNode.images.slice();
+                    if (isCrossFile) {
+                        // cross-file: ファイルコピー依頼 + パス変換
+                        host.copyImagesCross(clipNode.images, text);
+                        var targetDir = (pageDir || '').replace(/^\.\//, '').replace(/\/$/, '');
+                        var newImages = [];
+                        for (var imgI = 0; imgI < clipNode.images.length; imgI++) {
+                            var imgFilename = clipNode.images[imgI].split('/').pop();
+                            newImages.push(targetDir + '/images/' + imgFilename);
+                        }
+                        newNode.images = newImages;
+                    } else {
+                        newNode.images = clipNode.images.slice();
+                    }
                 }
             }
 
@@ -2228,16 +2273,31 @@ var Outliner = (function() {
                         internalClipboard = {
                             plainText: copyText,
                             isCut: false,
-                            nodes: copyNodesData
+                            nodes: copyNodesData,
+                            sourcePageDir: pageDir
                         };
+                        host.saveOutlinerClipboard(copyText, false, copyNodesData);
                     } else {
                         // 単一ノード: テキスト選択があればブラウザデフォルト、
                         // なければノード全体のテキストをコピー
                         var selC = window.getSelection();
                         if (!selC || selC.isCollapsed) {
                             e.preventDefault();
-                            navigator.clipboard.writeText(node.text || '');
-                            internalClipboard = null;
+                            var singleText = node.text || '';
+                            var singleNodesData = [{
+                                text: singleText, level: 0,
+                                isPage: node.isPage || false,
+                                pageId: node.pageId || null,
+                                images: (node.images && node.images.length > 0) ? node.images.slice() : []
+                            }];
+                            writeClipboardWithHtml(singleText, singleNodesData);
+                            internalClipboard = {
+                                plainText: singleText,
+                                isCut: false,
+                                nodes: singleNodesData,
+                                sourcePageDir: pageDir
+                            };
+                            host.saveOutlinerClipboard(singleText, false, singleNodesData);
                         }
                     }
                     break;
@@ -2251,8 +2311,10 @@ var Outliner = (function() {
                         internalClipboard = {
                             plainText: cutText,
                             isCut: true,
-                            nodes: cutNodesData
+                            nodes: cutNodesData,
+                            sourcePageDir: pageDir
                         };
+                        host.saveOutlinerClipboard(cutText, true, cutNodesData);
                         deleteSelectedNodes();
                     } else {
                         // 単一ノード: テキスト選択があればブラウザデフォルト、
@@ -2260,9 +2322,30 @@ var Outliner = (function() {
                         var selX = window.getSelection();
                         if (!selX || selX.isCollapsed) {
                             e.preventDefault();
-                            navigator.clipboard.writeText(node.text || '');
-                            internalClipboard = null;
+                            var cutSingleText = node.text || '';
+                            var cutSingleNodesData = [{
+                                text: cutSingleText, level: 0,
+                                isPage: node.isPage || false,
+                                pageId: node.pageId || null,
+                                images: (node.images && node.images.length > 0) ? node.images.slice() : []
+                            }];
+                            writeClipboardWithHtml(cutSingleText, cutSingleNodesData);
+                            internalClipboard = {
+                                plainText: cutSingleText,
+                                isCut: true,
+                                nodes: cutSingleNodesData,
+                                sourcePageDir: pageDir
+                            };
+                            host.saveOutlinerClipboard(cutSingleText, true, cutSingleNodesData);
                             saveSnapshot();
+                            // カット: ページ属性とテキストを除去（ノード自体は残す）
+                            if (node.isPage) {
+                                node.isPage = false;
+                                node.pageId = null;
+                            }
+                            if (node.images && node.images.length > 0) {
+                                node.images = [];
+                            }
                             model.updateText(nodeId, '');
                             textEl.innerHTML = '';
                             scheduleSyncToHost();
@@ -2499,7 +2582,33 @@ var Outliner = (function() {
         if (!prevNode) { return; }
 
         if ((node.text || '').length === 0 && (!node.children || node.children.length === 0)) {
+            // 空ノード+子なし: 単純削除
             model.removeNode(node.id);
+            if (currentScope.type === 'subtree' && !model.getNode(currentScope.rootId)) {
+                setScope({ type: 'document' });
+            }
+            renderTree();
+            focusNode(prevId);
+            scheduleSyncToHost();
+        } else if ((node.text || '').length === 0 && node.children && node.children.length > 0) {
+            // 空ノード+子あり: 子を親レベルに昇格（デインデント）して空ノード削除
+            var emptyParentId = node.parentId;
+            var parentSiblings = emptyParentId ? model.getNode(emptyParentId).children : model.rootIds;
+            var emptyIndex = parentSiblings.indexOf(node.id);
+            // 子ノードのIDをコピーし、nodeのchildrenをクリア（removeNodeの再帰削除を防ぐ）
+            var promotedIds = node.children.slice();
+            node.children = [];
+            // 親のchildren/rootIdsから空ノードを除去してノード削除
+            parentSiblings.splice(emptyIndex, 1);
+            delete model.nodes[node.id];
+            // 子ノードを元の位置に挿入（デインデント）
+            for (var ci = 0; ci < promotedIds.length; ci++) {
+                var promotedNode = model.nodes[promotedIds[ci]];
+                if (promotedNode) {
+                    promotedNode.parentId = emptyParentId;
+                    parentSiblings.splice(emptyIndex + ci, 0, promotedIds[ci]);
+                }
+            }
             if (currentScope.type === 'subtree' && !model.getNode(currentScope.rootId)) {
                 setScope({ type: 'document' });
             }

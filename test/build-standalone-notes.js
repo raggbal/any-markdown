@@ -114,6 +114,18 @@ const testNotesHostBridge = `
         copyPageFile: function(sourcePageId, newPageId) {
             window.__testApi.messages.push({ type: 'copyPageFile', sourcePageId: sourcePageId, newPageId: newPageId });
         },
+        copyPageFileCross: function(sourcePageId, newPageId, clipboardPlainText) {
+            window.__testApi.messages.push({ type: 'copyPageFileCross', sourcePageId: sourcePageId, newPageId: newPageId, clipboardPlainText: clipboardPlainText });
+        },
+        movePageFileCross: function(pageId, clipboardPlainText) {
+            window.__testApi.messages.push({ type: 'movePageFileCross', pageId: pageId, clipboardPlainText: clipboardPlainText });
+        },
+        copyImagesCross: function(images, clipboardPlainText) {
+            window.__testApi.messages.push({ type: 'copyImagesCross', images: images, clipboardPlainText: clipboardPlainText });
+        },
+        saveOutlinerClipboard: function(plainText, isCut, nodes) {
+            window.__testApi.messages.push({ type: 'saveOutlinerClipboard', plainText: plainText, isCut: isCut, nodes: nodes });
+        },
         setPageDir: function() {
             window.__testApi.messages.push({ type: 'setPageDir' });
         },

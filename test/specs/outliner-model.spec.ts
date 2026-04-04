@@ -176,9 +176,8 @@ test.describe('OutlinerModel', () => {
         test('3. 空ノード先頭でBackspace→ノード削除', async ({ page }) => {
             await init(page, twoNodes('ノード1', ''));
 
-            // 2番目の空ノードにフォーカス
-            await focusNode(page, 1);
-            await page.keyboard.press('Backspace');
+            // 2番目の空ノードにフォーカスしてBackspace
+            await page.locator('.outliner-text').nth(1).press('Backspace');
             await page.waitForTimeout(300);
 
             expect(await nodeCount(page)).toBe(1);
@@ -188,9 +187,8 @@ test.describe('OutlinerModel', () => {
         test('4. 2ノードのルート→1つ削除→1ノード残る', async ({ page }) => {
             await init(page, twoNodes('残る', ''));
 
-            // 空の2番目のノードを選択してBackspaceで削除
-            await focusNode(page, 1);
-            await page.keyboard.press('Backspace');
+            // 空の2番目のノードでBackspace削除
+            await page.locator('.outliner-text').nth(1).press('Backspace');
             await page.waitForTimeout(300);
 
             expect(await nodeCount(page)).toBe(1);
@@ -207,8 +205,8 @@ test.describe('OutlinerModel', () => {
         test('5. Tab→前の兄弟の子に移動（indent）', async ({ page }) => {
             await init(page, twoNodes('parent', 'child'));
 
-            await focusNode(page, 1);
-            await page.keyboard.press('Tab');
+            // 2番目のノードでTab
+            await page.locator('.outliner-text').nth(1).press('Tab');
             await page.waitForTimeout(300);
 
             // n2がn1の子になっている
@@ -219,8 +217,7 @@ test.describe('OutlinerModel', () => {
         test('6. 先頭ノードでTab→何も起きない', async ({ page }) => {
             await init(page, twoNodes('first', 'second'));
 
-            await focusNode(page, 0);
-            await page.keyboard.press('Tab');
+            await page.locator('.outliner-text').nth(0).press('Tab');
             await page.waitForTimeout(300);
 
             // 構造が変わっていないことを確認
@@ -231,12 +228,8 @@ test.describe('OutlinerModel', () => {
         test('7. Shift+Tab→親の兄弟に移動（outdent）', async ({ page }) => {
             await init(page, parentChild('parent', 'child'));
 
-            // ネストされたノードにフォーカス
-            const nestedText = page.locator('.outliner-children .outliner-text').first();
-            await nestedText.click();
-            await page.waitForTimeout(100);
-
-            await page.keyboard.press('Shift+Tab');
+            // ネストされたノードでShift+Tab
+            await page.locator('.outliner-text').nth(1).press('Shift+Tab');
             await page.waitForTimeout(300);
 
             expect(await topLevelNodeCount(page)).toBe(2);
@@ -245,8 +238,7 @@ test.describe('OutlinerModel', () => {
         test('8. ルートノードでShift+Tab→何も起きない', async ({ page }) => {
             await init(page, singleNode('n1', 'root'));
 
-            await focusNode(page, 0);
-            await page.keyboard.press('Shift+Tab');
+            await page.locator('.outliner-text').nth(0).press('Shift+Tab');
             await page.waitForTimeout(300);
 
             expect(await topLevelNodeCount(page)).toBe(1);
@@ -257,8 +249,7 @@ test.describe('OutlinerModel', () => {
             await init(page, threeNodes('one', 'two', 'three'));
 
             // 3番目のノードにフォーカス
-            await focusNode(page, 2);
-            await page.keyboard.press('Control+Shift+ArrowUp');
+            await page.locator('.outliner-text').nth(2).press('Control+Shift+ArrowUp');
             await page.waitForTimeout(300);
 
             // 'three'が2番目に移動
@@ -270,8 +261,7 @@ test.describe('OutlinerModel', () => {
             await init(page, threeNodes('one', 'two', 'three'));
 
             // 1番目のノードにフォーカス
-            await focusNode(page, 0);
-            await page.keyboard.press('Control+Shift+ArrowDown');
+            await page.locator('.outliner-text').nth(0).press('Control+Shift+ArrowDown');
             await page.waitForTimeout(300);
 
             // 'one'が2番目に移動
@@ -282,8 +272,7 @@ test.describe('OutlinerModel', () => {
         test('11. Ctrl+Shift+Up（先頭ノード）→何も起きない', async ({ page }) => {
             await init(page, threeNodes('one', 'two', 'three'));
 
-            await focusNode(page, 0);
-            await page.keyboard.press('Control+Shift+ArrowUp');
+            await page.locator('.outliner-text').nth(0).press('Control+Shift+ArrowUp');
             await page.waitForTimeout(300);
 
             // 順序が変わっていない
@@ -295,8 +284,7 @@ test.describe('OutlinerModel', () => {
         test('12. Ctrl+Shift+Down（末尾ノード）→何も起きない', async ({ page }) => {
             await init(page, threeNodes('one', 'two', 'three'));
 
-            await focusNode(page, 2);
-            await page.keyboard.press('Control+Shift+ArrowDown');
+            await page.locator('.outliner-text').nth(2).press('Control+Shift+ArrowDown');
             await page.waitForTimeout(300);
 
             // 順序が変わっていない
@@ -317,9 +305,8 @@ test.describe('OutlinerModel', () => {
                 },
             });
 
-            // n2にフォーカスしてTab
-            await focusNode(page, 1); // n2はvisible上2番目（c1は折りたたまれている）
-            await page.keyboard.press('Tab');
+            // n2にフォーカスしてTab（c1は折りたたまれて非表示なのでdata-node-idで直接指定）
+            await page.locator('.outliner-text[data-node-id="n2"]').press('Tab');
             await page.waitForTimeout(300);
 
             // n1のcollapsedがfalseになっていることを確認（syncDataで検証）
@@ -354,8 +341,7 @@ test.describe('OutlinerModel', () => {
             await init(page, singleNode('n1', 'test'));
 
             // テキストを編集してsyncDataをトリガー
-            await focusNode(page, 0);
-            await page.keyboard.press('End');
+            await page.locator('.outliner-text').nth(0).press('End');
             await page.keyboard.type('!');
 
             await waitForSync(page);
@@ -384,8 +370,7 @@ test.describe('OutlinerModel', () => {
             });
 
             // 編集してsyncDataをトリガー
-            await focusNode(page, 0);
-            await page.keyboard.press('End');
+            await page.locator('.outliner-text').nth(0).press('End');
             await page.keyboard.type(' ');
 
             await waitForSync(page);
@@ -443,8 +428,7 @@ test.describe('OutlinerModel', () => {
         test('19. テキスト編集でタグが更新される', async ({ page }) => {
             await init(page, singleNode('n1', 'text'));
 
-            await focusNode(page, 0);
-            await page.keyboard.press('End');
+            await page.locator('.outliner-text').nth(0).press('End');
             await page.keyboard.type(' #newtag');
 
             await waitForSync(page);
@@ -463,8 +447,7 @@ test.describe('OutlinerModel', () => {
             });
 
             // syncDataのtagsに#notagが含まれないことを確認
-            await focusNode(page, 0);
-            await page.keyboard.press('End');
+            await page.locator('.outliner-text').nth(0).press('End');
             await page.keyboard.type(' ');
 
             await waitForSync(page);
@@ -486,8 +469,7 @@ test.describe('OutlinerModel', () => {
 
             await clearMessages(page);
 
-            await focusNode(page, 0);
-            await page.keyboard.press('End');
+            await page.locator('.outliner-text').nth(0).press('End');
             await page.keyboard.type(' @page');
             await page.waitForTimeout(100);
             await page.keyboard.press('Enter');

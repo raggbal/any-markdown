@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { NotesFileManager } from './notes-file-manager';
 import { importMdFiles } from './markdown-import';
+import { OutlinerClipboardStore } from './outliner-clipboard-store';
 
 /**
  * Webview へのメッセージ送信インターフェース
@@ -175,6 +176,70 @@ export function handleNotesMessage(
             const destPath = path.join(pagesDir, `${message.newPageId}.md`);
             if (fs.existsSync(sourcePath)) {
                 fs.copyFileSync(sourcePath, destPath);
+            }
+            break;
+        }
+
+        case 'saveOutlinerClipboard': {
+            const clipPagesDir = fileManager.getPagesDirPath();
+            OutlinerClipboardStore.save({
+                plainText: message.plainText,
+                isCut: message.isCut,
+                nodes: message.nodes,
+                sourcePagesDirPath: clipPagesDir,
+                sourceImagesDirPath: path.join(clipPagesDir, 'images')
+            });
+            break;
+        }
+
+        case 'copyPageFileCross': {
+            const clipData = OutlinerClipboardStore.get(message.clipboardPlainText);
+            if (!clipData) break;
+            const crossSourcePath = path.join(clipData.sourcePagesDirPath, `${message.sourcePageId}.md`);
+            const crossDestDir = fileManager.getPagesDirPath();
+            if (!fs.existsSync(crossDestDir)) fs.mkdirSync(crossDestDir, { recursive: true });
+            const crossDestPath = path.join(crossDestDir, `${message.newPageId}.md`);
+            if (fs.existsSync(crossSourcePath)) {
+                fs.copyFileSync(crossSourcePath, crossDestPath);
+            }
+            break;
+        }
+
+        case 'movePageFileCross': {
+            const moveClipData = OutlinerClipboardStore.get(message.clipboardPlainText);
+            if (!moveClipData) break;
+            const moveSourcePath = path.join(moveClipData.sourcePagesDirPath, `${message.pageId}.md`);
+            const moveDestDir = fileManager.getPagesDirPath();
+            if (!fs.existsSync(moveDestDir)) fs.mkdirSync(moveDestDir, { recursive: true });
+            const moveDestPath = path.join(moveDestDir, `${message.pageId}.md`);
+            if (fs.existsSync(moveSourcePath) && moveSourcePath !== moveDestPath) {
+                fs.copyFileSync(moveSourcePath, moveDestPath);
+                try { fs.unlinkSync(moveSourcePath); } catch { /* ignore */ }
+            }
+            OutlinerClipboardStore.consumeIfCut(message.clipboardPlainText);
+            break;
+        }
+
+        case 'copyImagesCross': {
+            const imgClipData = OutlinerClipboardStore.get(message.clipboardPlainText);
+            if (!imgClipData || !message.images) break;
+            const targetImagesDir = path.join(fileManager.getPagesDirPath(), 'images');
+            if (!fs.existsSync(targetImagesDir)) fs.mkdirSync(targetImagesDir, { recursive: true });
+            for (const imgPath of message.images) {
+                const filename = path.basename(imgPath);
+                const imgSourcePath = path.join(imgClipData.sourceImagesDirPath, filename);
+                const imgDestPath = path.join(targetImagesDir, filename);
+                if (fs.existsSync(imgSourcePath) && !fs.existsSync(imgDestPath)) {
+                    fs.copyFileSync(imgSourcePath, imgDestPath);
+                }
+            }
+            if (imgClipData.isCut) {
+                for (const imgPath of message.images) {
+                    const filename = path.basename(imgPath);
+                    const imgSourcePath = path.join(imgClipData.sourceImagesDirPath, filename);
+                    try { fs.unlinkSync(imgSourcePath); } catch { /* ignore */ }
+                }
+                OutlinerClipboardStore.consumeIfCut(message.clipboardPlainText);
             }
             break;
         }

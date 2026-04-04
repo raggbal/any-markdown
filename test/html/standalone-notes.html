@@ -3140,6 +3140,9 @@ body {
                     <button class="side-panel-copy-path" id="sidePanelCopyPath" title="Copy file path">
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                     </button>
+                    <button class="side-panel-copy-inapp-link" id="sidePanelCopyInAppLink" title="Copy In-App Link" style="display:none">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                    </button>
                     <button class="side-panel-open-tab" id="sidePanelOpenTab" title="Open in new tab">
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
                     </button>
@@ -3242,9 +3245,6 @@ window.__createSidePanelBridgeMethods = function(postFn) {
         sidePanelOpenInTextEditor: function(sidePanelFilePath) {
             postFn({ type: 'sidePanelOpenInTextEditor', sidePanelFilePath: sidePanelFilePath });
         },
-        requestInAppLinkData: function(lineNumber, lineText) {
-            postFn({ type: 'requestInAppLinkData', lineNumber: lineNumber, lineText: lineText });
-        },
         getSidePanelImageDir: function(sidePanelFilePath) {
             postFn({ type: 'getSidePanelImageDir', sidePanelFilePath: sidePanelFilePath });
         },
@@ -3313,6 +3313,18 @@ window.__createSidePanelBridgeMethods = function(postFn) {
         },
         copyPageFile: function(sourcePageId, newPageId) {
             window.__testApi.messages.push({ type: 'copyPageFile', sourcePageId: sourcePageId, newPageId: newPageId });
+        },
+        copyPageFileCross: function(sourcePageId, newPageId, clipboardPlainText) {
+            window.__testApi.messages.push({ type: 'copyPageFileCross', sourcePageId: sourcePageId, newPageId: newPageId, clipboardPlainText: clipboardPlainText });
+        },
+        movePageFileCross: function(pageId, clipboardPlainText) {
+            window.__testApi.messages.push({ type: 'movePageFileCross', pageId: pageId, clipboardPlainText: clipboardPlainText });
+        },
+        copyImagesCross: function(images, clipboardPlainText) {
+            window.__testApi.messages.push({ type: 'copyImagesCross', images: images, clipboardPlainText: clipboardPlainText });
+        },
+        saveOutlinerClipboard: function(plainText, isCut, nodes) {
+            window.__testApi.messages.push({ type: 'saveOutlinerClipboard', plainText: plainText, isCut: isCut, nodes: nodes });
         },
         setPageDir: function() {
             window.__testApi.messages.push({ type: 'setPageDir' });
@@ -3874,12 +3886,6 @@ class SidePanelHostBridge {
         this._mainHost.sendToChat(startLine, endLine, selectedMarkdown, this.filePath);
     }
     notifySidePanelClosed() {}
-    requestInAppLinkData(lineNumber, lineText) {
-        // Handled by outliner.js via callback, not via host bridge
-        if (this._onRequestInAppLink) {
-            this._onRequestInAppLink(lineNumber, lineText);
-        }
-    }
     searchFiles(query) { this._mainHost.searchFiles(query); }
     createPageAtPath(path) { this._mainHost.createPageAtPath(path); }
     createPageAuto() { this._mainHost.createPageAuto(); }
@@ -4398,28 +4404,45 @@ class EditorInstance {
         }
     }
 
-    container.addEventListener('contextmenu', function(e) {
-        // Only handle if the click is inside our .editor element
-        if (!e.target.closest || !editor.contains(e.target)) return;
-        if (isSourceMode) return;
-        e.preventDefault();
-        e.stopPropagation();
-
+    function showEditorContextMenu(x, y) {
         hideEditorContextMenu();
         var sel = window.getSelection();
         var hasSelection = sel && !sel.isCollapsed;
+        // M-11: Save selection range before menu steals focus
+        var savedRange = (sel && sel.rangeCount > 0) ? sel.getRangeAt(0).cloneRange() : null;
         var isInNotesContext = !!document.querySelector('.notes-layout');
         var isMac = navigator.platform.indexOf('Mac') !== -1;
         var mod = isMac ? 'Cmd' : 'Ctrl';
 
+        function restoreSelectionAndFocus() {
+            // preventScroll to avoid jumping to top (問題2対策)
+            editor.focus({ preventScroll: true });
+            if (savedRange) {
+                var s = window.getSelection();
+                s.removeAllRanges();
+                s.addRange(savedRange);
+            }
+        }
+
         editorContextMenuEl = document.createElement('div');
         editorContextMenuEl.className = 'editor-context-menu';
-        editorContextMenuEl.style.left = e.clientX + 'px';
-        editorContextMenuEl.style.top = e.clientY + 'px';
+        // Compute theme-aware colors from CSS variables (fallback for non-themed contexts)
+        var cs = getComputedStyle(document.documentElement);
+        var menuBg = cs.getPropertyValue('--bg-color').trim() || '#252526';
+        var menuFg = cs.getPropertyValue('--text-color').trim() || '#cccccc';
+        var menuBorder = cs.getPropertyValue('--border-color').trim() || '#454545';
+        editorContextMenuEl.style.cssText = 'position:fixed;left:' + x + 'px;top:' + y + 'px;background:' + menuBg + ';border:1px solid ' + menuBorder + ';border-radius:6px;padding:4px 0;min-width:160px;box-shadow:0 4px 16px rgba(0,0,0,0.3);z-index:10000;font-size:13px;color:' + menuFg + ';';
+        // Prevent native context menu on our custom menu
+        editorContextMenuEl.addEventListener('contextmenu', function(ev) { ev.preventDefault(); ev.stopPropagation(); });
 
         function addCtxItem(label, handler, shortcut, disabled) {
             var item = document.createElement('div');
             item.className = 'editor-context-menu-item' + (disabled ? ' disabled' : '');
+            item.style.cssText = 'padding:6px 20px 6px 12px;cursor:' + (disabled ? 'default' : 'pointer') + ';display:flex;align-items:center;justify-content:space-between;gap:16px;white-space:nowrap;' + (disabled ? 'opacity:0.4;' : '');
+            if (!disabled) {
+                item.addEventListener('mouseenter', function() { item.style.background = (cs.getPropertyValue('--link-color').trim() || '#094771'); item.style.color = '#ffffff'; });
+                item.addEventListener('mouseleave', function() { item.style.background = ''; item.style.color = ''; });
+            }
             var labelSpan = document.createElement('span');
             labelSpan.className = 'context-menu-label';
             labelSpan.textContent = label;
@@ -4427,6 +4450,7 @@ class EditorInstance {
             if (shortcut) {
                 var kbdSpan = document.createElement('span');
                 kbdSpan.className = 'context-menu-shortcut';
+                kbdSpan.style.cssText = 'font-size:11px;opacity:0.6;margin-left:24px;';
                 kbdSpan.textContent = shortcut;
                 item.appendChild(kbdSpan);
             }
@@ -4439,59 +4463,31 @@ class EditorInstance {
         function addCtxSeparator() {
             var sep = document.createElement('div');
             sep.className = 'editor-context-menu-separator';
+            sep.style.cssText = 'height:1px;background:#454545;margin:4px 0;';
             editorContextMenuEl.appendChild(sep);
         }
 
+        // Cut
         addCtxItem(i18n.contextCut || 'Cut', function() {
+            restoreSelectionAndFocus();
             document.execCommand('cut');
         }, mod + '+X', !hasSelection);
 
+        // Copy
         addCtxItem(i18n.contextCopy || 'Copy', function() {
+            restoreSelectionAndFocus();
             document.execCommand('copy');
         }, mod + '+C', !hasSelection);
 
+        // Paste — use execCommand('paste') which triggers the editor's native paste handler
         addCtxItem(i18n.contextPaste || 'Paste', function() {
-            navigator.clipboard.readText().then(function(text) {
-                if (text) { document.execCommand('insertText', false, text); }
-            }).catch(function() {});
+            restoreSelectionAndFocus();
+            document.execCommand('paste');
         }, mod + '+V');
-
-        // Copy In-App Link (Notes sidepanel only)
-        if (isInNotesContext && self.options && self.options.isSidePanel) {
-            addCtxSeparator();
-            addCtxItem(i18n.copyInAppLink || 'Copy In-App Link', function() {
-                var lineText = '';
-                var cursorLine = 0;
-                try {
-                    var md = htmlToMarkdown();
-                    var mdLines = md.split('\n');
-                    if (sel && sel.rangeCount > 0) {
-                        var range = sel.getRangeAt(0);
-                        var blockEl = range.startContainer.nodeType === 3 ? range.startContainer.parentElement : range.startContainer;
-                        while (blockEl && blockEl !== editor && blockEl.parentElement !== editor) {
-                            blockEl = blockEl.parentElement;
-                        }
-                        if (blockEl && blockEl !== editor) {
-                            var blocks = Array.from(editor.querySelectorAll(':scope > *'));
-                            var blockIndex = blocks.indexOf(blockEl);
-                            var lineCount = 0;
-                            for (var bi = 0; bi < blocks.length && bi <= blockIndex; bi++) {
-                                if (bi === blockIndex) { cursorLine = lineCount; break; }
-                                var blockMd = mdProcessNode(blocks[bi]);
-                                lineCount += blockMd.split('\n').filter(function(l) { return l !== ''; }).length || 1;
-                            }
-                        }
-                    }
-                    lineText = (mdLines[cursorLine] || '').replace(/^#+\s*/, '').replace(/^[-*+]\s*(\[[ xX]\]\s*)?/, '').replace(/^\d+\.\s*/, '').replace(/^>\s*/, '').trim();
-                } catch (err) {
-                    logger.warn('In-app link data extraction failed:', err);
-                }
-                host.requestInAppLinkData(cursorLine, lineText || 'Link');
-            });
-        }
 
         document.body.appendChild(editorContextMenuEl);
 
+        // Auto-adjust position
         var rect = editorContextMenuEl.getBoundingClientRect();
         if (rect.right > window.innerWidth) {
             editorContextMenuEl.style.left = (window.innerWidth - rect.width - 8) + 'px';
@@ -4500,9 +4496,22 @@ class EditorInstance {
             editorContextMenuEl.style.top = (window.innerHeight - rect.height - 8) + 'px';
         }
 
+        // Close on outside click
         setTimeout(function() {
             document.addEventListener('click', hideEditorContextMenu, { once: true });
         }, 0);
+    }
+
+    // Register on document level — VSCode webview does not deliver contextmenu
+    // events to individual elements reliably. Each EditorInstance registers its own
+    // handler with editor.contains() guard so closures (editor, isSourceMode, host,
+    // i18n, self) remain intact per instance.
+    document.addEventListener('contextmenu', function(e) {
+        if (!e.target || !editor.contains(e.target)) return; // Not our editor
+        if (isSourceMode) return; // Let browser handle in source mode
+        e.preventDefault();
+        e.stopImmediatePropagation(); // Prevent other instances & outliner handler
+        showEditorContextMenu(e.clientX, e.clientY);
     });
 
     // ========== UNDO / REDO MANAGER ==========
@@ -17347,12 +17356,6 @@ class EditorInstance {
         } else if (message.type === 'scrollToLine') {
             // Scroll to a specific line number in the document
             scrollToLine(message.lineNumber);
-        } else if (message.type === 'inAppLinkData') {
-            // Received in-app link data from host — copy to clipboard
-            if (message.link && message.text) {
-                var mdLink = '[' + message.text.replace(/[\[\]]/g, '') + '](' + message.link + ')';
-                navigator.clipboard.writeText(mdLink);
-            }
         } else if (message.type === 'pasteText') {
             // Paste text relayed from main webview (side panel can't receive paste events directly)
             logger.log('pasteText received from main webview');
@@ -21913,6 +21916,16 @@ var Outliner = (function() {
         return internalClipboard;
     }
 
+    /** HTMLクリップボードからcross-outlinerメタデータを抽出 */
+    function extractOutlinerClipboardMeta(html) {
+        if (!html) { return null; }
+        var match = html.match(/data-outliner-clipboard="([^"]*)"/);
+        if (!match) { return null; }
+        try {
+            return JSON.parse(decodeURIComponent(match[1]));
+        } catch (e) { return null; }
+    }
+
     /** 選択ノードデータからネストされた <ul>/<li> HTML を生成（clipboard text/html 用） */
     function buildSelectedNodesHtml(nodesData) {
         if (!nodesData || nodesData.length === 0) { return ''; }
@@ -21950,9 +21963,12 @@ var Outliner = (function() {
         return html;
     }
 
-    /** クリップボードに text/plain + text/html を書き込む */
+    /** クリップボードに text/plain + text/html を書き込む (cross-outlinerメタデータ埋め込み) */
     function writeClipboardWithHtml(plainText, nodesData) {
         var htmlText = buildSelectedNodesHtml(nodesData);
+        // メタデータをHTMLに埋め込み (cross-webview paste用)
+        var metaJson = JSON.stringify({ nodes: nodesData, sourcePageDir: pageDir });
+        htmlText = htmlText.replace(/^<ul>/, '<ul data-outliner-clipboard="' + encodeURIComponent(metaJson) + '">');
         try {
             navigator.clipboard.write([
                 new ClipboardItem({
@@ -22026,10 +22042,22 @@ var Outliner = (function() {
         var node = model.getNode(nodeId);
         if (!node) { return; }
 
-        // 内部クリップボードの照合
+        // 内部クリップボードの照合 (Priority 1: 同一webview)
         var intClip = getValidInternalClipboard(clipText);
         var clipNodes = intClip ? intClip.nodes : null;
         var isCutPaste = intClip ? intClip.isCut : false;
+        var sourcePageDir = intClip ? intClip.sourcePageDir : null;
+
+        // Priority 2: HTMLクリップボードからcross-outlinerメタデータ抽出
+        if (!intClip) {
+            var htmlData = e.clipboardData ? e.clipboardData.getData('text/html') : '';
+            var crossMeta = extractOutlinerClipboardMeta(htmlData);
+            if (crossMeta && crossMeta.nodes) {
+                clipNodes = crossMeta.nodes;
+                isCutPaste = false; // cross-webviewでは常にコピー扱い
+                sourcePageDir = crossMeta.sourcePageDir || null;
+            }
+        }
 
         // カット時は1回消費
         if (intClip && intClip.isCut) {
@@ -22053,7 +22081,7 @@ var Outliner = (function() {
                 if (selectedNodeIds.has(flat[di])) { model.removeNode(flat[di]); }
             }
             clearSelection();
-            pasteNodesFromText(clipText, insertParentId, insertAfter, clipNodes, isCutPaste);
+            pasteNodesFromText(clipText, insertParentId, insertAfter, clipNodes, isCutPaste, sourcePageDir);
             return;
         }
 
@@ -22089,15 +22117,15 @@ var Outliner = (function() {
             var sibIdx = siblings.indexOf(nodeId);
             var insertAfterForEmpty = sibIdx > 0 ? siblings[sibIdx - 1] : null;
             model.removeNode(nodeId);
-            pasteNodesFromText(clipText, parentId, insertAfterForEmpty, clipNodes, isCutPaste);
+            pasteNodesFromText(clipText, parentId, insertAfterForEmpty, clipNodes, isCutPaste, sourcePageDir);
         } else {
             // テキストありノード: 現在ノードの後に全行を挿入
-            pasteNodesFromText(clipText, node.parentId, nodeId, clipNodes, isCutPaste);
+            pasteNodesFromText(clipText, node.parentId, nodeId, clipNodes, isCutPaste, sourcePageDir);
         }
     }
 
     /** インデント付きテキストからノード階層を構築してモデルに追加 */
-    function pasteNodesFromText(text, baseParentId, afterId, clipboardNodes, isCut) {
+    function pasteNodesFromText(text, baseParentId, afterId, clipboardNodes, isCut, srcPageDir) {
         var lines = text.split('\n');
         if (lines.length === 0) { return; }
 
@@ -22180,22 +22208,42 @@ var Outliner = (function() {
             // ページメタデータ・画像復元
             if (clipboardNodes && clipboardNodes[clipNodeIndexMap[n]]) {
                 var clipNode = clipboardNodes[clipNodeIndexMap[n]];
+                var isCrossFile = srcPageDir && srcPageDir !== pageDir;
                 if (clipNode.isPage && clipNode.pageId) {
                     if (isCut) {
                         // カット→ペースト: 元のpageIdをそのまま使う（移動扱い）
                         newNode.isPage = true;
                         newNode.pageId = clipNode.pageId;
+                        if (isCrossFile) {
+                            host.movePageFileCross(clipNode.pageId, text);
+                        }
                     } else {
                         // コピー→ペースト: 新pageId発行 + .mdファイル複製
                         var newPageId = model.generatePageId();
                         newNode.isPage = true;
                         newNode.pageId = newPageId;
-                        host.copyPageFile(clipNode.pageId, newPageId);
+                        if (isCrossFile) {
+                            host.copyPageFileCross(clipNode.pageId, newPageId, text);
+                        } else {
+                            host.copyPageFile(clipNode.pageId, newPageId);
+                        }
                     }
                 }
-                // 画像復元: カット=移動（同じパス）、コピー=複製（同じパス参照）
+                // 画像復元
                 if (clipNode.images && clipNode.images.length > 0) {
-                    newNode.images = clipNode.images.slice();
+                    if (isCrossFile) {
+                        // cross-file: ファイルコピー依頼 + パス変換
+                        host.copyImagesCross(clipNode.images, text);
+                        var targetDir = (pageDir || '').replace(/^\.\//, '').replace(/\/$/, '');
+                        var newImages = [];
+                        for (var imgI = 0; imgI < clipNode.images.length; imgI++) {
+                            var imgFilename = clipNode.images[imgI].split('/').pop();
+                            newImages.push(targetDir + '/images/' + imgFilename);
+                        }
+                        newNode.images = newImages;
+                    } else {
+                        newNode.images = clipNode.images.slice();
+                    }
                 }
             }
 
@@ -22674,16 +22722,31 @@ var Outliner = (function() {
                         internalClipboard = {
                             plainText: copyText,
                             isCut: false,
-                            nodes: copyNodesData
+                            nodes: copyNodesData,
+                            sourcePageDir: pageDir
                         };
+                        host.saveOutlinerClipboard(copyText, false, copyNodesData);
                     } else {
                         // 単一ノード: テキスト選択があればブラウザデフォルト、
                         // なければノード全体のテキストをコピー
                         var selC = window.getSelection();
                         if (!selC || selC.isCollapsed) {
                             e.preventDefault();
-                            navigator.clipboard.writeText(node.text || '');
-                            internalClipboard = null;
+                            var singleText = node.text || '';
+                            var singleNodesData = [{
+                                text: singleText, level: 0,
+                                isPage: node.isPage || false,
+                                pageId: node.pageId || null,
+                                images: (node.images && node.images.length > 0) ? node.images.slice() : []
+                            }];
+                            writeClipboardWithHtml(singleText, singleNodesData);
+                            internalClipboard = {
+                                plainText: singleText,
+                                isCut: false,
+                                nodes: singleNodesData,
+                                sourcePageDir: pageDir
+                            };
+                            host.saveOutlinerClipboard(singleText, false, singleNodesData);
                         }
                     }
                     break;
@@ -22697,8 +22760,10 @@ var Outliner = (function() {
                         internalClipboard = {
                             plainText: cutText,
                             isCut: true,
-                            nodes: cutNodesData
+                            nodes: cutNodesData,
+                            sourcePageDir: pageDir
                         };
+                        host.saveOutlinerClipboard(cutText, true, cutNodesData);
                         deleteSelectedNodes();
                     } else {
                         // 単一ノード: テキスト選択があればブラウザデフォルト、
@@ -22706,9 +22771,30 @@ var Outliner = (function() {
                         var selX = window.getSelection();
                         if (!selX || selX.isCollapsed) {
                             e.preventDefault();
-                            navigator.clipboard.writeText(node.text || '');
-                            internalClipboard = null;
+                            var cutSingleText = node.text || '';
+                            var cutSingleNodesData = [{
+                                text: cutSingleText, level: 0,
+                                isPage: node.isPage || false,
+                                pageId: node.pageId || null,
+                                images: (node.images && node.images.length > 0) ? node.images.slice() : []
+                            }];
+                            writeClipboardWithHtml(cutSingleText, cutSingleNodesData);
+                            internalClipboard = {
+                                plainText: cutSingleText,
+                                isCut: true,
+                                nodes: cutSingleNodesData,
+                                sourcePageDir: pageDir
+                            };
+                            host.saveOutlinerClipboard(cutSingleText, true, cutSingleNodesData);
                             saveSnapshot();
+                            // カット: ページ属性とテキストを除去（ノード自体は残す）
+                            if (node.isPage) {
+                                node.isPage = false;
+                                node.pageId = null;
+                            }
+                            if (node.images && node.images.length > 0) {
+                                node.images = [];
+                            }
                             model.updateText(nodeId, '');
                             textEl.innerHTML = '';
                             scheduleSyncToHost();
@@ -22945,7 +23031,33 @@ var Outliner = (function() {
         if (!prevNode) { return; }
 
         if ((node.text || '').length === 0 && (!node.children || node.children.length === 0)) {
+            // 空ノード+子なし: 単純削除
             model.removeNode(node.id);
+            if (currentScope.type === 'subtree' && !model.getNode(currentScope.rootId)) {
+                setScope({ type: 'document' });
+            }
+            renderTree();
+            focusNode(prevId);
+            scheduleSyncToHost();
+        } else if ((node.text || '').length === 0 && node.children && node.children.length > 0) {
+            // 空ノード+子あり: 子を親レベルに昇格（デインデント）して空ノード削除
+            var emptyParentId = node.parentId;
+            var parentSiblings = emptyParentId ? model.getNode(emptyParentId).children : model.rootIds;
+            var emptyIndex = parentSiblings.indexOf(node.id);
+            // 子ノードのIDをコピーし、nodeのchildrenをクリア（removeNodeの再帰削除を防ぐ）
+            var promotedIds = node.children.slice();
+            node.children = [];
+            // 親のchildren/rootIdsから空ノードを除去してノード削除
+            parentSiblings.splice(emptyIndex, 1);
+            delete model.nodes[node.id];
+            // 子ノードを元の位置に挿入（デインデント）
+            for (var ci = 0; ci < promotedIds.length; ci++) {
+                var promotedNode = model.nodes[promotedIds[ci]];
+                if (promotedNode) {
+                    promotedNode.parentId = emptyParentId;
+                    parentSiblings.splice(emptyIndex + ci, 0, promotedIds[ci]);
+                }
+            }
             if (currentScope.type === 'subtree' && !model.getNode(currentScope.rootId)) {
                 setScope({ type: 'document' });
             }
@@ -23963,6 +24075,8 @@ var Outliner = (function() {
                 if (!folderName || !outFileId) { hideContextMenu(); return; }
                 var node = model.getNode(nodeId);
                 var text = stripInlineMarkers(node ? node.text : '') || 'Untitled';
+                // Remove #tag and @tag from display text
+                text = text.replace(/\s*[#@]\S+/g, '').trim() || 'Untitled';
                 var link = 'fractal://note/' +
                     encodeURIComponent(folderName) + '/' +
                     encodeURIComponent(outFileId) + '/' +
@@ -24117,6 +24231,48 @@ var Outliner = (function() {
             });
         }
 
+        // Copy In-App Link button (Notes mode only)
+        var sidePanelCopyInAppLinkBtn = document.querySelector('.side-panel-copy-inapp-link');
+        if (sidePanelCopyInAppLinkBtn) {
+            // Show only in Notes mode
+            var notesLayoutForBtn = document.querySelector('.notes-layout');
+            if (notesLayoutForBtn) {
+                sidePanelCopyInAppLinkBtn.style.display = '';
+                sidePanelCopyInAppLinkBtn.addEventListener('click', function() {
+                    if (!sidePanelOriginNodeId) return;
+                    var folderName = notesLayoutForBtn.dataset.noteFolderName;
+                    var outFileId = (typeof notesFilePanel !== 'undefined' && notesFilePanel.getCurrentOutFileId)
+                        ? notesFilePanel.getCurrentOutFileId() : null;
+                    if (!folderName || !outFileId) return;
+                    var originNode = model.getNode(sidePanelOriginNodeId);
+                    var pageId = originNode ? originNode.pageId : null;
+                    if (!pageId) return;
+                    // Display text: prefer H1 from sidepanel md, fallback to node text
+                    var linkDisplayText = '';
+                    if (sidePanelInstance && sidePanelInstance.container) {
+                        var spH1 = sidePanelInstance.container.querySelector('.editor h1');
+                        if (spH1) { linkDisplayText = (spH1.textContent || '').trim(); }
+                    }
+                    if (!linkDisplayText) {
+                        linkDisplayText = stripInlineMarkers(originNode.text || '') || 'Untitled';
+                    }
+                    // Page link: fractal://note/{folder}/{outFileId}/page/{pageId}
+                    var link = 'fractal://note/' +
+                        encodeURIComponent(folderName) + '/' +
+                        encodeURIComponent(outFileId) + '/page/' +
+                        encodeURIComponent(pageId);
+                    var mdLink = '[' + linkDisplayText.replace(/[\[\]]/g, '') + '](' + link + ')';
+                    navigator.clipboard.writeText(mdLink).then(function() {
+                        var originalHTML = sidePanelCopyInAppLinkBtn.innerHTML;
+                        sidePanelCopyInAppLinkBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+                        setTimeout(function() {
+                            sidePanelCopyInAppLinkBtn.innerHTML = originalHTML;
+                        }, 2000);
+                    });
+                });
+            }
+        }
+
         // Outline sidebar open/close
         if (sidePanelOpenOutlineBtn) {
             sidePanelOpenOutlineBtn.addEventListener('click', function() {
@@ -24218,27 +24374,6 @@ var Outliner = (function() {
             onTocUpdate: updateSidePanelTocFromMarkdown,
             onImageRequest: function() { sidePanelImagePending = true; }
         });
-
-        // Set up in-app link callback for Notes mode
-        var notesLayoutForLink = document.querySelector('.notes-layout');
-        if (notesLayoutForLink) {
-            sidePanelHostBridge._onRequestInAppLink = function(lineNumber, lineText) {
-                var folderName = notesLayoutForLink.dataset.noteFolderName;
-                var outFileId = (typeof notesFilePanel !== 'undefined' && notesFilePanel.getCurrentOutFileId)
-                    ? notesFilePanel.getCurrentOutFileId() : null;
-                if (!folderName || !outFileId || !sidePanelOriginNodeId) return;
-                var originNode = model.getNode(sidePanelOriginNodeId);
-                var pageId = originNode ? originNode.pageId : null;
-                if (!pageId) return;
-                var link = 'fractal://note/' +
-                    encodeURIComponent(folderName) + '/' +
-                    encodeURIComponent(outFileId) + '/' +
-                    encodeURIComponent(sidePanelOriginNodeId) + '/' +
-                    encodeURIComponent(pageId) +
-                    (lineNumber !== undefined ? '?line=' + lineNumber : '');
-                sidePanelHostBridge._sendMessage({ type: 'inAppLinkData', link: link, text: lineText || 'Link' });
-            };
-        }
 
         sidePanelInstance = new window.EditorInstance(spContainer, sidePanelHostBridge, {
             initialContent: markdown,
@@ -24769,7 +24904,7 @@ var Outliner = (function() {
                         if (msg.jumpToNodeId) {
                             setTimeout(function() {
                                 jumpToAndHighlightNode(msg.jumpToNodeId);
-                            }, 100);
+                            }, 300);
                         }
                         // 新データの初期ベースライン（undoStackクリア → ボタンdisabled）
                         saveBaseline();
@@ -24867,17 +25002,17 @@ var Outliner = (function() {
                     break;
 
                 case 'notesNavigateInAppLink':
-                    // In-app link navigation: delegate to existing jumpToNode / jumpToMdPage
-                    // window.notesHostBridge has jumpToNode/jumpToMdPage (not outlinerHostBridge)
+                    // Node link navigation: close sidepanel + jump to node
                     var notesBridge = window.notesHostBridge;
                     if (notesBridge) {
-                        if (msg.pageId) {
-                            notesBridge.jumpToMdPage(msg.outFileId, msg.pageId, msg.lineNumber);
-                        } else {
-                            notesBridge.jumpToNode(msg.outFileId, msg.nodeId);
+                        // Close sidepanel immediately if open
+                        if (sidePanelEl && sidePanelEl.classList.contains('open')) {
+                            closeSidePanelImmediate();
                         }
+                        notesBridge.jumpToNode(msg.outFileId, msg.nodeId);
                     }
                     break;
+
 
                 // --- サイドパネル関連メッセージ ---
                 case 'openSidePanel':

@@ -5,6 +5,7 @@ import { getOutlinerWebviewContent } from './outlinerWebviewContent';
 import { getWebviewMessages, initLocale } from './i18n/messages';
 import { SidePanelManager } from './shared/sidePanelManager';
 import { importMdFiles } from './shared/markdown-import';
+import { OutlinerClipboardStore } from './shared/outliner-clipboard-store';
 
 /**
  * OutlinerProvider — .out ファイル用 Custom Text Editor Provider
@@ -194,6 +195,72 @@ export class OutlinerProvider implements vscode.CustomTextEditorProvider {
                     case 'copyPageFile':
                         await this.handleCopyPageFile(document, message);
                         break;
+
+                    case 'saveOutlinerClipboard': {
+                        const clipPagesDir = this.getPagesDirPath(document);
+                        const clipImagesDir = this.getOutlinerImageDirPath(document);
+                        OutlinerClipboardStore.save({
+                            plainText: message.plainText,
+                            isCut: message.isCut,
+                            nodes: message.nodes,
+                            sourcePagesDirPath: clipPagesDir,
+                            sourceImagesDirPath: clipImagesDir
+                        });
+                        break;
+                    }
+
+                    case 'copyPageFileCross': {
+                        const clipData = OutlinerClipboardStore.get(message.clipboardPlainText);
+                        if (clipData) {
+                            const crossSrc = path.join(clipData.sourcePagesDirPath, `${message.sourcePageId}.md`);
+                            await this.ensurePagesDir(document);
+                            const crossDest = this.getPageFilePath(document, message.newPageId);
+                            if (fs.existsSync(crossSrc)) {
+                                fs.copyFileSync(crossSrc, crossDest);
+                            }
+                        }
+                        break;
+                    }
+
+                    case 'movePageFileCross': {
+                        const moveClipData = OutlinerClipboardStore.get(message.clipboardPlainText);
+                        if (moveClipData) {
+                            const moveSrc = path.join(moveClipData.sourcePagesDirPath, `${message.pageId}.md`);
+                            await this.ensurePagesDir(document);
+                            const moveDest = this.getPageFilePath(document, message.pageId);
+                            if (fs.existsSync(moveSrc) && moveSrc !== moveDest) {
+                                fs.copyFileSync(moveSrc, moveDest);
+                                try { fs.unlinkSync(moveSrc); } catch { /* ignore */ }
+                            }
+                        }
+                        OutlinerClipboardStore.consumeIfCut(message.clipboardPlainText);
+                        break;
+                    }
+
+                    case 'copyImagesCross': {
+                        const imgClipData = OutlinerClipboardStore.get(message.clipboardPlainText);
+                        if (imgClipData && message.images) {
+                            const imgDir = this.getOutlinerImageDirPath(document);
+                            if (!fs.existsSync(imgDir)) fs.mkdirSync(imgDir, { recursive: true });
+                            for (const imgPath of message.images) {
+                                const filename = path.basename(imgPath);
+                                const imgSrc = path.join(imgClipData.sourceImagesDirPath, filename);
+                                const imgDest = path.join(imgDir, filename);
+                                if (fs.existsSync(imgSrc) && !fs.existsSync(imgDest)) {
+                                    fs.copyFileSync(imgSrc, imgDest);
+                                }
+                            }
+                            if (imgClipData.isCut) {
+                                for (const imgPath of message.images) {
+                                    const filename = path.basename(imgPath);
+                                    const imgSrc = path.join(imgClipData.sourceImagesDirPath, filename);
+                                    try { fs.unlinkSync(imgSrc); } catch { /* ignore */ }
+                                }
+                                OutlinerClipboardStore.consumeIfCut(message.clipboardPlainText);
+                            }
+                        }
+                        break;
+                    }
 
                     case 'openLink':
                         if (message.href) {

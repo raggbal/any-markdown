@@ -64,7 +64,7 @@ test.describe('Outliner コピー HTML リスト形式', () => {
 
         // text/html が設定されている場合、<ul> と <li> を含むことを検証
         if (pastedHtml && !pastedHtml.startsWith('ERROR')) {
-            expect(pastedHtml).toContain('<ul>');
+            expect(pastedHtml).toContain('<ul');
             expect(pastedHtml).toContain('<li>');
             expect(pastedHtml).toContain('Item 1');
             expect(pastedHtml).toContain('Item 2');

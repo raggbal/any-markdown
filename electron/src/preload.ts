@@ -120,6 +120,14 @@ contextBridge.exposeInMainWorld('outlinerHostBridge', {
         ipcRenderer.send('notes-message', { type: 'copyPagePaths', pageIds }),
     copyPageFile: (sourcePageId: string, newPageId: string) =>
         ipcRenderer.send('notes-message', { type: 'copyPageFile', sourcePageId, newPageId }),
+    copyPageFileCross: (sourcePageId: string, newPageId: string, clipboardPlainText: string) =>
+        ipcRenderer.send('notes-message', { type: 'copyPageFileCross', sourcePageId, newPageId, clipboardPlainText }),
+    movePageFileCross: (pageId: string, clipboardPlainText: string) =>
+        ipcRenderer.send('notes-message', { type: 'movePageFileCross', pageId, clipboardPlainText }),
+    copyImagesCross: (images: string[], clipboardPlainText: string) =>
+        ipcRenderer.send('notes-message', { type: 'copyImagesCross', images, clipboardPlainText }),
+    saveOutlinerClipboard: (plainText: string, isCut: boolean, nodes: unknown[]) =>
+        ipcRenderer.send('notes-message', { type: 'saveOutlinerClipboard', plainText, isCut, nodes }),
 
     // .mdファイルインポート
     importMdFilesDialog: (targetNodeId: string) =>

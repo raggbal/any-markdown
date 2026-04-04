@@ -1673,9 +1673,6 @@ window.__createSidePanelBridgeMethods = function(postFn) {
         sidePanelOpenInTextEditor: function(sidePanelFilePath) {
             postFn({ type: 'sidePanelOpenInTextEditor', sidePanelFilePath: sidePanelFilePath });
         },
-        requestInAppLinkData: function(lineNumber, lineText) {
-            postFn({ type: 'requestInAppLinkData', lineNumber: lineNumber, lineText: lineText });
-        },
         getSidePanelImageDir: function(sidePanelFilePath) {
             postFn({ type: 'getSidePanelImageDir', sidePanelFilePath: sidePanelFilePath });
         },
@@ -2226,12 +2223,6 @@ class SidePanelHostBridge {
         this._mainHost.sendToChat(startLine, endLine, selectedMarkdown, this.filePath);
     }
     notifySidePanelClosed() {}
-    requestInAppLinkData(lineNumber, lineText) {
-        // Handled by outliner.js via callback, not via host bridge
-        if (this._onRequestInAppLink) {
-            this._onRequestInAppLink(lineNumber, lineText);
-        }
-    }
     searchFiles(query) { this._mainHost.searchFiles(query); }
     createPageAtPath(path) { this._mainHost.createPageAtPath(path); }
     createPageAuto() { this._mainHost.createPageAuto(); }
@@ -2750,28 +2741,45 @@ class EditorInstance {
         }
     }
 
-    container.addEventListener('contextmenu', function(e) {
-        // Only handle if the click is inside our .editor element
-        if (!e.target.closest || !editor.contains(e.target)) return;
-        if (isSourceMode) return;
-        e.preventDefault();
-        e.stopPropagation();
-
+    function showEditorContextMenu(x, y) {
         hideEditorContextMenu();
         var sel = window.getSelection();
         var hasSelection = sel && !sel.isCollapsed;
+        // M-11: Save selection range before menu steals focus
+        var savedRange = (sel && sel.rangeCount > 0) ? sel.getRangeAt(0).cloneRange() : null;
         var isInNotesContext = !!document.querySelector('.notes-layout');
         var isMac = navigator.platform.indexOf('Mac') !== -1;
         var mod = isMac ? 'Cmd' : 'Ctrl';
 
+        function restoreSelectionAndFocus() {
+            // preventScroll to avoid jumping to top (問題2対策)
+            editor.focus({ preventScroll: true });
+            if (savedRange) {
+                var s = window.getSelection();
+                s.removeAllRanges();
+                s.addRange(savedRange);
+            }
+        }
+
         editorContextMenuEl = document.createElement('div');
         editorContextMenuEl.className = 'editor-context-menu';
-        editorContextMenuEl.style.left = e.clientX + 'px';
-        editorContextMenuEl.style.top = e.clientY + 'px';
+        // Compute theme-aware colors from CSS variables (fallback for non-themed contexts)
+        var cs = getComputedStyle(document.documentElement);
+        var menuBg = cs.getPropertyValue('--bg-color').trim() || '#252526';
+        var menuFg = cs.getPropertyValue('--text-color').trim() || '#cccccc';
+        var menuBorder = cs.getPropertyValue('--border-color').trim() || '#454545';
+        editorContextMenuEl.style.cssText = 'position:fixed;left:' + x + 'px;top:' + y + 'px;background:' + menuBg + ';border:1px solid ' + menuBorder + ';border-radius:6px;padding:4px 0;min-width:160px;box-shadow:0 4px 16px rgba(0,0,0,0.3);z-index:10000;font-size:13px;color:' + menuFg + ';';
+        // Prevent native context menu on our custom menu
+        editorContextMenuEl.addEventListener('contextmenu', function(ev) { ev.preventDefault(); ev.stopPropagation(); });
 
         function addCtxItem(label, handler, shortcut, disabled) {
             var item = document.createElement('div');
             item.className = 'editor-context-menu-item' + (disabled ? ' disabled' : '');
+            item.style.cssText = 'padding:6px 20px 6px 12px;cursor:' + (disabled ? 'default' : 'pointer') + ';display:flex;align-items:center;justify-content:space-between;gap:16px;white-space:nowrap;' + (disabled ? 'opacity:0.4;' : '');
+            if (!disabled) {
+                item.addEventListener('mouseenter', function() { item.style.background = (cs.getPropertyValue('--link-color').trim() || '#094771'); item.style.color = '#ffffff'; });
+                item.addEventListener('mouseleave', function() { item.style.background = ''; item.style.color = ''; });
+            }
             var labelSpan = document.createElement('span');
             labelSpan.className = 'context-menu-label';
             labelSpan.textContent = label;
@@ -2779,6 +2787,7 @@ class EditorInstance {
             if (shortcut) {
                 var kbdSpan = document.createElement('span');
                 kbdSpan.className = 'context-menu-shortcut';
+                kbdSpan.style.cssText = 'font-size:11px;opacity:0.6;margin-left:24px;';
                 kbdSpan.textContent = shortcut;
                 item.appendChild(kbdSpan);
             }
@@ -2791,59 +2800,31 @@ class EditorInstance {
         function addCtxSeparator() {
             var sep = document.createElement('div');
             sep.className = 'editor-context-menu-separator';
+            sep.style.cssText = 'height:1px;background:#454545;margin:4px 0;';
             editorContextMenuEl.appendChild(sep);
         }
 
+        // Cut
         addCtxItem(i18n.contextCut || 'Cut', function() {
+            restoreSelectionAndFocus();
             document.execCommand('cut');
         }, mod + '+X', !hasSelection);
 
+        // Copy
         addCtxItem(i18n.contextCopy || 'Copy', function() {
+            restoreSelectionAndFocus();
             document.execCommand('copy');
         }, mod + '+C', !hasSelection);
 
+        // Paste — use execCommand('paste') which triggers the editor's native paste handler
         addCtxItem(i18n.contextPaste || 'Paste', function() {
-            navigator.clipboard.readText().then(function(text) {
-                if (text) { document.execCommand('insertText', false, text); }
-            }).catch(function() {});
+            restoreSelectionAndFocus();
+            document.execCommand('paste');
         }, mod + '+V');
-
-        // Copy In-App Link (Notes sidepanel only)
-        if (isInNotesContext && self.options && self.options.isSidePanel) {
-            addCtxSeparator();
-            addCtxItem(i18n.copyInAppLink || 'Copy In-App Link', function() {
-                var lineText = '';
-                var cursorLine = 0;
-                try {
-                    var md = htmlToMarkdown();
-                    var mdLines = md.split('\n');
-                    if (sel && sel.rangeCount > 0) {
-                        var range = sel.getRangeAt(0);
-                        var blockEl = range.startContainer.nodeType === 3 ? range.startContainer.parentElement : range.startContainer;
-                        while (blockEl && blockEl !== editor && blockEl.parentElement !== editor) {
-                            blockEl = blockEl.parentElement;
-                        }
-                        if (blockEl && blockEl !== editor) {
-                            var blocks = Array.from(editor.querySelectorAll(':scope > *'));
-                            var blockIndex = blocks.indexOf(blockEl);
-                            var lineCount = 0;
-                            for (var bi = 0; bi < blocks.length && bi <= blockIndex; bi++) {
-                                if (bi === blockIndex) { cursorLine = lineCount; break; }
-                                var blockMd = mdProcessNode(blocks[bi]);
-                                lineCount += blockMd.split('\n').filter(function(l) { return l !== ''; }).length || 1;
-                            }
-                        }
-                    }
-                    lineText = (mdLines[cursorLine] || '').replace(/^#+\s*/, '').replace(/^[-*+]\s*(\[[ xX]\]\s*)?/, '').replace(/^\d+\.\s*/, '').replace(/^>\s*/, '').trim();
-                } catch (err) {
-                    logger.warn('In-app link data extraction failed:', err);
-                }
-                host.requestInAppLinkData(cursorLine, lineText || 'Link');
-            });
-        }
 
         document.body.appendChild(editorContextMenuEl);
 
+        // Auto-adjust position
         var rect = editorContextMenuEl.getBoundingClientRect();
         if (rect.right > window.innerWidth) {
             editorContextMenuEl.style.left = (window.innerWidth - rect.width - 8) + 'px';
@@ -2852,9 +2833,22 @@ class EditorInstance {
             editorContextMenuEl.style.top = (window.innerHeight - rect.height - 8) + 'px';
         }
 
+        // Close on outside click
         setTimeout(function() {
             document.addEventListener('click', hideEditorContextMenu, { once: true });
         }, 0);
+    }
+
+    // Register on document level — VSCode webview does not deliver contextmenu
+    // events to individual elements reliably. Each EditorInstance registers its own
+    // handler with editor.contains() guard so closures (editor, isSourceMode, host,
+    // i18n, self) remain intact per instance.
+    document.addEventListener('contextmenu', function(e) {
+        if (!e.target || !editor.contains(e.target)) return; // Not our editor
+        if (isSourceMode) return; // Let browser handle in source mode
+        e.preventDefault();
+        e.stopImmediatePropagation(); // Prevent other instances & outliner handler
+        showEditorContextMenu(e.clientX, e.clientY);
     });
 
     // ========== UNDO / REDO MANAGER ==========
@@ -15699,12 +15693,6 @@ class EditorInstance {
         } else if (message.type === 'scrollToLine') {
             // Scroll to a specific line number in the document
             scrollToLine(message.lineNumber);
-        } else if (message.type === 'inAppLinkData') {
-            // Received in-app link data from host — copy to clipboard
-            if (message.link && message.text) {
-                var mdLink = '[' + message.text.replace(/[\[\]]/g, '') + '](' + message.link + ')';
-                navigator.clipboard.writeText(mdLink);
-            }
         } else if (message.type === 'pasteText') {
             // Paste text relayed from main webview (side panel can't receive paste events directly)
             logger.log('pasteText received from main webview');

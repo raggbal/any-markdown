@@ -31,6 +31,18 @@
         copyPageFile: function(sourcePageId, newPageId) {
             api.postMessage({ type: 'copyPageFile', sourcePageId: sourcePageId, newPageId: newPageId });
         },
+        copyPageFileCross: function(sourcePageId, newPageId, clipboardPlainText) {
+            api.postMessage({ type: 'copyPageFileCross', sourcePageId: sourcePageId, newPageId: newPageId, clipboardPlainText: clipboardPlainText });
+        },
+        movePageFileCross: function(pageId, clipboardPlainText) {
+            api.postMessage({ type: 'movePageFileCross', pageId: pageId, clipboardPlainText: clipboardPlainText });
+        },
+        copyImagesCross: function(images, clipboardPlainText) {
+            api.postMessage({ type: 'copyImagesCross', images: images, clipboardPlainText: clipboardPlainText });
+        },
+        saveOutlinerClipboard: function(plainText, isCut, nodes) {
+            api.postMessage({ type: 'saveOutlinerClipboard', plainText: plainText, isCut: isCut, nodes: nodes });
+        },
         setPageDir: function() {
             api.postMessage({ type: 'setPageDir' });
         },
