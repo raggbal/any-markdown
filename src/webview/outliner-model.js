@@ -284,7 +284,7 @@ var OutlinerModel = (function() {
     };
 
     /** アウトデント: 親の兄弟に移動 */
-    Model.prototype.outdentNode = function(nodeId) {
+    Model.prototype.outdentNode = function(nodeId, excludeFromGrab) {
         var node = this.nodes[nodeId];
         if (!node || !node.parentId) { return false; }
 
@@ -294,11 +294,20 @@ var OutlinerModel = (function() {
         var childIdx = parent.children.indexOf(nodeId);
         if (childIdx < 0) { return false; }
 
-        // 後続兄弟を自分の子に移動
+        // 後続兄弟を自分の子に移動（excludeFromGrab に含まれるものは親に残す）
         var followingSiblings = parent.children.splice(childIdx + 1);
+        var remaining = [];
         for (var i = 0; i < followingSiblings.length; i++) {
-            node.children.push(followingSiblings[i]);
-            this.nodes[followingSiblings[i]].parentId = nodeId;
+            if (excludeFromGrab && excludeFromGrab.has(followingSiblings[i])) {
+                remaining.push(followingSiblings[i]);
+            } else {
+                node.children.push(followingSiblings[i]);
+                this.nodes[followingSiblings[i]].parentId = nodeId;
+            }
+        }
+        // excludeされたノードを親に戻す
+        for (var j = 0; j < remaining.length; j++) {
+            parent.children.push(remaining[j]);
         }
 
         // 元の親の children から除去

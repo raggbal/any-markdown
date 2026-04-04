@@ -2046,12 +2046,23 @@ var Outliner = (function() {
                         saveSnapshot();
                         var anyMoved = false;
                         if (e.shiftKey) {
+                            // 選択ルート（親が選択外のノード）のみoutdent。子は親に追従
+                            var selRootIds = [];
+                            var selRootSet = new Set();
                             for (var si = 0; si < sortedIds.length; si++) {
                                 var sn = model.getNode(sortedIds[si]);
-                                if (currentScope.type === 'subtree' && currentScope.rootId && sn && sn.parentId === currentScope.rootId) {
+                                if (!sn) { continue; }
+                                if (currentScope.type === 'subtree' && currentScope.rootId && sn.parentId === currentScope.rootId) {
                                     continue;
                                 }
-                                if (model.outdentNode(sortedIds[si])) { anyMoved = true; }
+                                if (!sn.parentId || !selectedNodeIds.has(sn.parentId)) {
+                                    selRootIds.push(sortedIds[si]);
+                                    selRootSet.add(sortedIds[si]);
+                                }
+                            }
+                            // 逆順で処理（挿入位置の正確性を保つため）
+                            for (var ri = selRootIds.length - 1; ri >= 0; ri--) {
+                                if (model.outdentNode(selRootIds[ri], selRootSet)) { anyMoved = true; }
                             }
                         } else {
                             for (var ti = 0; ti < sortedIds.length; ti++) {

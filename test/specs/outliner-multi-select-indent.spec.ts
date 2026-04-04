@@ -76,14 +76,12 @@ test.describe('Outliner multi-select indent/outdent', () => {
             });
         });
 
-        const n2Text = page.locator('.outliner-text[data-node-id="n2"]');
-        await n2Text.click();
+        // n2クリック→Shift+ArrowDown→Shift+Tab (cross-paste testと同じパターン)
+        await page.locator('.outliner-text[data-node-id="n2"]').press('Shift+ArrowDown');
+        await page.waitForTimeout(50);
+        await page.keyboard.press('Shift+ArrowDown');
         await page.waitForTimeout(200);
-        const n3Text = page.locator('.outliner-text[data-node-id="n3"]');
-        await n3Text.click({ modifiers: ['Shift'] });
-        await page.waitForTimeout(200);
-
-        await pressTab(page, true);
+        await page.keyboard.press('Shift+Tab');
         await page.waitForTimeout(1500);
 
         const syncData = await page.evaluate(() => {
@@ -142,16 +140,14 @@ test.describe('Outliner multi-select indent/outdent', () => {
             });
         });
 
-        // n1, n2 を選択
-        const n1Text = page.locator('.outliner-text[data-node-id="n1"]');
-        await n1Text.click();
-        await page.waitForTimeout(200);
-        const n2Text = page.locator('.outliner-text[data-node-id="n2"]');
-        await n2Text.click({ modifiers: ['Shift'] });
+        // n1, n2 を選択 (locator.press + keyboard.press パターン)
+        await page.locator('.outliner-text[data-node-id="n1"]').press('Shift+ArrowDown');
+        await page.waitForTimeout(50);
+        await page.keyboard.press('Shift+ArrowDown');
         await page.waitForTimeout(200);
 
         // 1回目のTab: n1,n2 がn0の子になる
-        await pressTab(page, false);
+        await page.keyboard.press('Tab');
         await page.waitForTimeout(300);
 
         // フォーカスがまだ存在し、連続操作可能かテスト
@@ -165,7 +161,7 @@ test.describe('Outliner multi-select indent/outdent', () => {
         expect(selectedAfterFirst).toBeGreaterThanOrEqual(2);
 
         // 1回目のShift+Tab: n1,n2 がn0と同レベルに戻る
-        await pressTab(page, true);
+        await page.keyboard.press('Shift+Tab');
         await page.waitForTimeout(1500);
 
         const syncData = await page.evaluate(() => {

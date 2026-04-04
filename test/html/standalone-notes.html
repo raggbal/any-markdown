@@ -19962,7 +19962,7 @@ var OutlinerModel = (function() {
     };
 
     /** アウトデント: 親の兄弟に移動 */
-    Model.prototype.outdentNode = function(nodeId) {
+    Model.prototype.outdentNode = function(nodeId, excludeFromGrab) {
         var node = this.nodes[nodeId];
         if (!node || !node.parentId) { return false; }
 
@@ -19972,11 +19972,20 @@ var OutlinerModel = (function() {
         var childIdx = parent.children.indexOf(nodeId);
         if (childIdx < 0) { return false; }
 
-        // 後続兄弟を自分の子に移動
+        // 後続兄弟を自分の子に移動（excludeFromGrab に含まれるものは親に残す）
         var followingSiblings = parent.children.splice(childIdx + 1);
+        var remaining = [];
         for (var i = 0; i < followingSiblings.length; i++) {
-            node.children.push(followingSiblings[i]);
-            this.nodes[followingSiblings[i]].parentId = nodeId;
+            if (excludeFromGrab && excludeFromGrab.has(followingSiblings[i])) {
+                remaining.push(followingSiblings[i]);
+            } else {
+                node.children.push(followingSiblings[i]);
+                this.nodes[followingSiblings[i]].parentId = nodeId;
+            }
+        }
+        // excludeされたノードを親に戻す
+        for (var j = 0; j < remaining.length; j++) {
+            parent.children.push(remaining[j]);
         }
 
         // 元の親の children から除去
@@ -22495,12 +22504,23 @@ var Outliner = (function() {
                         saveSnapshot();
                         var anyMoved = false;
                         if (e.shiftKey) {
+                            // 選択ルート（親が選択外のノード）のみoutdent。子は親に追従
+                            var selRootIds = [];
+                            var selRootSet = new Set();
                             for (var si = 0; si < sortedIds.length; si++) {
                                 var sn = model.getNode(sortedIds[si]);
-                                if (currentScope.type === 'subtree' && currentScope.rootId && sn && sn.parentId === currentScope.rootId) {
+                                if (!sn) { continue; }
+                                if (currentScope.type === 'subtree' && currentScope.rootId && sn.parentId === currentScope.rootId) {
                                     continue;
                                 }
-                                if (model.outdentNode(sortedIds[si])) { anyMoved = true; }
+                                if (!sn.parentId || !selectedNodeIds.has(sn.parentId)) {
+                                    selRootIds.push(sortedIds[si]);
+                                    selRootSet.add(sortedIds[si]);
+                                }
+                            }
+                            // 逆順で処理（挿入位置の正確性を保つため）
+                            for (var ri = selRootIds.length - 1; ri >= 0; ri--) {
+                                if (model.outdentNode(selRootIds[ri], selRootSet)) { anyMoved = true; }
                             }
                         } else {
                             for (var ti = 0; ti < sortedIds.length; ti++) {
