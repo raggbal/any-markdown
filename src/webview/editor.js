@@ -514,6 +514,19 @@ class EditorInstance {
     currentImageDir = extractImageDirFromMarkdown(markdown);
     currentForceRelativePath = extractForceRelativePathFromMarkdown(markdown);
     
+    // Classify link href for visual icon distinction
+    function classifyLinkHref(href) {
+        if (!href) return '';
+        if (href.startsWith('fractal://note/')) {
+            return /\/page\/[^/?]+$/.test(href) ? 'link-fractal-page' : 'link-fractal-node';
+        }
+        if (!href.startsWith('http://') && !href.startsWith('https://') && !href.startsWith('#') &&
+            /\.(?:md|markdown)(?:[#?]|$)/i.test(href)) {
+            return 'link-internal-md';
+        }
+        return '';
+    }
+
     // Resolve relative image path to full webview URI
     function resolveImagePath(src) {
         if (!src) return '';
@@ -1688,7 +1701,9 @@ class EditorInstance {
         
         // Links (must be after images)
         html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, function(match, linkText, href) {
-            const linkHtml = '<a href="' + href + '">' + linkText + '</a>';
+            var linkClass = classifyLinkHref(href);
+            var classAttr = linkClass ? ' class="' + linkClass + '"' : '';
+            const linkHtml = '<a href="' + href + '"' + classAttr + '>' + linkText + '</a>';
             const placeholder = '\x00LINK' + (placeholderIndex++) + '\x00';
             placeholders.push({ placeholder, html: linkHtml });
             return placeholder;

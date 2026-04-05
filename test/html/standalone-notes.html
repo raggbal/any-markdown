@@ -607,6 +607,44 @@ body {
 .editor h3 { font-size: 1.25em; }
 .editor p, .editor div.paragraph { margin: 0.5em 0; min-height: 1.6em; }
 .editor a { color: var(--link-color); text-decoration: none; }
+.editor a.link-fractal-node::before,
+.editor a.link-fractal-page::before,
+.editor a.link-internal-md::before {
+    display: inline-block;
+    vertical-align: baseline;
+    margin-right: 2px;
+    width: 1em;
+    height: 1em;
+    content: '';
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    opacity: 0.6;
+    position: relative;
+    top: 0.15em;
+}
+.editor a.link-fractal-node::before {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='3.5' fill='none' stroke='%236c6c6c' stroke-width='1.5'/%3E%3Cline x1='8' y1='1' x2='8' y2='4' stroke='%236c6c6c' stroke-width='1.5'/%3E%3Cline x1='8' y1='12' x2='8' y2='15' stroke='%236c6c6c' stroke-width='1.5'/%3E%3Cline x1='1' y1='8' x2='4' y2='8' stroke='%236c6c6c' stroke-width='1.5'/%3E%3Cline x1='12' y1='8' x2='15' y2='8' stroke='%236c6c6c' stroke-width='1.5'/%3E%3C/svg%3E");
+}
+.editor a.link-fractal-page::before {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 1h6l4 4v10H4V1z' fill='none' stroke='%236c6c6c' stroke-width='1.2'/%3E%3Cpath d='M10 1v4h4' fill='none' stroke='%236c6c6c' stroke-width='1.2'/%3E%3Cline x1='6' y1='8' x2='12' y2='8' stroke='%236c6c6c' stroke-width='1'/%3E%3Cline x1='6' y1='11' x2='12' y2='11' stroke='%236c6c6c' stroke-width='1'/%3E%3C/svg%3E");
+}
+.editor a.link-internal-md::before {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='2' y='1' width='12' height='14' rx='1' fill='none' stroke='%236c6c6c' stroke-width='1.2'/%3E%3Cpath d='M5 5.5L7 9.5L7 5.5' fill='none' stroke='%236c6c6c' stroke-width='1.2' stroke-linejoin='round'/%3E%3Cpath d='M9 5.5L11 9.5L11 5.5' fill='none' stroke='%236c6c6c' stroke-width='1.2' stroke-linejoin='round'/%3E%3Cline x1='5' y1='12' x2='11' y2='12' stroke='%236c6c6c' stroke-width='1'/%3E%3C/svg%3E");
+}
+/* Dark theme link icons */
+[data-theme="night"] .editor a.link-fractal-node::before,
+[data-theme="dark"] .editor a.link-fractal-node::before {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='3.5' fill='none' stroke='%23a0a0a0' stroke-width='1.5'/%3E%3Cline x1='8' y1='1' x2='8' y2='4' stroke='%23a0a0a0' stroke-width='1.5'/%3E%3Cline x1='8' y1='12' x2='8' y2='15' stroke='%23a0a0a0' stroke-width='1.5'/%3E%3Cline x1='1' y1='8' x2='4' y2='8' stroke='%23a0a0a0' stroke-width='1.5'/%3E%3Cline x1='12' y1='8' x2='15' y2='8' stroke='%23a0a0a0' stroke-width='1.5'/%3E%3C/svg%3E");
+}
+[data-theme="night"] .editor a.link-fractal-page::before,
+[data-theme="dark"] .editor a.link-fractal-page::before {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 1h6l4 4v10H4V1z' fill='none' stroke='%23a0a0a0' stroke-width='1.2'/%3E%3Cpath d='M10 1v4h4' fill='none' stroke='%23a0a0a0' stroke-width='1.2'/%3E%3Cline x1='6' y1='8' x2='12' y2='8' stroke='%23a0a0a0' stroke-width='1'/%3E%3Cline x1='6' y1='11' x2='12' y2='11' stroke='%23a0a0a0' stroke-width='1'/%3E%3C/svg%3E");
+}
+[data-theme="night"] .editor a.link-internal-md::before,
+[data-theme="dark"] .editor a.link-internal-md::before {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='2' y='1' width='12' height='14' rx='1' fill='none' stroke='%23a0a0a0' stroke-width='1.2'/%3E%3Cpath d='M5 5.5L7 9.5L7 5.5' fill='none' stroke='%23a0a0a0' stroke-width='1.2' stroke-linejoin='round'/%3E%3Cpath d='M9 5.5L11 9.5L11 5.5' fill='none' stroke='%23a0a0a0' stroke-width='1.2' stroke-linejoin='round'/%3E%3Cline x1='5' y1='12' x2='11' y2='12' stroke='%23a0a0a0' stroke-width='1'/%3E%3C/svg%3E");
+}
 
 /* Perplexity theme overrides */
 /* Base: p/li=16px, code/blockquote/table=14px, h3=18px */
@@ -2027,6 +2065,44 @@ body {
     color: var(--outliner-tag-color);
     text-decoration: underline;
     cursor: pointer;
+}
+.outliner-text a.link-fractal-node::before,
+.outliner-text a.link-fractal-page::before,
+.outliner-text a.link-internal-md::before {
+    display: inline-block;
+    vertical-align: baseline;
+    margin-right: 2px;
+    width: 1em;
+    height: 1em;
+    content: '';
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    opacity: 0.6;
+    position: relative;
+    top: 0.15em;
+}
+.outliner-text a.link-fractal-node::before {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='3.5' fill='none' stroke='%236c6c6c' stroke-width='1.5'/%3E%3Cline x1='8' y1='1' x2='8' y2='4' stroke='%236c6c6c' stroke-width='1.5'/%3E%3Cline x1='8' y1='12' x2='8' y2='15' stroke='%236c6c6c' stroke-width='1.5'/%3E%3Cline x1='1' y1='8' x2='4' y2='8' stroke='%236c6c6c' stroke-width='1.5'/%3E%3Cline x1='12' y1='8' x2='15' y2='8' stroke='%236c6c6c' stroke-width='1.5'/%3E%3C/svg%3E");
+}
+.outliner-text a.link-fractal-page::before {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 1h6l4 4v10H4V1z' fill='none' stroke='%236c6c6c' stroke-width='1.2'/%3E%3Cpath d='M10 1v4h4' fill='none' stroke='%236c6c6c' stroke-width='1.2'/%3E%3Cline x1='6' y1='8' x2='12' y2='8' stroke='%236c6c6c' stroke-width='1'/%3E%3Cline x1='6' y1='11' x2='12' y2='11' stroke='%236c6c6c' stroke-width='1'/%3E%3C/svg%3E");
+}
+.outliner-text a.link-internal-md::before {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='2' y='1' width='12' height='14' rx='1' fill='none' stroke='%236c6c6c' stroke-width='1.2'/%3E%3Cpath d='M5 5.5L7 9.5L7 5.5' fill='none' stroke='%236c6c6c' stroke-width='1.2' stroke-linejoin='round'/%3E%3Cpath d='M9 5.5L11 9.5L11 5.5' fill='none' stroke='%236c6c6c' stroke-width='1.2' stroke-linejoin='round'/%3E%3Cline x1='5' y1='12' x2='11' y2='12' stroke='%236c6c6c' stroke-width='1'/%3E%3C/svg%3E");
+}
+/* Dark theme link icons */
+[data-theme="night"] .outliner-text a.link-fractal-node::before,
+[data-theme="dark"] .outliner-text a.link-fractal-node::before {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='3.5' fill='none' stroke='%23a0a0a0' stroke-width='1.5'/%3E%3Cline x1='8' y1='1' x2='8' y2='4' stroke='%23a0a0a0' stroke-width='1.5'/%3E%3Cline x1='8' y1='12' x2='8' y2='15' stroke='%23a0a0a0' stroke-width='1.5'/%3E%3Cline x1='1' y1='8' x2='4' y2='8' stroke='%23a0a0a0' stroke-width='1.5'/%3E%3Cline x1='12' y1='8' x2='15' y2='8' stroke='%23a0a0a0' stroke-width='1.5'/%3E%3C/svg%3E");
+}
+[data-theme="night"] .outliner-text a.link-fractal-page::before,
+[data-theme="dark"] .outliner-text a.link-fractal-page::before {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 1h6l4 4v10H4V1z' fill='none' stroke='%23a0a0a0' stroke-width='1.2'/%3E%3Cpath d='M10 1v4h4' fill='none' stroke='%23a0a0a0' stroke-width='1.2'/%3E%3Cline x1='6' y1='8' x2='12' y2='8' stroke='%23a0a0a0' stroke-width='1'/%3E%3Cline x1='6' y1='11' x2='12' y2='11' stroke='%23a0a0a0' stroke-width='1'/%3E%3C/svg%3E");
+}
+[data-theme="night"] .outliner-text a.link-internal-md::before,
+[data-theme="dark"] .outliner-text a.link-internal-md::before {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='2' y='1' width='12' height='14' rx='1' fill='none' stroke='%23a0a0a0' stroke-width='1.2'/%3E%3Cpath d='M5 5.5L7 9.5L7 5.5' fill='none' stroke='%23a0a0a0' stroke-width='1.2' stroke-linejoin='round'/%3E%3Cpath d='M9 5.5L11 9.5L11 5.5' fill='none' stroke='%23a0a0a0' stroke-width='1.2' stroke-linejoin='round'/%3E%3Cline x1='5' y1='12' x2='11' y2='12' stroke='%23a0a0a0' stroke-width='1'/%3E%3C/svg%3E");
 }
 
 /* --- Children container --- */
@@ -4361,6 +4437,19 @@ class EditorInstance {
     currentImageDir = extractImageDirFromMarkdown(markdown);
     currentForceRelativePath = extractForceRelativePathFromMarkdown(markdown);
     
+    // Classify link href for visual icon distinction
+    function classifyLinkHref(href) {
+        if (!href) return '';
+        if (href.startsWith('fractal://note/')) {
+            return /\/page\/[^/?]+$/.test(href) ? 'link-fractal-page' : 'link-fractal-node';
+        }
+        if (!href.startsWith('http://') && !href.startsWith('https://') && !href.startsWith('#') &&
+            /\.(?:md|markdown)(?:[#?]|$)/i.test(href)) {
+            return 'link-internal-md';
+        }
+        return '';
+    }
+
     // Resolve relative image path to full webview URI
     function resolveImagePath(src) {
         if (!src) return '';
@@ -5535,7 +5624,9 @@ class EditorInstance {
         
         // Links (must be after images)
         html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, function(match, linkText, href) {
-            const linkHtml = '<a href="' + href + '">' + linkText + '</a>';
+            var linkClass = classifyLinkHref(href);
+            var classAttr = linkClass ? ' class="' + linkClass + '"' : '';
+            const linkHtml = '<a href="' + href + '"' + classAttr + '>' + linkText + '</a>';
             const placeholder = '\x00LINK' + (placeholderIndex++) + '\x00';
             placeholders.push({ placeholder, html: linkHtml });
             return placeholder;
@@ -21545,6 +21636,19 @@ var Outliner = (function() {
         return text.replace(/(?<!\]\()(?<!\[)(https?:\/\/\S+)/g, '[$1]($1)');
     }
 
+    /** リンクhrefからリンク種別のCSSクラスを返す */
+    function classifyLinkHref(href) {
+        if (!href) return '';
+        if (href.startsWith('fractal://note/')) {
+            return /\/page\/[^/?]+$/.test(href) ? 'link-fractal-page' : 'link-fractal-node';
+        }
+        if (!href.startsWith('http://') && !href.startsWith('https://') && !href.startsWith('#') &&
+            /\.(?:md|markdown)(?:[#?]|$)/i.test(href)) {
+            return 'link-internal-md';
+        }
+        return '';
+    }
+
     /** プレーンテキストからインラインMarkdownをHTMLに変換 */
     function renderInlineText(text) {
         if (!text) { return ''; }
@@ -21571,7 +21675,9 @@ var Outliner = (function() {
         var linkPlaceholders = [];
         // まずMarkdownリンク [text](url) を退避
         html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, function(match, text, url) {
-            var aTag = '<a href="' + url + '" title="' + url + '">' + text + '</a>';
+            var linkClass = classifyLinkHref(url);
+            var classAttr = linkClass ? ' class="' + linkClass + '"' : '';
+            var aTag = '<a href="' + url + '"' + classAttr + ' title="' + url + '">' + text + '</a>';
             linkPlaceholders.push(aTag);
             return '\x00LINK' + (linkPlaceholders.length - 1) + '\x00';
         });
@@ -22518,13 +22624,22 @@ var Outliner = (function() {
                                     selRootSet.add(sortedIds[si]);
                                 }
                             }
-                            // 逆順で処理（挿入位置の正確性を保つため）
-                            for (var ri = selRootIds.length - 1; ri >= 0; ri--) {
-                                if (model.outdentNode(selRootIds[ri], selRootSet)) { anyMoved = true; }
+                            // 一番上の選択ルートがoutdent不可ならスキップ
+                            var topRoot = selRootIds.length > 0 ? model.getNode(selRootIds[0]) : null;
+                            if (topRoot && topRoot.parentId) {
+                                // 逆順で処理（挿入位置の正確性を保つため）
+                                for (var ri = selRootIds.length - 1; ri >= 0; ri--) {
+                                    if (model.outdentNode(selRootIds[ri], selRootSet)) { anyMoved = true; }
+                                }
                             }
                         } else {
-                            for (var ti = 0; ti < sortedIds.length; ti++) {
-                                if (model.indentNode(sortedIds[ti])) { anyMoved = true; }
+                            // 一番上の選択ノードがindent不可（前に兄弟なし）ならスキップ
+                            var topNode = model.getNode(sortedIds[0]);
+                            var topInfo = topNode ? model._getSiblingInfo(sortedIds[0]) : null;
+                            if (topInfo && topInfo.index > 0) {
+                                for (var ti = 0; ti < sortedIds.length; ti++) {
+                                    if (model.indentNode(sortedIds[ti])) { anyMoved = true; }
+                                }
                             }
                         }
                         if (anyMoved) {

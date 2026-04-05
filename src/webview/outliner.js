@@ -1087,6 +1087,19 @@ var Outliner = (function() {
         return text.replace(/(?<!\]\()(?<!\[)(https?:\/\/\S+)/g, '[$1]($1)');
     }
 
+    /** リンクhrefからリンク種別のCSSクラスを返す */
+    function classifyLinkHref(href) {
+        if (!href) return '';
+        if (href.startsWith('fractal://note/')) {
+            return /\/page\/[^/?]+$/.test(href) ? 'link-fractal-page' : 'link-fractal-node';
+        }
+        if (!href.startsWith('http://') && !href.startsWith('https://') && !href.startsWith('#') &&
+            /\.(?:md|markdown)(?:[#?]|$)/i.test(href)) {
+            return 'link-internal-md';
+        }
+        return '';
+    }
+
     /** プレーンテキストからインラインMarkdownをHTMLに変換 */
     function renderInlineText(text) {
         if (!text) { return ''; }
@@ -1113,7 +1126,9 @@ var Outliner = (function() {
         var linkPlaceholders = [];
         // まずMarkdownリンク [text](url) を退避
         html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, function(match, text, url) {
-            var aTag = '<a href="' + url + '" title="' + url + '">' + text + '</a>';
+            var linkClass = classifyLinkHref(url);
+            var classAttr = linkClass ? ' class="' + linkClass + '"' : '';
+            var aTag = '<a href="' + url + '"' + classAttr + ' title="' + url + '">' + text + '</a>';
             linkPlaceholders.push(aTag);
             return '\x00LINK' + (linkPlaceholders.length - 1) + '\x00';
         });
