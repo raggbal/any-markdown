@@ -3584,7 +3584,13 @@
         const code = pre.querySelector('code');
         if (!code) return;
         
-        const text = code.textContent || '';
+        // Preserve rendered line breaks, excluding browser-only placeholders.
+        // Do not trim: indentation and trailing blank lines are user content.
+        const isEmptyCodeBlock = code.childNodes.length === 1 &&
+            code.firstChild.nodeType === 1 && code.firstChild.tagName === 'BR';
+        const text = isEmptyCodeBlock
+            ? ''
+            : stripTrailingNewlines(getCodePlainText(code), code, pre);
         navigator.clipboard.writeText(text).then(() => {
             const copyBtn = pre.querySelector('.code-copy-btn');
             if (copyBtn) {
