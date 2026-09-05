@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('hostBridge', {
     reportEditingState: (editing: boolean) => ipcRenderer.send('editing-state', editing),
     reportFocus: () => ipcRenderer.send('focus'),
     reportBlur: () => ipcRenderer.send('blur'),
+    reportOutlineState: () => { /* VS Code extension setting only */ },
     openLink: (href: string) => ipcRenderer.send('open-link', href),
     requestInsertLink: (text: string) => ipcRenderer.send('insert-link', text),
     requestInsertImage: () => ipcRenderer.send('insert-image'),

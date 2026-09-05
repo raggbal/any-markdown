@@ -351,7 +351,11 @@ FORCE_RELATIVE_PATH: true
 | `any-markdown.forceRelativeImagePath` | Force relative paths for images | `false` |
 | `any-markdown.language` | UI language (`default`, `en`, `ja`, `zh-cn`, `zh-tw`, `ko`, `es`, `fr`) | `default` |
 | `any-markdown.toolbarMode` | Toolbar display mode (`full`, `simple`). Simple shows only undo/redo and utility buttons (use `Cmd+/` for other operations) | `simple` |
+| `any-markdown.outlineStateScope` | Remember outline visibility per Markdown file (`file`) or share it across all Markdown files (`global`) | `file` |
+| `any-markdown.outlineDefaultOpen` | Open the outline when the selected scope does not have a saved state yet | `true` |
 | `any-markdown.enableDebugLogging` | Enable debug logging in browser console | `false` |
+
+With `outlineStateScope` set to `file`, every Markdown resource restores its own last outline state in the current workspace. With `global`, toggling the outline controls the next Markdown editor that renders as well, and the preference survives VS Code restarts.
 
 ### Themes
 

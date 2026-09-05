@@ -116,15 +116,18 @@
     </style>
 </head>
 <body>
-    <div id="sidebar" style="display:none;"><div id="outline"></div></div>
-    <div id="sidebarResizer" style="display:none;"></div>
-    <div id="toolbar" style="display:none;"></div>
+    <div id="sidebar" class="sidebar" style="display:none;">
+        <button id="closeSidebar"></button>
+        <div id="outline"></div>
+        <div id="sidebarResizer"></div>
+    </div>
+    <div id="toolbar" style="display:none;">
+        <button data-action="openOutline" class="hidden" id="openSidebarBtn"></button>
+    </div>
     <div id="statusLeft" style="display:none;"></div>
     <div id="statusImageDir" style="display:none;"></div>
     <div id="wordCount" style="display:none;"></div>
     <div id="sourceEditor" style="display:none;"></div>
-    <button id="closeSidebar" style="display:none;"></button>
-    <button id="openSidebarBtn" style="display:none;"></button>
     <!-- Search & Replace elements (hidden, required by script) -->
     <div id="searchReplaceBox" style="display:none;">
         <input id="searchInput" type="text">
@@ -182,6 +185,9 @@
         },
         reportBlur: function() {
             window.__testApi.messages.push({ type: 'webviewBlur' });
+        },
+        reportOutlineState: function(open) {
+            window.__testApi.messages.push({ type: 'outlineStateChanged', open: open });
         },
 
         // ホスト側 UI が必要な操作
@@ -11310,8 +11316,8 @@
 
         const action = btn.dataset.action;
 
-        // Source toggle doesn't count as an edit
-        if (action !== 'source') {
+        // View-only actions do not change Markdown content
+        if (action !== 'source' && action !== 'openOutline') {
             markAsEdited(); // User has made an edit
         }
 
@@ -11867,16 +11873,22 @@
     const closeSidebarBtn = document.getElementById('closeSidebar');
     const sidebarResizer = document.getElementById('sidebarResizer');
     
+    function setSidebarOpen(open) {
+        sidebar.classList.toggle('hidden', !open);
+        openSidebarBtn.classList.toggle('hidden', open);
+        if (!open) {
+            // Clear inline width so .hidden class can take effect
+            sidebar.style.width = '';
+        }
+        host.reportOutlineState(open);
+    }
+
     function openSidebar() {
-        sidebar.classList.remove('hidden');
-        openSidebarBtn.classList.add('hidden');
+        setSidebarOpen(true);
     }
     
     function closeSidebar() {
-        sidebar.classList.add('hidden');
-        // Clear inline width so .hidden class can take effect
-        sidebar.style.width = '';
-        openSidebarBtn.classList.remove('hidden');
+        setSidebarOpen(false);
     }
     
     // Close sidebar button handler

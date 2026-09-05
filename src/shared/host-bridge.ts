@@ -15,6 +15,7 @@ export interface HostBridge {
     reportEditingState(editing: boolean): void;
     reportFocus(): void;
     reportBlur(): void;
+    reportOutlineState(open: boolean): void;
 
     // ホスト側 UI が必要な操作
     openLink(href: string): void;

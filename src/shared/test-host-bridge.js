@@ -33,6 +33,9 @@
         reportBlur: function() {
             window.__testApi.messages.push({ type: 'webviewBlur' });
         },
+        reportOutlineState: function(open) {
+            window.__testApi.messages.push({ type: 'outlineStateChanged', open: open });
+        },
 
         // ホスト側 UI が必要な操作
         openLink: function(href) {

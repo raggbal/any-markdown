@@ -26,6 +26,9 @@
         reportBlur: function() {
             api.postMessage({ type: 'webviewBlur' });
         },
+        reportOutlineState: function(open) {
+            api.postMessage({ type: 'outlineStateChanged', open: open });
+        },
 
         // ホスト側 UI が必要な操作
         openLink: function(href) {

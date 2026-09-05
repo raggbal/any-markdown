@@ -11089,8 +11089,8 @@
 
         const action = btn.dataset.action;
 
-        // Source toggle doesn't count as an edit
-        if (action !== 'source') {
+        // View-only actions do not change Markdown content
+        if (action !== 'source' && action !== 'openOutline') {
             markAsEdited(); // User has made an edit
         }
 
@@ -11646,16 +11646,22 @@
     const closeSidebarBtn = document.getElementById('closeSidebar');
     const sidebarResizer = document.getElementById('sidebarResizer');
     
+    function setSidebarOpen(open) {
+        sidebar.classList.toggle('hidden', !open);
+        openSidebarBtn.classList.toggle('hidden', open);
+        if (!open) {
+            // Clear inline width so .hidden class can take effect
+            sidebar.style.width = '';
+        }
+        host.reportOutlineState(open);
+    }
+
     function openSidebar() {
-        sidebar.classList.remove('hidden');
-        openSidebarBtn.classList.add('hidden');
+        setSidebarOpen(true);
     }
     
     function closeSidebar() {
-        sidebar.classList.add('hidden');
-        // Clear inline width so .hidden class can take effect
-        sidebar.style.width = '';
-        openSidebarBtn.classList.remove('hidden');
+        setSidebarOpen(false);
     }
     
     // Close sidebar button handler

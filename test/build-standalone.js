@@ -166,15 +166,18 @@ const html = `<!DOCTYPE html>
     </style>
 </head>
 <body>
-    <div id="sidebar" style="display:none;"><div id="outline"></div></div>
-    <div id="sidebarResizer" style="display:none;"></div>
-    <div id="toolbar" style="display:none;"></div>
+    <div id="sidebar" class="sidebar" style="display:none;">
+        <button id="closeSidebar"></button>
+        <div id="outline"></div>
+        <div id="sidebarResizer"></div>
+    </div>
+    <div id="toolbar" style="display:none;">
+        <button data-action="openOutline" class="hidden" id="openSidebarBtn"></button>
+    </div>
     <div id="statusLeft" style="display:none;"></div>
     <div id="statusImageDir" style="display:none;"></div>
     <div id="wordCount" style="display:none;"></div>
     <div id="sourceEditor" style="display:none;"></div>
-    <button id="closeSidebar" style="display:none;"></button>
-    <button id="openSidebarBtn" style="display:none;"></button>
     <!-- Search & Replace elements (hidden, required by script) -->
     <div id="searchReplaceBox" style="display:none;">
         <input id="searchInput" type="text">

@@ -2,6 +2,21 @@ import * as vscode from 'vscode';
 import { getWebviewContent } from './webviewContent';
 import { t, getWebviewMessages, initLocale } from './i18n/messages';
 
+type OutlineStateScope = 'file' | 'global';
+
+interface OutlineStateStoreContract {
+    getOpen(scope: OutlineStateScope, resourceKey: string, defaultOpen: boolean): boolean;
+    setOpen(scope: OutlineStateScope, resourceKey: string, open: boolean): Promise<void>;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { OutlineStateStore } = require('./shared/outline-state-store') as {
+    OutlineStateStore: new (
+        workspaceState: vscode.Memento,
+        globalState: vscode.Memento
+    ) => OutlineStateStoreContract;
+};
+
 // ============================================
 // DocumentParser: IMAGE_DIR ディレクティブの解析
 // ============================================
@@ -326,8 +341,11 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
 
     // Track the currently active webview panel for undo/redo command forwarding
     private activeWebviewPanel: vscode.WebviewPanel | undefined;
+    private readonly outlineStateStore: OutlineStateStoreContract;
 
-    constructor(private readonly context: vscode.ExtensionContext) {}
+    constructor(private readonly context: vscode.ExtensionContext) {
+        this.outlineStateStore = new OutlineStateStore(context.workspaceState, context.globalState);
+    }
 
     /**
      * Send undo command to the active webview
@@ -415,6 +433,13 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
             try {
                 const config = vscode.workspace.getConfiguration('any-markdown');
                 const content = convertImagePaths(document.getText());
+                const outlineScope = config.get<OutlineStateScope>('outlineStateScope', 'file');
+                const outlineDefaultOpen = config.get<boolean>('outlineDefaultOpen', true);
+                const outlineOpen = this.outlineStateStore.getOpen(
+                    outlineScope,
+                    document.uri.toString(),
+                    outlineDefaultOpen
+                );
                 webviewPanel.webview.html = getWebviewContent(
                     webviewPanel.webview,
                     this.context.extensionUri,
@@ -425,7 +450,8 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
                         toolbarMode: config.get<string>('toolbarMode', 'full'),
                         documentBaseUri: documentBaseUri,
                         webviewMessages: getWebviewMessages(),
-                        enableDebugLogging: config.get<boolean>('enableDebugLogging', false)
+                        enableDebugLogging: config.get<boolean>('enableDebugLogging', false),
+                        outlineOpen
                     }
                 );
             } catch (error) {
@@ -662,6 +688,24 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
                     webviewHasFocus = false;
                     isActivelyEditing = false;
                     break;
+
+                case 'outlineStateChanged': {
+                    if (typeof message.open !== 'boolean') {
+                        break;
+                    }
+                    const outlineConfig = vscode.workspace.getConfiguration('any-markdown');
+                    const outlineScope = outlineConfig.get<OutlineStateScope>('outlineStateScope', 'file');
+                    try {
+                        await this.outlineStateStore.setOpen(
+                            outlineScope,
+                            document.uri.toString(),
+                            message.open
+                        );
+                    } catch (error) {
+                        console.error('[Any MD] Failed to persist outline state:', error);
+                    }
+                    break;
+                }
 
                 case 'insertImage':
                     await this.handleImageInsert(document, webviewPanel.webview);

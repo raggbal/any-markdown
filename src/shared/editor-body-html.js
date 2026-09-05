@@ -5,15 +5,19 @@
  *
  * @param {Record<string, string>} messages - i18n メッセージ
  * @param {string} platform - process.platform ('darwin' | 'win32' | 'linux')
+ * @param {{ outlineOpen?: boolean }} [options] - editor UI state
  * @returns {string} <div class="container">...</div> の HTML文字列
  */
-function generateEditorBodyHtml(messages, platform) {
+function generateEditorBodyHtml(messages, platform, options) {
     const msg = messages || {};
     const m = (key) => msg[key] || '';
     const mod = platform === 'darwin' ? 'Cmd' : 'Ctrl';
+    const outlineOpen = !options || options.outlineOpen !== false;
+    const sidebarClass = outlineOpen ? 'sidebar' : 'sidebar hidden';
+    const openButtonClass = outlineOpen ? 'menu-btn hidden' : 'menu-btn';
 
     return `<div class="container">
-        <aside class="sidebar" id="sidebar">
+        <aside class="${sidebarClass}" id="sidebar">
             <div class="sidebar-header">
                 <h3>Outline</h3>
                 <button class="sidebar-toggle" id="closeSidebar" title="${m('closeOutline')}">&#9776;</button>
@@ -39,7 +43,7 @@ function generateEditorBodyHtml(messages, platform) {
         <main class="editor-container">
             <div class="toolbar" id="toolbar">
                 <div class="toolbar-fixed toolbar-fixed--left">
-                    <button data-action="openOutline" class="menu-btn hidden" id="openSidebarBtn" title="${m('openOutline')}"></button>
+                    <button data-action="openOutline" class="${openButtonClass}" id="openSidebarBtn" title="${m('openOutline')}"></button>
                     <div class="toolbar-group" data-group="history">
                         <button data-action="undo" title="${m('undo')}"></button>
                         <button data-action="redo" title="${m('redo')}"></button>

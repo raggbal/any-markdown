@@ -22,6 +22,7 @@ interface EditorConfig {
     documentBaseUri?: string;
     webviewMessages?: WebviewMessages;
     enableDebugLogging?: boolean;
+    outlineOpen?: boolean;
 }
 
 export function getWebviewContent(
@@ -55,7 +56,8 @@ export function getWebviewContent(
         toolbarMode: config?.toolbarMode ?? 'full',
         documentBaseUri: config?.documentBaseUri ?? '',
         webviewMessages: config?.webviewMessages,
-        enableDebugLogging: config?.enableDebugLogging ?? false
+        enableDebugLogging: config?.enableDebugLogging ?? false,
+        outlineOpen: config?.outlineOpen ?? true
     };
     
     const nonce = getNonce();
@@ -108,7 +110,7 @@ export function getWebviewContent(
     </style>
 </head>
 <body>
-    ${generateEditorBodyHtml(msg, process.platform)}
+    ${generateEditorBodyHtml(msg, process.platform, { outlineOpen: safeConfig.outlineOpen })}
 
     <script src="${turndownUri}"></script>
     <script src="${turndownGfmUri}"></script>
