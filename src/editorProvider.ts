@@ -327,6 +327,9 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
     // Track the currently active webview panel for undo/redo command forwarding
     private activeWebviewPanel: vscode.WebviewPanel | undefined;
 
+    // Open panels by document URI, used to scroll the target editor after following a link
+    private readonly panelsByDocument = new Map<string, vscode.WebviewPanel>();
+
     constructor(private readonly context: vscode.ExtensionContext) {}
 
     /**
@@ -408,6 +411,8 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
             });
         };
         
+        this.panelsByDocument.set(document.uri.toString(), webviewPanel);
+
         // Remember the original line ending style to preserve on save
         const originalEol = document.eol;
 
@@ -553,6 +558,10 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
                         const newContent = new TextDecoder().decode(fileContent);
                         const currentContent = document.getText();
 
+                        // Never replace unsaved edits with the file on disk. This event also fires
+                        // for our own saves, and the user may have kept typing since then.
+                        if (document.isDirty || pendingContent !== null || isApplyingOwnEdit) return;
+
                         if (newContent !== currentContent) {
                             // Sync VS Code document with file content (triggers onDidChangeTextDocument)
                             isApplyingOwnEdit = true;
@@ -601,38 +610,44 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
         let editDebounceTimer: NodeJS.Timeout | null = null;
         let applyEditQueue: Promise<void> = Promise.resolve();
 
+        const flushPendingEdit = (): Promise<void> => {
+            if (editDebounceTimer) {
+                clearTimeout(editDebounceTimer);
+                editDebounceTimer = null;
+            }
+            const contentToApply = pendingContent;
+            pendingContent = null;
+            if (contentToApply === null) return applyEditQueue;
+
+            applyEditQueue = applyEditQueue.then(async () => {
+                try {
+                    // Skip if content is identical — prevents unnecessary dirty marking
+                    const normalize = (s: string) => s.replace(/\r\n/g, '\n');
+                    if (normalize(contentToApply) === normalize(document.getText())) return;
+
+                    isApplyingOwnEdit = true;
+                    const edit = new vscode.WorkspaceEdit();
+                    edit.replace(
+                        document.uri,
+                        new vscode.Range(0, 0, document.lineCount, 0),
+                        contentToApply
+                    );
+                    await vscode.workspace.applyEdit(edit);
+                } catch (e) {
+                    console.log('[Any MD] Edit error (ignored):', e);
+                } finally {
+                    isApplyingOwnEdit = false;
+                }
+            });
+            return applyEditQueue;
+        };
+
         const scheduleEdit = (content: string) => {
             pendingContent = content;
             if (editDebounceTimer) {
                 clearTimeout(editDebounceTimer);
             }
-            editDebounceTimer = setTimeout(() => {
-                editDebounceTimer = null;
-                const contentToApply = pendingContent;
-                pendingContent = null;
-                if (contentToApply === null) return;
-
-                applyEditQueue = applyEditQueue.then(async () => {
-                    try {
-                        // Skip if content is identical — prevents unnecessary dirty marking
-                        const normalize = (s: string) => s.replace(/\r\n/g, '\n');
-                        if (normalize(contentToApply) === normalize(document.getText())) return;
-
-                        isApplyingOwnEdit = true;
-                        const edit = new vscode.WorkspaceEdit();
-                        edit.replace(
-                            document.uri,
-                            new vscode.Range(0, 0, document.lineCount, 0),
-                            contentToApply
-                        );
-                        await vscode.workspace.applyEdit(edit);
-                    } catch (e) {
-                        console.log('[Any MD] Edit error (ignored):', e);
-                    } finally {
-                        isApplyingOwnEdit = false;
-                    }
-                });
-            }, 100);
+            editDebounceTimer = setTimeout(flushPendingEdit, 100);
         };
 
         // Handle messages from the webview
@@ -647,6 +662,8 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
                     break;
 
                 case 'save':
+                    // The debounced edit must land first, otherwise the previous text is saved
+                    await flushPendingEdit();
                     await document.save();
                     break;
 
@@ -707,11 +724,7 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
                         });
                     } else {
                         // Handle internal links
-                        const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri);
-                        if (workspaceFolder) {
-                            const linkUri = vscode.Uri.joinPath(workspaceFolder.uri, message.href);
-                            vscode.commands.executeCommand('vscode.open', linkUri);
-                        }
+                        await this.openInternalLink(document, message.href);
                     }
                     break;
 
@@ -851,11 +864,59 @@ export class AnyMarkdownEditorProvider implements vscode.CustomTextEditorProvide
             if (this.activeWebviewPanel === webviewPanel) {
                 this.activeWebviewPanel = undefined;
             }
+            if (this.panelsByDocument.get(document.uri.toString()) === webviewPanel) {
+                this.panelsByDocument.delete(document.uri.toString());
+            }
             changeDocumentSubscription.dispose();
             changeConfigSubscription.dispose();
             fileChangeSubscription.dispose();
             fileWatcher.dispose();
         });
+    }
+
+    /**
+     * Open a relative link the way Markdown resolves it: from the current document's
+     * directory. Links that only exist from the workspace root still work as a fallback.
+     */
+    private async openInternalLink(document: vscode.TextDocument, href: string) {
+        const decode = (s: string) => {
+            try {
+                return decodeURIComponent(s);
+            } catch {
+                return s;
+            }
+        };
+        const hashIndex = href.indexOf('#');
+        const linkPath = decode(hashIndex === -1 ? href : href.substring(0, hashIndex));
+        const anchor = hashIndex === -1 ? '' : decode(href.substring(hashIndex + 1));
+
+        const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri);
+        const candidates: vscode.Uri[] = [];
+        if (!linkPath.startsWith('/')) {
+            candidates.push(vscode.Uri.joinPath(document.uri, '..', linkPath));
+        }
+        if (workspaceFolder) {
+            candidates.push(vscode.Uri.joinPath(workspaceFolder.uri, linkPath));
+        }
+        if (linkPath.startsWith('/')) {
+            candidates.push(vscode.Uri.file(linkPath));
+        }
+
+        let target = candidates[0];
+        for (const candidate of candidates) {
+            try {
+                await vscode.workspace.fs.stat(candidate);
+                target = candidate;
+                break;
+            } catch {
+                // Try the next candidate
+            }
+        }
+
+        await vscode.commands.executeCommand('vscode.open', target);
+        if (anchor) {
+            this.panelsByDocument.get(target.toString())?.webview.postMessage({ type: 'scrollToAnchor', anchor });
+        }
     }
 
     private async handleImageInsert(document: vscode.TextDocument, webview: vscode.Webview) {
