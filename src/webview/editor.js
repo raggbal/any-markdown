@@ -11922,8 +11922,10 @@
             e.stopPropagation();
             // Flush pending sync before save, then reset edit flag
             clearTimeout(syncTimeout);
+            clearTimeout(saveTimeout);
             if (hasUserEdited) {
-                markdown = htmlToMarkdown();
+                // The WYSIWYG DOM is stale in source mode
+                markdown = isSourceMode ? sourceEditor.value : htmlToMarkdown();
                 host.syncContent(markdown);
             }
             host.save();
